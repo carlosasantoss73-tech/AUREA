@@ -10,7 +10,7 @@ const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u0
 export const technologyRadarContextProvider: ContextProvider = {
   async retrieve(input): Promise<RetrievedContext> {
     const q = normalize(input.query);
-    const terms = q.split(/\s+/).filter(term => term.length >= 4);
+    const terms = q.split(/\s+/).filter(term => term.length >= 3);
     const matches = TECHNOLOGY_RADAR_B11.filter(candidate => {
       const haystack = normalize(`${candidate.name} ${candidate.function} ${candidate.notes}`);
       return terms.some(term => haystack.includes(term));
