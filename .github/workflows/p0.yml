@@ -2,7 +2,7 @@ name: AUREA P0
 
 on:
   push:
-    branches: [main, p0-functionalization, b13-hardening]
+    branches: [main, p0-functionalization, b13-hardening, b14-context-retrieval-v2]
   pull_request:
     branches: [main]
 
