@@ -2,7 +2,7 @@ name: AUREA P0
 
 on:
   push:
-    branches: [main, p0-functionalization]
+    branches: [main, p0-functionalization, b13-hardening]
   pull_request:
     branches: [main]
 
