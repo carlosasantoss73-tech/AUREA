@@ -6,6 +6,16 @@ import { ContextRetrievalGate, RetrievedContext } from "../context/context-retri
 export interface RegisteredTool { toolId: string; effectClass: HarnessRequest["effectClass"]; execute: (payload: unknown) => Promise<unknown> | unknown; }
 export interface RuntimeResult { traceId: string; status: "EXECUTED" | "BLOCKED" | "TOOL_NOT_REGISTERED" | "DRY_RUN"; reason: string; result?: unknown; context?: RetrievedContext; }
 
+function inferContextQuery(request: HarnessRequest): string | undefined {
+  if (request.contextQuery?.trim()) return request.contextQuery.trim();
+  if (typeof request.payload === "string" && request.payload.trim()) return request.payload.trim();
+  if (request.payload && typeof request.payload === "object" && !Array.isArray(request.payload)) {
+    const candidate = (request.payload as Record<string, unknown>).query;
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  return undefined;
+}
+
 export class AureaRuntime {
   private readonly tools = new Map<string, RegisteredTool>();
   constructor(private readonly contextGate?: ContextRetrievalGate) {}
@@ -16,20 +26,19 @@ export class AureaRuntime {
     const tool = this.tools.get(request.toolId);
     if (!tool) return { traceId, status: "TOOL_NOT_REGISTERED", reason: "TOOL_NOT_REGISTERED_OR_ALLOWED" };
     if (tool.effectClass !== request.effectClass) return { traceId, status: "BLOCKED", reason: "EFFECT_CLASS_MISMATCH" };
-
     const envelope = buildExecutionEnvelope(request, traceId);
     const supervision = supervise(envelope);
     if (!supervision.approved) return { traceId: envelope.traceId, status: "BLOCKED", reason: supervision.reason };
     assertExecutable(envelope);
 
     let context: RetrievedContext | undefined;
-    if (this.contextGate && request.contextQuery) {
-      const retrieval = await this.contextGate.retrieve({ actorId: request.actorId, actorRole: request.actorRole, projectId: request.projectId, query: request.contextQuery, allowedProjects: request.allowedProjects, allowedCapabilities: request.allowedCapabilities, allowedTools: request.allowedTools });
+    const contextQuery = inferContextQuery(request);
+    if (this.contextGate && contextQuery) {
+      const retrieval = await this.contextGate.retrieve({ actorId: request.actorId, actorRole: request.actorRole, projectId: request.projectId, query: contextQuery, allowedProjects: request.allowedProjects, allowedCapabilities: request.allowedCapabilities, allowedTools: request.allowedTools });
       if (retrieval.status === "BLOCKED") return { traceId: envelope.traceId, status: "BLOCKED", reason: `CONTEXT_${retrieval.reason}` };
       if (retrieval.status === "EMPTY") return { traceId: envelope.traceId, status: "BLOCKED", reason: "CONTEXT_REQUIRED_BUT_NOT_FOUND" };
       context = retrieval.context;
     }
-
     if (request.dryRun) return { traceId: envelope.traceId, status: "DRY_RUN", reason: "DRY_RUN_NO_TOOL_EXECUTION", context };
     const payload = context
       ? (envelope.payload && typeof envelope.payload === "object" && !Array.isArray(envelope.payload) ? { ...(envelope.payload as Record<string, unknown>), __aureaContext: context } : { payload: envelope.payload, __aureaContext: context })
