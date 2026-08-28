@@ -3,21 +3,24 @@ import { buildExecutionEnvelope, assertExecutable, HarnessRequest } from "./aure
 import { supervise } from "./aurea-supervisor";
 
 export interface RegisteredTool { toolId: string; effectClass: HarnessRequest["effectClass"]; execute: (payload: unknown) => Promise<unknown> | unknown; }
-export interface RuntimeResult { traceId: string; status: "EXECUTED" | "BLOCKED" | "TOOL_NOT_REGISTERED"; reason: string; result?: unknown; }
+export interface RuntimeResult { traceId: string; status: "EXECUTED" | "BLOCKED" | "TOOL_NOT_REGISTERED" | "DRY_RUN"; reason: string; result?: unknown; }
 
 export class AureaRuntime {
   private readonly tools = new Map<string, RegisteredTool>();
   registerTool(tool: RegisteredTool): void { this.tools.set(tool.toolId, tool); }
 
   async execute(request: HarnessRequest): Promise<RuntimeResult> {
+    const traceId = crypto.randomUUID();
     const tool = this.tools.get(request.toolId);
-    if (!tool) return { traceId: "", status: "TOOL_NOT_REGISTERED", reason: "TOOL_NOT_REGISTERED_OR_ALLOWED" };
-    if (tool.effectClass !== request.effectClass) return { traceId: "", status: "BLOCKED", reason: "EFFECT_CLASS_MISMATCH" };
+    if (!tool) return { traceId, status: "TOOL_NOT_REGISTERED", reason: "TOOL_NOT_REGISTERED_OR_ALLOWED" };
+    if (tool.effectClass !== request.effectClass) return { traceId, status: "BLOCKED", reason: "EFFECT_CLASS_MISMATCH" };
 
-    const envelope = buildExecutionEnvelope(request);
+    const envelope = buildExecutionEnvelope(request, traceId);
     const supervision = supervise(envelope);
     if (!supervision.approved) return { traceId: envelope.traceId, status: "BLOCKED", reason: supervision.reason };
     assertExecutable(envelope);
+
+    if (request.dryRun) return { traceId: envelope.traceId, status: "DRY_RUN", reason: "DRY_RUN_NO_TOOL_EXECUTION" };
 
     const result = await tool.execute(envelope.payload);
     return { traceId: envelope.traceId, status: "EXECUTED", reason: "EXECUTION_ALLOWED", result };
