@@ -13,13 +13,18 @@ describe("AUREA B14 Context Retrieval Gate", () => {
     expect(requiresHistoricalContext("continúa con lo que hicimos ayer")).toBe(true);
     expect(requiresHistoricalContext("crea un video nuevo")).toBe(false);
   });
-  it("retrieves automatically", async () => {
+  it("retrieves automatically for explicit continuity", async () => {
     const result = await new ContextRetrievalGate(provider()).retrieve(req("¿Qué herramientas trabajamos esta semana?"));
     expect(result.status).toBe("READY");
     expect(result.context?.facts).toContain("fact recovered");
   });
-  it("does not retrieve when continuity is not indicated", async () => {
-    const result = await new ContextRetrievalGate(provider()).retrieve(req("Genera un anuncio vertical"));
+  it("retrieves relevant context even without an explicit continuity phrase", async () => {
+    const result = await new ContextRetrievalGate(provider(["Krea queda como candidata prioritaria"], [{ sourceId: "decision-test", version: 1 }])).retrieve(req("¿Qué decisión creativa tomamos sobre Krea?"));
+    expect(result.status).toBe("READY");
+    expect(result.context?.facts).toContain("Krea queda como candidata prioritaria");
+  });
+  it("does not fail ordinary requests when no relevant context exists", async () => {
+    const result = await new ContextRetrievalGate(provider([], [])).retrieve(req("Genera un anuncio vertical"));
     expect(result.status).toBe("NOT_NEEDED");
   });
   it("blocks cross-project retrieval", async () => {
