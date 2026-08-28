@@ -24,7 +24,7 @@ export class ContextRetrievalGate {
   constructor(private readonly provider: ContextProvider) {}
   async retrieve(request: ContextRetrievalRequest): Promise<ContextRetrievalResult> {
     const traceId = crypto.randomUUID();
-    if (!requiresHistoricalContext(request.query)) return { traceId, status: "NOT_NEEDED", reason: "NO_CONTINUITY_SIGNAL" };
+    const historical = requiresHistoricalContext(request.query);
     const permissionRequest: PermissionRequest = {
       actorId: request.actorId, actorRole: request.actorRole, projectId: request.projectId,
       capabilityId: "knowledge.read", toolId: "knowledge.search", action: "retrieve_context", effectClass: "READ",
@@ -33,7 +33,11 @@ export class ContextRetrievalGate {
     const permission = evaluatePermission(permissionRequest, traceId);
     if (!["ALLOW", "ALLOW_WITH_LIMITS"].includes(permission.decision)) return { traceId, status: "BLOCKED", reason: permission.reason };
     const context = await this.provider.retrieve({ projectId: request.projectId, query: request.query, traceId });
-    if (!context.citations.length && !context.facts.length) return { traceId, status: "EMPTY", reason: "HISTORICAL_CONTEXT_NOT_FOUND" };
-    return { traceId, status: "READY", reason: "HISTORICAL_CONTEXT_RETRIEVED", context };
+    if (!context.citations.length && !context.facts.length) {
+      return historical
+        ? { traceId, status: "EMPTY", reason: "HISTORICAL_CONTEXT_NOT_FOUND" }
+        : { traceId, status: "NOT_NEEDED", reason: "NO_RELEVANT_CONTEXT_FOUND" };
+    }
+    return { traceId, status: "READY", reason: historical ? "HISTORICAL_CONTEXT_RETRIEVED" : "RELEVANT_CONTEXT_RETRIEVED", context };
   }
 }
