@@ -8,7 +8,7 @@ describe("AUREA Runtime librarian integration contract", () => {
     runtime.registerTool({
       toolId: "knowledge.search",
       effectClass: "READ",
-      execute: payload => { calls.push(payload); return { records: ["r1"], sourceCount: 1 }; }
+      execute: (payload: unknown) => { calls.push(payload); return { records: ["r1"], sourceCount: 1 }; }
     });
 
     const result = await runtime.execute({
