@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { ContextRecord, ContextStore, createStoreContextProvider } from "./durable-context-store";
-import { ContextProvider, RetrievedContext } from "./context-retrieval-gate";
+import { ContextProvider } from "./context-retrieval-gate";
 
 /** File-backed store for deployments that do not yet have a database adapter. */
 export class JsonContextStore implements ContextStore {
@@ -13,7 +13,7 @@ export class JsonContextStore implements ContextStore {
     if (this.loaded) return;
     try {
       const raw = await fs.readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw new Error("CONTEXT_STORE_INVALID_FORMAT");
       this.cache = parsed as ContextRecord[];
     } catch (error) {
@@ -31,7 +31,9 @@ export class JsonContextStore implements ContextStore {
     const terms = normalize(query).split(/\s+/).filter(term => term.length >= 3);
     return this.cache.filter(record => record.projectId === projectId)
       .map(record => ({ record, score: terms.reduce((score, term) => score + (normalize(`${record.title} ${record.text} ${(record.tags ?? []).join(" ")}`).includes(term) ? 1 : 0), 0) }))
-      .filter(item => item.score > 0).sort((a,b) => b.score-a.score || a.record.id.localeCompare(b.record.id)).map(item => item.record);
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.record.id.localeCompare(b.record.id))
+      .map(item => item.record);
   }
 
   async initialize(): Promise<void> { await this.ensureLoaded(); }
@@ -44,7 +46,9 @@ export class JsonContextStore implements ContextStore {
       this.cache[index] = record;
     } else this.cache.push(record);
     await fs.mkdir(dirname(this.filePath), { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify(this.cache, null, 2), "utf8");
+    const temporaryPath = join(dirname(this.filePath), `.${this.filePath.split(/[\\/]/).pop()}.tmp-${process.pid}-${Date.now()}`);
+    await fs.writeFile(temporaryPath, JSON.stringify(this.cache, null, 2), "utf8");
+    await fs.rename(temporaryPath, this.filePath);
   }
 }
 
