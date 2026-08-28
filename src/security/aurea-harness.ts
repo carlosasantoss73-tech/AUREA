@@ -4,6 +4,7 @@ import { evaluatePermission, PermissionRequest, PermissionResult } from "./permi
 export interface HarnessRequest extends PermissionRequest {
   payload?: unknown;
   dryRun?: boolean;
+  contextQuery?: string;
 }
 
 export interface ExecutionEnvelope {
@@ -21,7 +22,5 @@ export function buildExecutionEnvelope(request: HarnessRequest, traceId = crypto
 }
 
 export function assertExecutable(envelope: ExecutionEnvelope): void {
-  if (envelope.status !== "READY") {
-    throw new Error(`AUREA_HARNESS_BLOCKED:${envelope.permission.reason}`);
-  }
+  if (envelope.status !== "READY") throw new Error(`AUREA_HARNESS_BLOCKED:${envelope.permission.reason}`);
 }
