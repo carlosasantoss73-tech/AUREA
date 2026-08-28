@@ -4,7 +4,7 @@ import { AureaRuntime } from "./aurea-runtime";
 describe("AUREA Runtime P0", () => {
   it("executes only a registered tool through Gateway → Harness → Supervisor", async () => {
     const runtime = new AureaRuntime();
-    runtime.registerTool({ toolId: "knowledge.search", effectClass: "READ", execute: p => ({ received: p }) });
+    runtime.registerTool({ toolId: "knowledge.search", effectClass: "READ", execute: (p: unknown) => ({ received: p }) });
     const result = await runtime.execute({
       actorId: "agent-1", actorRole: "agent", projectId: "p1", capabilityId: "knowledge.read",
       toolId: "knowledge.search", action: "read", effectClass: "READ",
