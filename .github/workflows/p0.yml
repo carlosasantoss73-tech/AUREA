@@ -2,12 +2,16 @@ name: AUREA P0
 
 on:
   push:
-    branches: [main, p0-functionalization]
+    branches: [main, p0-functionalization, b13-hardening]
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
+
+concurrency:
+  group: aurea-p0-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
