@@ -21,15 +21,18 @@ export interface IngestionResult {
  */
 export async function ingestEvidence(store: ContextStore & { upsert?: (record: ContextRecord) => Promise<void> }, input: IngestionInput): Promise<IngestionResult> {
   const existing = store.records.find(record => record.id === stableId(input));
-  const version = input.version ?? (existing ? existing.version + 1 : 1);
+  if (existing && existing.text === input.text && existing.title === input.title && existing.sourceId === input.sourceId && JSON.stringify(existing.tags ?? []) === JSON.stringify(input.tags ?? [])) {
+    return { action: "UNCHANGED", record: existing };
+  }
+
+  const version = existing
+    ? Math.max(existing.version + 1, input.version ?? 0)
+    : (input.version ?? 1);
   const record: ContextRecord = {
     id: stableId(input), projectId: input.projectId, title: input.title, text: input.text,
     sourceId: input.sourceId, version, tags: input.tags,
   };
   if (!store.upsert) throw new Error("CONTEXT_STORE_NOT_WRITABLE");
-  if (existing && existing.version === record.version && existing.text === record.text && existing.title === record.title && JSON.stringify(existing.tags ?? []) === JSON.stringify(record.tags ?? [])) {
-    return { action: "UNCHANGED", record: existing };
-  }
   await store.upsert(record);
   return { action: existing ? "UPDATED" : "CREATED", record };
 }
