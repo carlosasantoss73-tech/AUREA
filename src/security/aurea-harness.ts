@@ -4,6 +4,8 @@ import { evaluatePermission, PermissionRequest, PermissionResult } from "./permi
 export interface HarnessRequest extends PermissionRequest {
   payload?: unknown;
   dryRun?: boolean;
+  /** Optional user-intent query used by the automatic Context Retrieval Gate. */
+  contextQuery?: string;
 }
 
 export interface ExecutionEnvelope {
