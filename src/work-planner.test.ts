@@ -54,7 +54,7 @@ describe("AUREA pre-build work planner", () => {
   });
 
   it("requires review when no reusable asset is found", async () => {
-    const planner = new WorkPlanner({ async searchAssets: async () => [] });
+    const planner = new WorkPlanner({ searchAssets: () => Promise.resolve([]) });
     const plan = await planner.plan({
       projectId: "sales-ai",
       objective: "voz",
