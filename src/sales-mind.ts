@@ -19,7 +19,7 @@ export function assessListening(input: ConversationInput): ListeningAssessment {
   if (/\b(no|pero|sin embargo|dif[ií]cil|caro|duda|dudas|problema)\b/.test(lower)) signals.push("OBJECTION");
   if (/\b(quiero|busco|necesito|me interesa|quisiera)\b/.test(lower)) signals.push("NEED");
   if (/\b(comprar|reservar|contratar|agendar|avanzar|listo)\b/.test(lower)) signals.push("BUYING_SIGNAL");
-  if (/\b(no s[eé]|no estoy seguro|tal vez|quiz[aá]s)\b/.test(lower)) signals.push("UNCERTAINTY");
+  if (/\b(no s[eé]|no estoy seguro|tal vez|quiz[aá]s|no sé qué me conviene|no se que me conviene|estoy indeciso|indecisa|no tengo claro|no tengo clara)\b/.test(lower)) signals.push("UNCERTAINTY");
   if (/\b(hablar con|asesor|persona|humano)\b/.test(lower)) signals.push("HANDOFF_SIGNAL");
   if (signals.includes("NEED")) inferredNeeds.push("Necesidad explícita; falta determinar prioridad y contexto.");
   if (signals.includes("OBJECTION")) inferredNeeds.push("Posible barrera que debe comprenderse antes de intentar cerrar.");
