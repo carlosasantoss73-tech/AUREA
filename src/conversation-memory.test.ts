@@ -19,7 +19,7 @@ describe("AUREA Conversation Memory", () => {
     expect(next.turnCount).toBe(1);
   });
 
-  it("recovers the latest operational context", () => {
+  it("recovers the latest operational context and preserves the resilience decision", () => {
     const memory = createConversationMemory("c-2", "vender", "2026-09-02T00:00:00.000Z");
     const result = runSalesMind({ message: "Está caro, sigo con la misma duda", objective: "vender" });
     const resilience = decideResilience(result, {
@@ -33,7 +33,7 @@ describe("AUREA Conversation Memory", () => {
 
     expect(recovered.conversationId).toBe("c-2");
     expect(recovered.lastDecision).toBe("HANDLE_OBJECTION");
-    expect(recovered.lastResilienceAction).toBe("CONTINUE");
+    expect(recovered.lastResilienceAction).toBe("CHANGE_APPROACH");
     expect(recovered.objections).toHaveLength(1);
   });
 
