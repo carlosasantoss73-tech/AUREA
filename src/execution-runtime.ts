@@ -42,6 +42,12 @@ export interface ExecutionRuntimeResult {
   replayOfTraceId?: string;
 }
 
+export interface ExecutionRuntimeRequest {
+  admission: RuntimeAdmissionResult;
+  provider: ProviderRuntimeAdapter;
+  input: unknown;
+}
+
 /**
  * Executes only an already-admitted request. Unknown adapters and malformed
  * success responses fail closed. A traceId is also an idempotency key for the
@@ -58,10 +64,8 @@ export class ExecutionRuntime {
     this.adapters.set(adapter.providerId, adapter);
   }
 
-  async execute(
-    admission: RuntimeAdmissionResult,
-    input: unknown,
-  ): Promise<ExecutionRuntimeResult> {
+  async execute(request: ExecutionRuntimeRequest): Promise<ExecutionRuntimeResult> {
+    const { admission, provider, input } = request;
     const traceId = admission.execution?.permission.traceId ?? "UNKNOWN_TRACE";
 
     if (admission.status !== "ADMITTED" || admission.execution?.status !== "AUTHORIZED") {
@@ -70,6 +74,28 @@ export class ExecutionRuntime {
         traceId,
         evidence: [...admission.evidence],
         error: "EXECUTION_REQUIRES_ADMITTED_AUTHORIZED_RUNTIME",
+      };
+    }
+
+    if (admission.providerId !== provider.providerId) {
+      return {
+        status: "BLOCKED",
+        traceId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
+        evidence: [...admission.evidence],
+        error: "EXECUTION_PROVIDER_MISMATCH",
+      };
+    }
+
+    if (provider.status !== "EXECUTABLE") {
+      return {
+        status: "BLOCKED",
+        traceId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
+        evidence: [...admission.evidence, `PROVIDER_STATUS:${provider.status}`],
+        error: "EXECUTION_PROVIDER_NOT_EXECUTABLE",
       };
     }
 
@@ -83,43 +109,26 @@ export class ExecutionRuntime {
       };
     }
 
-    if (!admission.providerId) {
-      return {
-        status: "BLOCKED",
-        traceId,
-        evidence: [...admission.evidence],
-        error: "EXECUTION_PROVIDER_ID_MISSING",
-      };
-    }
-
-    const adapter = this.adapters.get(admission.providerId);
+    const adapter = this.adapters.get(provider.providerId);
     if (!adapter) {
       return {
         status: "BLOCKED",
         traceId,
-        providerId: admission.providerId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
         evidence: [...admission.evidence],
-        error: `EXECUTION_ADAPTER_NOT_REGISTERED:${admission.providerId}`,
+        error: `EXECUTION_ADAPTER_NOT_REGISTERED:${provider.providerId}`,
       };
     }
 
-    const provider = admission.execution.workCell
-      ? {
-          providerId: admission.providerId,
-          modelId: "UNKNOWN_MODEL",
-          status: "EXECUTABLE" as const,
-          capabilities: [],
-          healthEvidence: [],
-        }
-      : undefined;
-
     try {
-      const response = await adapter.execute({ traceId, provider: provider!, input });
+      const response = await adapter.execute({ traceId, provider, input });
       if (!response || !Array.isArray(response.evidence) || response.evidence.length === 0) {
         return {
           status: "FAILED",
           traceId,
-          providerId: admission.providerId,
+          providerId: provider.providerId,
+          modelId: provider.modelId,
           evidence: [...admission.evidence],
           error: "EXECUTION_RESULT_EVIDENCE_REQUIRED",
         };
@@ -128,8 +137,8 @@ export class ExecutionRuntime {
       const result: ExecutionRuntimeResult = {
         status: "SUCCEEDED",
         traceId,
-        providerId: admission.providerId,
-        modelId: provider?.modelId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
         output: response.output,
         evidence: [...new Set([...admission.evidence, ...response.evidence])],
       };
@@ -139,7 +148,8 @@ export class ExecutionRuntime {
       return {
         status: "FAILED",
         traceId,
-        providerId: admission.providerId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
         evidence: [...admission.evidence],
         error: error instanceof Error ? error.message : "EXECUTION_ADAPTER_FAILED",
       };
