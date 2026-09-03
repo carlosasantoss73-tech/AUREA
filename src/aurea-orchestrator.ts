@@ -33,7 +33,7 @@ export interface OrchestrationPlan {
 export class AureaOrchestrator {
   plan(projectId: string, objective: string, tasks: OrchestrationTask[]): OrchestrationPlan {
     const completed = new Set(tasks.filter(task => task.status === "DONE").map(task => task.id));
-    const normalized = tasks.map(task => {
+    const normalized: OrchestrationTask[] = tasks.map(task => {
       if (task.status === "DONE") return task;
       const dependenciesReady = task.dependsOn.every(id => completed.has(id));
       return { ...task, status: dependenciesReady ? "READY" : "PENDING" };
