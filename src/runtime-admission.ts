@@ -19,6 +19,11 @@ export interface RuntimeAdmissionRequest {
   preferredProviderId?: string;
   allowedProviderIds?: string[];
   allowedProjects?: string[];
+  /** Allowlists for knowledge/context retrieval only. */
+  contextAllowedProjects?: string[];
+  contextAllowedCapabilities?: string[];
+  contextAllowedTools?: string[];
+  /** Allowlists for the subsequent execution authorization only. */
   allowedCapabilities?: string[];
   allowedTools?: string[];
   approvedByHuman?: boolean;
@@ -39,6 +44,10 @@ export interface RuntimeAdmissionResult {
  * C1/C2/C3/C7 integration boundary.
  * Admission proves that platform, knowledge, provider and execution controls
  * agree before a Work Cell is allowed to enter RUNNING. It does not execute tools.
+ *
+ * Security boundary: knowledge retrieval and tool execution have separate
+ * allowlist inputs. Execution capabilities/tools must never accidentally become
+ * the authorization scope for internal knowledge access.
  */
 export class RuntimeAdmission {
   constructor(
@@ -70,9 +79,9 @@ export class RuntimeAdmission {
       actorRole: request.actorRole,
       projectId: request.workCell.projectId,
       query: request.contextQuery,
-      allowedProjects: request.allowedProjects,
-      allowedCapabilities: request.allowedCapabilities,
-      allowedTools: request.allowedTools,
+      allowedProjects: request.contextAllowedProjects ?? request.allowedProjects,
+      allowedCapabilities: request.contextAllowedCapabilities,
+      allowedTools: request.contextAllowedTools,
     });
     evidence.push(`CONTEXT:${context.status}`);
     if (context.status === "BLOCKED" || context.status === "EMPTY") {
