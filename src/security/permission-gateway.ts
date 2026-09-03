@@ -31,7 +31,9 @@ export interface PermissionResult {
   effectiveLimit?: number;
 }
 
-export function evaluatePermission(req: PermissionRequest, traceId = crypto.randomUUID()): PermissionResult {
+// Keep the public contract general: callers may use externally supplied trace IDs,
+// while crypto.randomUUID() remains the default generator.
+export function evaluatePermission(req: PermissionRequest, traceId: string = crypto.randomUUID()): PermissionResult {
   if (!req.actorId || !req.actorRole || !req.projectId || !req.capabilityId || !req.toolId || !req.action) {
     return { decision: "DENY", reason: "MISSING_SECURITY_CONTEXT", traceId };
   }
