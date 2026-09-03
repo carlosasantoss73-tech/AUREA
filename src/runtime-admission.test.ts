@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AureaPlatformIntegration, PlatformAdapter } from "./aurea-platform-integration.js";
+import { ContextRetrievalGate } from "./context/context-retrieval-gate.js";
 import { HealthLedger } from "./health-ledger.js";
 import { AureaSentinel } from "./sentinel.js";
 import { ProviderRuntime } from "./provider-runtime.js";
@@ -38,12 +39,7 @@ function admission() {
   const providers = new ProviderRuntime();
   providers.register({ providerId: "provider-live", modelId: "model-live", status: "EXECUTABLE", capabilities: ["text"], healthEvidence: ["health:pass"] });
   const executionGate = new AureaExecutionGate(new AureaSentinel(new HealthLedger()));
-  return new RuntimeAdmission(platform, new (requireContextGate())(contextProvider), providers, executionGate);
-}
-
-function requireContextGate(): typeof import("./context/context-retrieval-gate.js").ContextRetrievalGate {
-  // Static type-only indirection keeps this test explicit about the existing B14 gate.
-  return require("./context/context-retrieval-gate.js").ContextRetrievalGate;
+  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate);
 }
 
 describe("RuntimeAdmission", () => {
@@ -64,7 +60,6 @@ describe("RuntimeAdmission", () => {
     platform.register(platformAdapter);
     const providers = new ProviderRuntime();
     const gate = new AureaExecutionGate(new AureaSentinel(new HealthLedger()));
-    const { ContextRetrievalGate } = await import("./context/context-retrieval-gate.js");
     const runtime = new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, gate);
     const result = await runtime.admit({
       traceId: "TRACE-RUNTIME-002", integrationId: "INT-RUNTIME", workCell: cell,
