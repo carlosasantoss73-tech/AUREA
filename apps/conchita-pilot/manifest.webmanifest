@@ -1,0 +1,11 @@
+{
+  "name": "Conchita",
+  "short_name": "Conchita",
+  "lang": "es",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#111827",
+  "description": "Acceso móvil ligero a Conchita.",
+  "icons": []
+}

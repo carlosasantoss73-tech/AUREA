@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>Conchita</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0b1020; display: grid; place-items: center; }
+    main { width: min(680px, 100%); min-height: 100vh; padding: 28px 20px; display: flex; flex-direction: column; }
+    header { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+    .logo { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; background:#fff; color:#111827; font-weight:800; }
+    h1 { margin:0; font-size:1.5rem; } p { color:#aab3c5; }
+    #messages { flex:1; display:flex; flex-direction:column; gap:10px; justify-content:flex-end; padding-bottom:18px; }
+    .msg { padding:12px 14px; border-radius:16px; max-width:86%; white-space:pre-wrap; }
+    .assistant { background:#182238; align-self:flex-start; } .user { background:#293754; align-self:flex-end; }
+    form { display:flex; gap:8px; padding-bottom:env(safe-area-inset-bottom); }
+    input { flex:1; min-width:0; border:1px solid #33415f; background:#121a2d; color:white; border-radius:14px; padding:14px; font-size:16px; }
+    button { border:0; border-radius:14px; padding:0 18px; font-weight:700; background:#fff; color:#111827; }
+    .status { font-size:.85rem; margin-top:8px; }
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="logo">C</div><div><h1>Conchita</h1><div class="status" id="status">Preparando conexión segura…</div></div></header>
+  <section id="messages" aria-live="polite"><div class="msg assistant">Hola. Soy Conchita. Este es tu acceso piloto.</div></section>
+  <form id="chat"><input id="message" autocomplete="off" placeholder="Habla o escribe a Conchita…" /><button>Enviar</button></form>
+</main>
+<script>
+const API_BASE = window.CONCHITA_API_BASE || '';
+const status = document.querySelector('#status');
+const messages = document.querySelector('#messages');
+const input = document.querySelector('#message');
+const add = (text, role) => { const el=document.createElement('div'); el.className=`msg ${role}`; el.textContent=text; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; };
+async function send(text) {
+  if (!API_BASE) throw new Error('CONCHITA_API_BASE_NOT_CONFIGURED');
+  const response = await fetch(`${API_BASE}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ text, channel:'MOBILE_APP' }) });
+  if (!response.ok) throw new Error(`HTTP_${response.status}`);
+  return response.json();
+}
+document.querySelector('#chat').addEventListener('submit', async e => {
+  e.preventDefault(); const text=input.value.trim(); if(!text) return; input.value=''; add(text,'user'); status.textContent='Conectando…';
+  try { const result=await send(text); add(result.text ?? result.message ?? 'Conchita respondió sin texto.', 'assistant'); status.textContent='Conectada'; }
+  catch { add('El canal piloto todavía no está conectado al servicio cloud. Tu interfaz ya está preparada; falta publicar el Gateway seguro.', 'assistant'); status.textContent='Modo piloto: gateway pendiente'; }
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+</script>
+</body>
+</html>
