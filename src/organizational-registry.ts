@@ -131,4 +131,8 @@ export class OrganizationalRegistry {
   getAgent(agentId: string): AgentDefinition | undefined {
     return this.agents.get(agentId);
   }
+
+  getRole(roleId: string): RoleDefinition | undefined {
+    return this.roles.get(roleId);
+  }
 }
