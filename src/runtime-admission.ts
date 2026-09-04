@@ -1,5 +1,6 @@
 import { ContextRetrievalGate, ContextProvider } from "./context/context-retrieval-gate.js";
 import { AureaExecutionGate, ExecutionGateRequest, ExecutionGateResult } from "./execution-gate.js";
+import { ExecutionStateBridge } from "./execution-state-bridge.js";
 import { AureaPlatformIntegration } from "./aurea-platform-integration.js";
 import { ProviderRuntime } from "./provider-runtime.js";
 import { WorkCell } from "./work-cell.js";
@@ -19,11 +20,9 @@ export interface RuntimeAdmissionRequest {
   preferredProviderId?: string;
   allowedProviderIds?: string[];
   allowedProjects?: string[];
-  /** Allowlists for knowledge/context retrieval only. */
   contextAllowedProjects?: string[];
   contextAllowedCapabilities?: string[];
   contextAllowedTools?: string[];
-  /** Allowlists for the subsequent execution authorization only. */
   allowedCapabilities?: string[];
   allowedTools?: string[];
   approvedByHuman?: boolean;
@@ -42,12 +41,11 @@ export interface RuntimeAdmissionResult {
 
 /**
  * C1/C2/C3/C7 integration boundary.
- * Admission proves that platform, knowledge, provider and execution controls
- * agree before a Work Cell is allowed to enter RUNNING. It does not execute tools.
+ * Admission proves platform, knowledge, provider and execution controls agree
+ * before a Work Cell is allowed to enter RUNNING.
  *
- * Security boundary: knowledge retrieval and tool execution have separate
- * allowlist inputs. Execution capabilities/tools must never accidentally become
- * the authorization scope for internal knowledge access.
+ * When the state bridge is supplied, the authoritative Work Cell registry is
+ * committed only after execution authorization succeeds.
  */
 export class RuntimeAdmission {
   constructor(
@@ -55,6 +53,7 @@ export class RuntimeAdmission {
     private readonly contextGate: ContextRetrievalGate,
     private readonly providers: ProviderRuntime,
     private readonly executionGate: AureaExecutionGate,
+    private readonly executionStateBridge?: ExecutionStateBridge,
   ) {}
 
   async admit(request: RuntimeAdmissionRequest): Promise<RuntimeAdmissionResult> {
@@ -100,7 +99,7 @@ export class RuntimeAdmission {
       return this.blocked(blockers, evidence, context.status);
     }
 
-    const execution = this.executionGate.authorize({
+    const executionRequest: ExecutionGateRequest = {
       traceId: request.traceId,
       workCell: request.workCell,
       actorId: request.actorId,
@@ -115,8 +114,16 @@ export class RuntimeAdmission {
       approvedByHuman: request.approvedByHuman,
       maxCalls: request.maxCalls,
       callsUsed: request.callsUsed,
-    });
+    };
+
+    const execution = this.executionStateBridge
+      ? this.executionStateBridge.authorizeAndCommit(executionRequest)
+      : this.executionGate.authorize(executionRequest);
+
     evidence.push(...execution.evidence);
+    if ("stateCommitted" in execution && execution.stateCommitted) {
+      evidence.push("EXECUTION_STATE_COMMITTED");
+    }
     if (execution.status === "BLOCKED") {
       blockers.push(...execution.blockers);
       return { status: "BLOCKED", blockers, evidence, contextStatus: context.status, providerId: provider.provider.providerId, execution };
@@ -132,11 +139,7 @@ export class RuntimeAdmission {
     };
   }
 
-  private blocked(
-    blockers: string[],
-    evidence: string[],
-    contextStatus: RuntimeAdmissionResult["contextStatus"],
-  ): RuntimeAdmissionResult {
+  private blocked(blockers: string[], evidence: string[], contextStatus: RuntimeAdmissionResult["contextStatus"]): RuntimeAdmissionResult {
     return { status: "BLOCKED", blockers, evidence, contextStatus };
   }
 }
@@ -146,6 +149,7 @@ export function createRuntimeAdmission(
   contextProvider: ContextProvider,
   providers: ProviderRuntime,
   executionGate: AureaExecutionGate,
+  executionStateBridge?: ExecutionStateBridge,
 ): RuntimeAdmission {
-  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate);
+  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate, executionStateBridge);
 }
