@@ -69,6 +69,29 @@ export class WorkCellRegistry {
     return this.get(workCellId);
   }
 
+  recordValidation(
+    workCellId: string,
+    traceId: string,
+    qaStatus: "PASS" | "FAIL",
+    auditStatus: "PASS" | "FAIL",
+    evidence: string[],
+  ): WorkCell {
+    if (!traceId) throw new Error("TRACE_ID_REQUIRED");
+    if (evidence.length === 0) throw new Error("VALIDATION_EVIDENCE_REQUIRED");
+    const current = this.cells.get(workCellId);
+    if (!current) throw new Error(`WORK_CELL_NOT_FOUND:${workCellId}`);
+    if (current.state !== "QA") throw new Error(`VALIDATION_REQUIRES_QA_STATE:${current.state}`);
+
+    const next = {
+      ...current,
+      qaStatus,
+      auditStatus,
+      evidence: [...new Set([...current.evidence, ...evidence])],
+    };
+    this.cells.set(workCellId, structuredClone(next));
+    return this.get(workCellId);
+  }
+
   history(workCellId?: string): WorkCellTransition[] {
     return this.transitions
       .filter((item) => !workCellId || item.workCellId === workCellId)
