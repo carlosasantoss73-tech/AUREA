@@ -46,7 +46,7 @@ function json(body: unknown, status: number, headers: Record<string, string> = {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
 }
 
-function createConchitaMessageHandler(env: Env): (request: Request) => Promise<Response> {
+function makePilotMessageHandler(env: Env): (request: Request) => Promise<Response> {
   const sessions = new ConchitaKvSessionRepository(env.CONCHITA_SESSIONS);
   const authenticator = new ConchitaKvSessionAuthenticator(sessions);
   const providers = new ProviderRuntime();
@@ -164,7 +164,7 @@ export default {
       const url = new URL(request.url);
       if (url.pathname === '/health') return json({ status: 'OK', service: 'conchita-cloudflare-worker' });
       if (url.pathname === '/conchita/v1/session') return handleSession(request, env);
-      const messageHandler = createConchitaMessageHandler(env);
+      const messageHandler = makePilotMessageHandler(env);
       return await messageHandler(request);
     } catch {
       return json({ status: 'BLOCKED', error: 'WORKER_CONFIGURATION_OR_RUNTIME_FAILURE' }, 503);
