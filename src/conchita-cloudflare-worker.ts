@@ -1,7 +1,7 @@
 import { ConchitaAnthropicExecutionAdapter } from './conchita-anthropic-execution-adapter.js';
 import { ConchitaCloudMessageGate } from './conchita-cloud-message-gate.js';
 import { ConchitaKvExecutionResultStore } from './conchita-cloudflare-kv-execution-result-store.js';
-import { ConchitaKvSessionAuthenticator, ConchitaKvSessionRepository } from './conchita-cloud-kv-session-store.js';
+import { ConchitaKvSessionAuthenticator, ConchitaKvSessionRepository, type ConchitaKvNamespace } from './conchita-cloud-kv-session-store.js';
 import { ConchitaPersonalV0Gateway } from './conchita-personal-v0-gateway.js';
 import { createConchitaHttpEdgeHandler } from './conchita-http-edge-adapter.js';
 import { ConchitaRuntimeBridge } from './conchita-runtime-bridge.js';
@@ -14,13 +14,10 @@ import { AureaSentinel } from './sentinel.js';
 import { HealthLedger } from './health-ledger.js';
 import { ContextRetrievalGate, type ContextProvider } from './context/context-retrieval-gate.js';
 import { createConchitaSessionRecord } from './conchita-cloud-session-store.js';
+import type { ConchitaMode, ConchitaSession } from './conchita-personal-v0-contract.js';
 
 interface Env {
-  CONCHITA_SESSIONS: {
-    get<T = unknown>(key: string, type: 'json'): Promise<T | null>;
-    put(key: string, value: string, options?: { expiration?: number; expirationTtl?: number }): Promise<void>;
-    delete(key: string): Promise<void>;
-  };
+  CONCHITA_SESSIONS: ConchitaKvNamespace;
   CONCHITA_ANTHROPIC_MODEL: string;
   ANTHROPIC_API_KEY: string;
   CONCHITA_PILOT_USER_ID: string;
@@ -97,7 +94,7 @@ function buildMessageHandler(env: Env) {
     new AureaExecutionGate(sentinel),
   );
   const admissionFactory = {
-    build(request: { session: { sessionId: string; userId: string; channel: 'MOBILE_APP'; mode: 'PERSONAL' | 'XOLAR'; createdAt: string }; message: string; mode: 'PERSONAL' | 'XOLAR'; traceId: string }) {
+    build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) {
       return {
         traceId: request.traceId,
         integrationId: 'conchita-cloudflare-edge',
