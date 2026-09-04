@@ -9,14 +9,13 @@ export interface AnthropicExecutionConfig {
 
 /**
  * Production-shaped provider adapter for Anthropic Messages API.
- *
  * Credentials are supplied at runtime and are never stored in the provider
  * registry or returned as evidence. The adapter fails closed on missing
  * configuration, non-2xx responses, malformed payloads, or missing text.
  */
 export class ConchitaAnthropicExecutionAdapter implements ExecutionAdapter {
   readonly providerId: string;
-
+  private readonly apiKey: string;
   private readonly endpoint: string;
   private readonly maxTokens: number;
   private readonly fetchImpl: typeof fetch;
@@ -25,6 +24,7 @@ export class ConchitaAnthropicExecutionAdapter implements ExecutionAdapter {
     if (!providerId) throw new Error("ANTHROPIC_PROVIDER_ID_REQUIRED");
     if (!config.apiKey) throw new Error("ANTHROPIC_API_KEY_REQUIRED");
     this.providerId = providerId;
+    this.apiKey = config.apiKey;
     this.endpoint = config.endpoint ?? "https://api.anthropic.com/v1/messages";
     this.maxTokens = config.maxTokens ?? 1024;
     this.fetchImpl = config.fetchImpl ?? fetch;
@@ -59,14 +59,12 @@ export class ConchitaAnthropicExecutionAdapter implements ExecutionAdapter {
     return {
       output: text,
       evidence: [
-        `PROVIDER_HTTP:anthropic`,
+        "PROVIDER_HTTP:anthropic",
         `PROVIDER_MODEL:${request.provider.modelId}`,
         `TRACE:${request.traceId}`,
       ],
     };
   }
-
-  private readonly apiKey: string;
 
   private readInput(input: unknown): { message: string } {
     if (!input || typeof input !== "object") throw new Error("ANTHROPIC_INPUT_INVALID");
