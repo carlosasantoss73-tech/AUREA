@@ -70,3 +70,9 @@ The code-side contract is implemented on branch `feat/external-code-cell-v1`. Th
 
 ## Completion rule
 The External Code Work Cell is `100%` only when E1-E6 have evidence. Until then, its status must remain `PENDING` for the unproven gates.
+
+## Iteration 2 operational learning
+- CI evidence must be checked by commit SHA before merge; an empty status response is not equivalent to no CI if workflow runs can be resolved separately.
+- A merge commit SHA reported while a PR remains open is treated as non-authoritative until `main` is verified.
+- Audit checkpoints must explicitly distinguish code-side readiness from real external execution.
+- The first external mission must be bounded, reproducible, branch-isolated, and independently adversarially verified.
