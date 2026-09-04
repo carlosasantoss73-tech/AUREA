@@ -1,11 +1,13 @@
-import {
+import type {
   ConchitaMessageRequest,
   ConchitaMessageResponse,
   ConchitaMode,
   ConchitaPersonalGateway,
   ConchitaSession,
-  validateConchitaMessage,
 } from "./conchita-personal-v0-contract.js";
+import { validateConchitaMessage } from "./conchita-personal-v0-contract.js";
+import type { ConchitaAuthenticatedPrincipal } from "./conchita-authenticated-principal.js";
+import { validateConchitaPrincipal } from "./conchita-authenticated-principal.js";
 
 export interface ConchitaPersonalRequestHandler {
   handle(request: {
@@ -34,25 +36,48 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     return { ...session };
   }
 
-  async sendMessage(request: ConchitaMessageRequest): Promise<ConchitaMessageResponse> {
+  async sendAuthenticatedMessage(
+    principal: ConchitaAuthenticatedPrincipal | undefined,
+    request: ConchitaMessageRequest,
+  ): Promise<ConchitaMessageResponse> {
+    const principalBlockers = validateConchitaPrincipal(principal);
+    if (principalBlockers.length > 0) {
+      return {
+        sessionId: request.sessionId,
+        clientRequestId: request.clientRequestId,
+        traceId: "BLOCKED",
+        status: "BLOCKED",
+        evidence: ["CONCHITA_AUTHENTICATED_PRINCIPAL"],
+        blockers: principalBlockers,
+      };
+    }
+
     const validation = validateConchitaMessage(request);
     if (validation.length > 0) return {
       sessionId: request.sessionId, clientRequestId: request.clientRequestId, traceId: "BLOCKED",
       status: "BLOCKED", evidence: ["CONCHITA_GATEWAY_VALIDATION"], blockers: validation,
     };
+
     const session = this.sessions.get(request.sessionId);
-    if (!session || session.userId !== request.userId) return {
+    if (!session || session.userId !== principal!.userId) return {
       sessionId: request.sessionId, clientRequestId: request.clientRequestId, traceId: "BLOCKED",
       status: "BLOCKED", evidence: ["CONCHITA_SESSION_AUTHORIZATION"], blockers: ["SESSION_NOT_AUTHORIZED"],
     };
+
     const traceId = this.id();
     const mode = request.mode ?? session.mode;
-    const result = await this.handler.handle({ session: { ...session, mode }, message: request.message.trim(), mode, traceId });
+    const result = await this.handler.handle({
+      session: { ...session, mode }, message: request.message.trim(), mode, traceId,
+    });
     return {
       sessionId: session.sessionId, clientRequestId: request.clientRequestId, traceId,
       status: result.status, response: result.response,
       evidence: [...new Set(result.evidence)], blockers: [...result.blockers],
     };
+  }
+
+  async sendMessage(request: ConchitaMessageRequest): Promise<ConchitaMessageResponse> {
+    return this.sendAuthenticatedMessage(undefined, request);
   }
 
   async closeSession(sessionId: string): Promise<void> { this.sessions.delete(sessionId); }
