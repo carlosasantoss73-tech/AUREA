@@ -162,7 +162,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
-      if (url.pathname === '/health') return json({ status: 'OK', service: 'conchita-cloudflare-worker' });
+      if (url.pathname === '/health') return json({ status: 'OK', service: 'conchita-cloudflare-worker' }, 200);
       if (url.pathname === '/conchita/v1/session') return handleSession(request, env);
       const messageHandler = makePilotMessageHandler(env);
       return await messageHandler(request);
