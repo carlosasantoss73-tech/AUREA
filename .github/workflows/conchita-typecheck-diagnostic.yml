@@ -1,0 +1,27 @@
+name: Conchita Typecheck Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Capture typecheck output
+        run: npm run typecheck > typecheck.log 2>&1 || true
+      - name: Publish typecheck output
+        run: cat typecheck.log
+      - name: Upload typecheck output
+        uses: actions/upload-artifact@v4
+        with:
+          name: conchita-typecheck-log
+          path: typecheck.log

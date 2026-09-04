@@ -11,42 +11,81 @@
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #0b1020; display: grid; place-items: center; }
     main { width: min(680px, 100%); min-height: 100vh; padding: 28px 20px; display: flex; flex-direction: column; }
-    header { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+    header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
     .logo { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; background:#fff; color:#111827; font-weight:800; }
     h1 { margin:0; font-size:1.5rem; } p { color:#aab3c5; }
+    #setup { border:1px solid #33415f; border-radius:16px; padding:14px; margin-bottom:14px; }
+    #setup[hidden] { display:none; }
+    #setup form { display:grid; gap:8px; }
     #messages { flex:1; display:flex; flex-direction:column; gap:10px; justify-content:flex-end; padding-bottom:18px; }
     .msg { padding:12px 14px; border-radius:16px; max-width:86%; white-space:pre-wrap; }
     .assistant { background:#182238; align-self:flex-start; } .user { background:#293754; align-self:flex-end; }
-    form { display:flex; gap:8px; padding-bottom:env(safe-area-inset-bottom); }
+    form.chat { display:flex; gap:8px; padding-bottom:env(safe-area-inset-bottom); }
     input { flex:1; min-width:0; border:1px solid #33415f; background:#121a2d; color:white; border-radius:14px; padding:14px; font-size:16px; }
     button { border:0; border-radius:14px; padding:0 18px; font-weight:700; background:#fff; color:#111827; }
     .status { font-size:.85rem; margin-top:8px; }
+    .hint { margin:0 0 10px; font-size:.82rem; }
   </style>
 </head>
 <body>
 <main>
   <header><div class="logo">C</div><div><h1>Conchita</h1><div class="status" id="status">Preparando conexión segura…</div></div></header>
+  <section id="setup">
+    <p class="hint">Activación del piloto. El token solo se usa para crear la sesión y no se guarda.</p>
+    <form id="setup-form">
+      <input id="api" type="url" autocomplete="url" placeholder="URL del Gateway Cloudflare" />
+      <input id="token" type="password" autocomplete="off" placeholder="Token de activación del piloto" />
+      <button>Activar Conchita</button>
+    </form>
+  </section>
   <section id="messages" aria-live="polite"><div class="msg assistant">Hola. Soy Conchita. Este es tu acceso piloto.</div></section>
-  <form id="chat"><input id="message" autocomplete="off" placeholder="Habla o escribe a Conchita…" /><button>Enviar</button></form>
+  <form id="chat" class="chat"><input id="message" autocomplete="off" placeholder="Habla o escribe a Conchita…" /><button>Enviar</button></form>
 </main>
 <script>
-const API_BASE = window.CONCHITA_API_BASE || '';
+const params = new URLSearchParams(location.search);
+const API_BASE = (params.get('api') || localStorage.getItem('CONCHITA_API_BASE') || '').replace(/\/$/, '');
 const status = document.querySelector('#status');
 const messages = document.querySelector('#messages');
 const input = document.querySelector('#message');
+const setup = document.querySelector('#setup');
+const apiInput = document.querySelector('#api');
+const tokenInput = document.querySelector('#token');
 const add = (text, role) => { const el=document.createElement('div'); el.className=`msg ${role}`; el.textContent=text; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; };
+const sessionId = () => sessionStorage.getItem('CONCHITA_SESSION_ID') || '';
 const clientRequestId = () => crypto.randomUUID();
+apiInput.value = API_BASE;
+if (API_BASE) localStorage.setItem('CONCHITA_API_BASE', API_BASE);
+async function activate() {
+  const base = apiInput.value.trim().replace(/\/$/, '');
+  const token = tokenInput.value;
+  if (!base || !token) throw new Error('PILOT_CONFIGURATION_REQUIRED');
+  const response = await fetch(`${base}/conchita/v1/session`, { method:'POST', headers:{ Authorization:`Bearer ${token}` } });
+  if (!response.ok) throw new Error(`HTTP_${response.status}`);
+  const result = await response.json();
+  if (result.status !== 'COMPLETED' || !result.sessionId) throw new Error('SESSION_NOT_CREATED');
+  localStorage.setItem('CONCHITA_API_BASE', base);
+  sessionStorage.setItem('CONCHITA_SESSION_ID', result.sessionId);
+  tokenInput.value = '';
+  setup.hidden = true;
+  status.textContent = 'Conectada';
+}
 async function send(text) {
-  if (!API_BASE) throw new Error('CONCHITA_API_BASE_NOT_CONFIGURED');
-  const response = await fetch(`${API_BASE}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ message:text, sessionId:window.CONCHITA_SESSION_ID || '', clientRequestId:clientRequestId(), mode:'PERSONAL' }) });
+  const base = (localStorage.getItem('CONCHITA_API_BASE') || API_BASE).replace(/\/$/, '');
+  if (!base || !sessionId()) throw new Error('CONCHITA_SESSION_REQUIRED');
+  const response = await fetch(`${base}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ message:text, sessionId:sessionId(), clientRequestId:clientRequestId(), mode:'PERSONAL' }) });
   if (!response.ok) throw new Error(`HTTP_${response.status}`);
   return response.json();
 }
+document.querySelector('#setup-form').addEventListener('submit', async e => {
+  e.preventDefault(); status.textContent='Activando…';
+  try { await activate(); } catch { status.textContent='No se pudo activar el piloto'; }
+});
 document.querySelector('#chat').addEventListener('submit', async e => {
   e.preventDefault(); const text=input.value.trim(); if(!text) return; input.value=''; add(text,'user'); status.textContent='Conectando…';
-  try { const result=await send(text); add(result.response ?? result.text ?? result.message ?? 'Conchita respondió sin texto.', 'assistant'); status.textContent='Conectada'; }
-  catch { add('El canal piloto todavía no está conectado al servicio cloud. Tu interfaz ya está preparada; falta publicar el Gateway seguro.', 'assistant'); status.textContent='Modo piloto: gateway pendiente'; }
+  try { const result=await send(text); add(result.response ?? 'Conchita respondió sin texto.', 'assistant'); status.textContent='Conectada'; }
+  catch { add('La sesión piloto no está disponible. Activa Conchita nuevamente.', 'assistant'); status.textContent='Sesión no disponible'; setup.hidden=false; }
 });
+if (sessionId() && API_BASE) { setup.hidden=true; status.textContent='Sesión piloto lista'; }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 </script>
 </body>
