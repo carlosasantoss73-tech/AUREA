@@ -1,9 +1,5 @@
-import type {
-  ConchitaMessageResponse,
-  ConchitaMode,
-  ConchitaPersonalRequestHandler,
-  ConchitaSession,
-} from "./conchita-personal-v0-gateway.js";
+import type { ConchitaMessageResponse, ConchitaMode, ConchitaSession } from "./conchita-personal-v0-contract.js";
+import type { ConchitaPersonalRequestHandler } from "./conchita-personal-v0-gateway.js";
 import type { ExecutionRuntime, ExecutionRuntimeResult } from "./execution-runtime.js";
 import type { RuntimeAdmission, RuntimeAdmissionRequest } from "./runtime-admission.js";
 import type { ProviderRuntime } from "./provider-runtime.js";
