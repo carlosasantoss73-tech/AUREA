@@ -79,7 +79,7 @@ export class WorkCellRegistry {
     if (!traceId) throw new Error("TRACE_ID_REQUIRED");
     if (evidence.length === 0) throw new Error("VALIDATION_EVIDENCE_REQUIRED");
     const current = this.cells.get(workCellId);
-    if (!current) throw new Error(`WORK_CELL_NOT_FOUND:${current.state}`);
+    if (!current) throw new Error(`WORK_CELL_NOT_FOUND:${workCellId}`);
     if (current.state !== "QA") throw new Error(`VALIDATION_REQUIRES_QA_STATE:${current.state}`);
 
     const next = {
