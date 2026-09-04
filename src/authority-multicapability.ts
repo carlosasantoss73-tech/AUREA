@@ -70,7 +70,10 @@ export class AuthorityMultiCapabilityResolver {
     if (candidates.length === 0) blockers.push("ACTOR_NOT_AUTHORIZED_FOR_RESPONSIBILITY");
 
     const actor = candidates[0];
-    const profile = actor ? this.profiles.get(this.findAuthorityProfileId(actor.roleId)) : undefined;
+    const role = actor ? this.organization.getRole(actor.roleId) : undefined;
+    const profile = role ? this.profiles.get(role.authorityProfileId) : undefined;
+    if (actor && !role) blockers.push("REGISTERED_ROLE_NOT_FOUND");
+    if (actor && role && request.actorRole !== role.name) blockers.push("ACTOR_ROLE_IDENTITY_MISMATCH");
     if (actor && !profile) blockers.push("AUTHORITY_PROFILE_NOT_REGISTERED");
     if (actor && profile && profile.roleId !== actor.roleId) blockers.push("AUTHORITY_ROLE_MISMATCH");
     if (actor && profile && !profile.allowedScopes.includes(resolution.scope)) blockers.push("AUTHORITY_SCOPE_DENIED");
@@ -133,10 +136,5 @@ export class AuthorityMultiCapabilityResolver {
       blockers: [],
       evidence,
     };
-  }
-
-  private findAuthorityProfileId(roleId: string): string {
-    const profile = [...this.profiles.values()].find(item => item.roleId === roleId);
-    return profile?.authorityProfileId ?? "";
   }
 }
