@@ -12,14 +12,11 @@ export interface WorkCellPersistenceState {
 
 const emptyState = (): WorkCellPersistenceState => ({ cells: {}, transitions: [] });
 
-/**
- * Durable storage adapter kept separate from the in-process WorkCellRegistry.
- * It provides snapshot/recovery primitives without changing the registry API.
- */
+/** Durable storage adapter kept separate from the in-process WorkCellRegistry. */
 export class WorkCellFileStore {
   constructor(private readonly filePath: string) {}
 
-  private async load(): Promise<WorkCellPersistenceState> {
+  async loadState(): Promise<WorkCellPersistenceState> {
     try {
       const raw = await readFile(this.filePath, "utf8");
       const parsed = JSON.parse(raw) as Partial<WorkCellPersistenceState>;
@@ -34,7 +31,7 @@ export class WorkCellFileStore {
     }
   }
 
-  private async save(state: WorkCellPersistenceState): Promise<void> {
+  async saveState(state: WorkCellPersistenceState): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.tmp`;
     await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
@@ -42,25 +39,25 @@ export class WorkCellFileStore {
   }
 
   async saveSnapshot(cell: WorkCell): Promise<void> {
-    const state = await this.load();
+    const state = await this.loadState();
     state.cells[cell.workCellId] = structuredClone(cell);
-    await this.save(state);
+    await this.saveState(state);
   }
 
   async saveTransition(transition: WorkCellTransition): Promise<void> {
-    const state = await this.load();
+    const state = await this.loadState();
     state.transitions.push(structuredClone(transition));
-    await this.save(state);
+    await this.saveState(state);
   }
 
   async getSnapshot(workCellId: string): Promise<WorkCell | undefined> {
-    const state = await this.load();
+    const state = await this.loadState();
     const cell = state.cells[workCellId];
     return cell ? structuredClone(cell) : undefined;
   }
 
   async getTransitions(workCellId?: string): Promise<WorkCellTransition[]> {
-    const state = await this.load();
+    const state = await this.loadState();
     return state.transitions
       .filter(item => !workCellId || item.workCellId === workCellId)
       .map(item => structuredClone(item));
