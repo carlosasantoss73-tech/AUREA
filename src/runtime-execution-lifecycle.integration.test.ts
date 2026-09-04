@@ -38,7 +38,7 @@ const contextProvider = {
       projectId: input.projectId,
       query: input.query,
       facts: ["context:valid"],
-      citations: [{ sourceId: "SRC-E2E-001", documentId: "DOC-E2E-001", version: "v1" }],
+      citations: [{ sourceId: "SRC-E2E-001", documentId: "DOC-E2E-001", version: 1 }],
     };
   },
 };
