@@ -4,13 +4,16 @@ on:
   push:
     branches: [main, p0-functionalization, b13-hardening, b14-context-retrieval-v2, b15-memory-ingestion]
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
 
 permissions:
   contents: read
 
 concurrency:
-  group: aurea-p0-${{ github.ref }}
+  group: aurea-p0-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
