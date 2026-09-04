@@ -114,14 +114,7 @@ export class ExecutionRuntime {
     }
 
     const previous = this.completed.get(traceId);
-    if (previous) {
-      return {
-        ...previous,
-        status: "REPLAYED",
-        replayOfTraceId: previous.traceId,
-        evidence: [...previous.evidence, `IDEMPOTENT_REPLAY:${traceId}`],
-      };
-    }
+    if (previous) return this.replay(previous);
 
     const reservation = await this.reserveTrace(traceId);
     if (reservation === "BLOCKED") {
@@ -133,6 +126,20 @@ export class ExecutionRuntime {
         evidence: [...admission.evidence, "EXECUTION_TRACE_RESERVED"],
         error: "EXECUTION_IDEMPOTENCY_RESERVATION_EXISTS",
       };
+    }
+    if (reservation === "COMPLETED") {
+      const durable = this.completed.get(traceId);
+      if (!durable) {
+        return {
+          status: "BLOCKED",
+          traceId,
+          providerId: provider.providerId,
+          modelId: provider.modelId,
+          evidence: [...admission.evidence, "RESULT_STORE_COMPLETED_WITHOUT_RESULT"],
+          error: "EXECUTION_RESULT_STORE_INCONSISTENT",
+        };
+      }
+      return this.replay(durable);
     }
 
     const adapter = this.adapters.get(provider.providerId);
@@ -175,8 +182,6 @@ export class ExecutionRuntime {
         try {
           await this.resultStore.commitCompleted(result);
         } catch (error) {
-          // Keep the durable reservation: a retry must not invoke the provider
-          // again until the ambiguous result is reconciled.
           return {
             status: "FAILED",
             traceId,
@@ -202,6 +207,15 @@ export class ExecutionRuntime {
         error: error instanceof Error ? error.message : "EXECUTION_ADAPTER_FAILED",
       };
     }
+  }
+
+  private replay(previous: ExecutionRuntimeResult): ExecutionRuntimeResult {
+    return {
+      ...previous,
+      status: "REPLAYED",
+      replayOfTraceId: previous.traceId,
+      evidence: [...previous.evidence, `IDEMPOTENT_REPLAY:${previous.traceId}`],
+    };
   }
 
   private async ensureHydrated(): Promise<string | undefined> {
