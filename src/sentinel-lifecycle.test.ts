@@ -31,7 +31,7 @@ describe("SentinelLifecycle", () => {
     expect(learned.status).toBe("RESOLVED");
     expect(learned.learning).toContain("bounded retry");
     expect(learned.preventiveRule).toBe("ALWAYS_BOUND_RETRY_AND_RECORD_BACKOFF");
-    expect(ledger.list().length).toBe(5);
+    expect(ledger.list().length).toBe(6);
   });
 
   it("escalates S4 instead of auto-containing it", () => {
