@@ -17,12 +17,6 @@ export interface ConchitaRuntimeAdmissionFactory {
   }): RuntimeAdmissionRequest;
 }
 
-/**
- * Server-side convergence point for Conchita Personal V0.
- * The Gateway remains responsible for session authorization; this bridge only
- * maps an authorized Conchita request into the existing AUREA admission and
- * execution controls. No provider/tool is callable before admission succeeds.
- */
 export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
   constructor(
     private readonly admission: RuntimeAdmission,
@@ -41,11 +35,7 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
     const admitted = await this.admission.admit(admissionRequest);
 
     if (admitted.status !== "ADMITTED" || !admitted.providerId) {
-      return {
-        status: "BLOCKED",
-        evidence: [...admitted.evidence],
-        blockers: [...admitted.blockers],
-      };
+      return { status: "BLOCKED", response: undefined, evidence: [...admitted.evidence], blockers: [...admitted.blockers] };
     }
 
     const selected = this.providers.select({
@@ -56,9 +46,8 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
 
     if (selected.status !== "SELECTED" || !selected.provider) {
       return {
-        status: "BLOCKED",
-        evidence: [...admitted.evidence, ...selected.evidence],
-        blockers: [...selected.blockers],
+        status: "BLOCKED", response: undefined,
+        evidence: [...admitted.evidence, ...selected.evidence], blockers: [...selected.blockers],
       };
     }
 
