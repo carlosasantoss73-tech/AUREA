@@ -1,5 +1,6 @@
 import { ContextRetrievalGate, ContextProvider } from "./context/context-retrieval-gate.js";
 import { AureaExecutionGate, ExecutionGateRequest, ExecutionGateResult } from "./execution-gate.js";
+import { ExecutionStateBridge } from "./execution-state-bridge.js";
 import { AureaPlatformIntegration } from "./aurea-platform-integration.js";
 import { ProviderRuntime } from "./provider-runtime.js";
 import { WorkCell } from "./work-cell.js";
@@ -43,7 +44,12 @@ export interface RuntimeAdmissionResult {
 /**
  * C1/C2/C3/C7 integration boundary.
  * Admission proves that platform, knowledge, provider and execution controls
- * agree before a Work Cell is allowed to enter RUNNING. It does not execute tools.
+ * agree before a Work Cell is allowed to enter RUNNING.
+ *
+ * When an ExecutionStateBridge is supplied, authorization is committed to the
+ * authoritative Work Cell registry in the same admission boundary. This closes
+ * the former gap where ExecutionGate returned a RUNNING clone without changing
+ * the source-of-truth Work Cell state.
  *
  * Security boundary: knowledge retrieval and tool execution have separate
  * allowlist inputs. Execution capabilities/tools must never accidentally become
@@ -55,6 +61,7 @@ export class RuntimeAdmission {
     private readonly contextGate: ContextRetrievalGate,
     private readonly providers: ProviderRuntime,
     private readonly executionGate: AureaExecutionGate,
+    private readonly executionStateBridge?: ExecutionStateBridge,
   ) {}
 
   async admit(request: RuntimeAdmissionRequest): Promise<RuntimeAdmissionResult> {
@@ -100,7 +107,7 @@ export class RuntimeAdmission {
       return this.blocked(blockers, evidence, context.status);
     }
 
-    const execution = this.executionGate.authorize({
+    const executionRequest: ExecutionGateRequest = {
       traceId: request.traceId,
       workCell: request.workCell,
       actorId: request.actorId,
@@ -115,7 +122,12 @@ export class RuntimeAdmission {
       approvedByHuman: request.approvedByHuman,
       maxCalls: request.maxCalls,
       callsUsed: request.callsUsed,
-    });
+    };
+
+    const execution = this.executionStateBridge
+      ? this.executionStateBridge.authorizeAndCommit(executionRequest)
+      : this.executionGate.authorize(executionRequest);
+
     evidence.push(...execution.evidence);
     if (execution.status === "BLOCKED") {
       blockers.push(...execution.blockers);
@@ -146,6 +158,13 @@ export function createRuntimeAdmission(
   contextProvider: ContextProvider,
   providers: ProviderRuntime,
   executionGate: AureaExecutionGate,
+  executionStateBridge?: ExecutionStateBridge,
 ): RuntimeAdmission {
-  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate);
+  return new RuntimeAdmission(
+    platform,
+    new ContextRetrievalGate(contextProvider),
+    providers,
+    executionGate,
+    executionStateBridge,
+  );
 }
