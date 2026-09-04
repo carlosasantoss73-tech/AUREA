@@ -82,16 +82,36 @@ export class ExecutionResultLifecycle {
       gate.evidence,
     );
 
-    if (gate.status === "BLOCKED") {
+    if (request.validation.qaStatus !== "PASS" || request.validation.auditStatus !== "PASS") {
       return {
         status: "QA_PENDING",
         workCell: this.registry.get(request.workCellId),
-        blockers: gate.blockers,
+        blockers: gate.blockers.length > 0 ? gate.blockers : ["QA_OR_AUDIT_NOT_PASSED"],
         evidence: [...gate.evidence],
       };
     }
 
-    const completed = this.registry.transition(request.workCellId, "COMPLETED", request.traceId, ["QA_PASS", "AUDIT_PASS", "WORK_CELL_COMPLETED"]);
+    // The closure gate requires COMPLETED state. Validation happens in QA first,
+    // then the authoritative state advances to COMPLETED, and only then is closure
+    // evaluated. This preserves the designed gate semantics instead of evaluating
+    // a closure condition against an intentionally non-closable QA state.
+    const completed = this.registry.transition(
+      request.workCellId,
+      "COMPLETED",
+      request.traceId,
+      ["QA_PASS", "AUDIT_PASS", "WORK_CELL_COMPLETED"],
+    );
+
+    const closureGate = this.qaAuditGate.evaluate(completed, request.validation);
+    if (closureGate.status === "BLOCKED") {
+      return {
+        status: "COMPLETED",
+        workCell: this.registry.get(request.workCellId),
+        blockers: closureGate.blockers,
+        evidence: [...closureGate.evidence],
+      };
+    }
+
     const closed = this.registry.transition(request.workCellId, "CLOSED", request.traceId, ["WORK_CELL_CLOSED"]);
     return { status: "CLOSED", workCell: closed, blockers: [], evidence: [...completed.evidence, ...closed.evidence] };
   }
