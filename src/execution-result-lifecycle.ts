@@ -58,15 +58,19 @@ export class ExecutionResultLifecycle {
       return { status: "FAILED", workCell: failed, blockers: [request.execution.error ?? "EXECUTION_FAILED"], evidence: [...failed.evidence] };
     }
 
-    if (request.execution.status !== "SUCCEEDED") {
+    if (request.execution.status !== "SUCCEEDED" && request.execution.status !== "REPLAYED") {
       throw new Error(`UNEXPECTED_EXECUTION_STATUS:${request.execution.status}`);
     }
+
+    const executionEvidence = request.execution.status === "REPLAYED"
+      ? [...request.execution.evidence, "EXECUTION_REPLAYED_FROM_DURABLE_RESULT"]
+      : request.execution.evidence;
 
     const qaCell = this.registry.transition(
       request.workCellId,
       "QA",
       request.traceId,
-      [...request.execution.evidence, "EXECUTION_SUCCEEDED", "QA_STARTED"],
+      [...executionEvidence, "EXECUTION_SUCCEEDED", "QA_STARTED"],
     );
 
     if (!request.validation) {
@@ -91,10 +95,6 @@ export class ExecutionResultLifecycle {
       };
     }
 
-    // The closure gate requires COMPLETED state. Validation happens in QA first,
-    // then the authoritative state advances to COMPLETED, and only then is closure
-    // evaluated. This preserves the designed gate semantics instead of evaluating
-    // a closure condition against an intentionally non-closable QA state.
     const completed = this.registry.transition(
       request.workCellId,
       "COMPLETED",
