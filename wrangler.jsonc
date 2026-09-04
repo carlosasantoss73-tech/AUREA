@@ -11,7 +11,7 @@
     }
   ],
   "vars": {
-    "CONCHITA_ANTHROPIC_MODEL": "claude-sonnet-4-5",
+    "CONCHITA_ANTHROPIC_MODEL": "claude-sonnet-5",
     "CONCHITA_PILOT_USER_ID": "pilot-user",
     "CONCHITA_ALLOWED_ORIGIN": "REPLACE_WITH_CONCHITA_PAGES_ORIGIN"
   },
