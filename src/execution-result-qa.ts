@@ -15,13 +15,15 @@ export interface ExecutionResultValidation extends QAAuditEvidence {
 /**
  * Independent post-execution validator.
  * It does not execute, mutate runtime state, or close a Work Cell.
+ * A REPLAYED result is accepted because it is a previously validated durable
+ * execution result; it still requires the same trace/provider/evidence checks.
  */
 export class ExecutionResultQA {
   validate(request: ExecutionResultValidationRequest): ExecutionResultValidation {
     const blockers: string[] = [];
     const evidence = [...request.result.evidence];
 
-    if (request.result.status !== "SUCCEEDED") {
+    if (request.result.status !== "SUCCEEDED" && request.result.status !== "REPLAYED") {
       blockers.push(`EXECUTION_NOT_SUCCEEDED:${request.result.status}`);
     }
     if (request.result.traceId !== request.expectedTraceId) {
