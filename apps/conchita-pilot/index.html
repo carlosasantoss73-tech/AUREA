@@ -35,15 +35,16 @@ const status = document.querySelector('#status');
 const messages = document.querySelector('#messages');
 const input = document.querySelector('#message');
 const add = (text, role) => { const el=document.createElement('div'); el.className=`msg ${role}`; el.textContent=text; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; };
+const clientRequestId = () => crypto.randomUUID();
 async function send(text) {
   if (!API_BASE) throw new Error('CONCHITA_API_BASE_NOT_CONFIGURED');
-  const response = await fetch(`${API_BASE}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ text, channel:'MOBILE_APP' }) });
+  const response = await fetch(`${API_BASE}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ message:text, sessionId:window.CONCHITA_SESSION_ID || '', clientRequestId:clientRequestId(), mode:'PERSONAL' }) });
   if (!response.ok) throw new Error(`HTTP_${response.status}`);
   return response.json();
 }
 document.querySelector('#chat').addEventListener('submit', async e => {
   e.preventDefault(); const text=input.value.trim(); if(!text) return; input.value=''; add(text,'user'); status.textContent='Conectando…';
-  try { const result=await send(text); add(result.text ?? result.message ?? 'Conchita respondió sin texto.', 'assistant'); status.textContent='Conectada'; }
+  try { const result=await send(text); add(result.response ?? result.text ?? result.message ?? 'Conchita respondió sin texto.', 'assistant'); status.textContent='Conectada'; }
   catch { add('El canal piloto todavía no está conectado al servicio cloud. Tu interfaz ya está preparada; falta publicar el Gateway seguro.', 'assistant'); status.textContent='Modo piloto: gateway pendiente'; }
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
