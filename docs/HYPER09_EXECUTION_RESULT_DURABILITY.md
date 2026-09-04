@@ -1,24 +1,27 @@
 # HYPER-09 — Durable execution result idempotency
 
 ## Objective
-Make execution-result idempotency survive a runtime restart without allowing a second provider call for a previously completed `traceId`.
+Make execution-result idempotency survive a runtime restart without allowing a second provider call when a previous execution is already completed or remains ambiguous.
 
 ## Implemented
-- `ExecutionResultStore` contract with `loadCompleted` / `saveCompleted`.
-- `ExecutionRuntime` can hydrate completed results before executing a provider.
-- If the durable result store cannot be loaded, execution fails closed before the provider is called.
-- A completed result is persisted before it is accepted into the runtime's completed-result cache.
-- If persistence of a successful provider result fails, AUREA does not report durable success; the result is returned as `FAILED` with explicit `RESULT_NOT_DURABLY_PERSISTED` evidence.
+- `ExecutionResultStore` exposes durable `loadState`, `reserve`, `commitCompleted` and `releaseReservation` semantics.
+- `ExecutionRuntime` hydrates completed results and outstanding reservations before provider execution.
+- A trace is reserved before the provider is called.
+- A completed trace is replayed rather than executed again.
+- Provider failure releases the reservation so a controlled retry is possible.
+- Durable commit failure retains the reservation and blocks duplicate execution until reconciliation.
+- If the durable store cannot load, execution fails closed before the provider is called.
 - `InMemoryExecutionResultStore` is a test/dev adapter only; production durability still requires a real persistent adapter.
 
 ## Safety boundary
-The provider may already have executed when result persistence fails. Therefore this state is **not** silently retried: it requires recovery/reconciliation before another execution is attempted.
+The difficult case is provider success followed by persistence failure: the provider may already have executed while the durable result is unknown. AUREA therefore retains the trace reservation instead of silently retrying. A production store must make reservation/commit durable and support reconciliation.
 
 ## Verification
 Tests cover:
-1. replay after a new `ExecutionRuntime` instance using the same store;
-2. fail-closed behavior when result-store hydration fails;
-3. no durable success when result persistence fails.
+1. replay after a new `ExecutionRuntime` instance;
+2. fail-closed store hydration;
+3. duplicate prevention after commit failure;
+4. controlled retry after provider failure.
 
 ## Classification
 - Contract: IMPLEMENTED
