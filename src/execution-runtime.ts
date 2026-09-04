@@ -1,17 +1,15 @@
 /**
- * AUREA Execution Runtime — first controlled execution boundary.
+ * AUREA Execution Runtime — controlled execution boundary.
  *
  * Admission/authorization and provider selection already exist elsewhere.
- * This module performs the missing step: invoke an explicitly registered
- * execution adapter and return a traceable result envelope.
- *
- * It intentionally does not modify RuntimeAdmission, ProviderRuntime or the
- * Work Cell object in place. Persistence/state mutation belongs to a later
- * integration cell.
+ * This module invokes an explicitly registered execution adapter and returns
+ * a traceable result envelope. Completed results may also be hydrated from a
+ * durable store so traceId idempotency survives runtime restart.
  */
 
 import type { RuntimeAdmissionResult } from "./runtime-admission.js";
 import type { ProviderRuntimeAdapter } from "./provider-runtime.js";
+import type { ExecutionResultStore } from "./execution-result-store.js";
 
 export interface ExecutionAdapterRequest {
   traceId: string;
@@ -50,12 +48,15 @@ export interface ExecutionRuntimeRequest {
 
 /**
  * Executes only an already-admitted request. Unknown adapters and malformed
- * success responses fail closed. A traceId is also an idempotency key for the
- * lifetime of this runtime instance.
+ * success responses fail closed. A traceId is an idempotency key for the
+ * lifetime of this runtime and, when configured, across restarts.
  */
 export class ExecutionRuntime {
   private readonly adapters = new Map<string, ExecutionAdapter>();
   private readonly completed = new Map<string, ExecutionRuntimeResult>();
+  private hydrated = false;
+
+  constructor(private readonly resultStore?: ExecutionResultStore) {}
 
   registerAdapter(adapter: ExecutionAdapter): void {
     if (this.adapters.has(adapter.providerId)) {
@@ -96,6 +97,18 @@ export class ExecutionRuntime {
         modelId: provider.modelId,
         evidence: [...admission.evidence, `PROVIDER_STATUS:${provider.status}`],
         error: "EXECUTION_PROVIDER_NOT_EXECUTABLE",
+      };
+    }
+
+    const hydration = await this.ensureHydrated();
+    if (hydration) {
+      return {
+        status: "BLOCKED",
+        traceId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
+        evidence: [...admission.evidence, "RESULT_STORE_REQUIRED_FOR_IDEMPOTENCY", hydration],
+        error: "EXECUTION_IDEMPOTENCY_STORE_UNAVAILABLE",
       };
     }
 
@@ -142,6 +155,22 @@ export class ExecutionRuntime {
         output: response.output,
         evidence: [...new Set([...admission.evidence, ...response.evidence])],
       };
+
+      if (this.resultStore) {
+        try {
+          await this.resultStore.saveCompleted(result);
+        } catch (error) {
+          return {
+            status: "FAILED",
+            traceId,
+            providerId: provider.providerId,
+            modelId: provider.modelId,
+            evidence: [...result.evidence, "RESULT_NOT_DURABLY_PERSISTED"],
+            error: error instanceof Error ? error.message : "EXECUTION_RESULT_PERSISTENCE_FAILED",
+          };
+        }
+      }
+
       this.completed.set(traceId, result);
       return result;
     } catch (error) {
@@ -153,6 +182,20 @@ export class ExecutionRuntime {
         evidence: [...admission.evidence],
         error: error instanceof Error ? error.message : "EXECUTION_ADAPTER_FAILED",
       };
+    }
+  }
+
+  private async ensureHydrated(): Promise<string | undefined> {
+    if (!this.resultStore || this.hydrated) return undefined;
+    try {
+      const results = await this.resultStore.loadCompleted();
+      for (const result of results) {
+        if (result.status === "SUCCEEDED") this.completed.set(result.traceId, { ...result, evidence: [...result.evidence] });
+      }
+      this.hydrated = true;
+      return undefined;
+    } catch (error) {
+      return error instanceof Error ? error.message : "RESULT_STORE_LOAD_FAILED";
     }
   }
 }
