@@ -65,8 +65,10 @@ describe("ExecutionRuntime durable result boundary", () => {
 
   it("fails closed before provider execution when the result store cannot load", async () => {
     const store: ExecutionResultStore = {
-      loadCompleted: vi.fn(async () => { throw new Error("STORE_UNAVAILABLE"); }),
-      saveCompleted: vi.fn(async () => undefined),
+      loadState: vi.fn(async () => { throw new Error("STORE_UNAVAILABLE"); }),
+      reserve: vi.fn(async () => "RESERVED" as const),
+      commitCompleted: vi.fn(async () => undefined),
+      releaseReservation: vi.fn(async () => undefined),
     };
     const runtime = new ExecutionRuntime(store);
     const execute = vi.fn(async () => ({ output: "must-not-run", evidence: ["BAD"] }));
@@ -79,22 +81,41 @@ describe("ExecutionRuntime durable result boundary", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("does not report a durable success when result persistence fails", async () => {
+  it("retains the reservation when durable commit fails, blocking duplicate execution", async () => {
     const store: ExecutionResultStore = {
-      loadCompleted: vi.fn(async () => []),
-      saveCompleted: vi.fn(async () => { throw new Error("STORE_WRITE_FAILED"); }),
+      loadState: vi.fn(async () => ({ completed: [], reservedTraceIds: [] })),
+      reserve: vi.fn(async () => "RESERVED" as const),
+      commitCompleted: vi.fn(async () => { throw new Error("STORE_WRITE_FAILED"); }),
+      releaseReservation: vi.fn(async () => undefined),
     };
     const runtime = new ExecutionRuntime(store);
-    const execute: ExecutionAdapter = {
-      providerId: provider.providerId,
-      execute: vi.fn(async () => ({ output: "executed", evidence: ["ADAPTER:EXECUTED"] })),
-    };
-    runtime.registerAdapter(execute);
+    const execute = vi.fn(async () => ({ output: "executed", evidence: ["ADAPTER:EXECUTED"] }));
+    runtime.registerAdapter({ providerId: provider.providerId, execute });
 
     const result = await runtime.execute({ admission, provider, input: {} });
+    const retry = await runtime.execute({ admission, provider, input: {} });
 
     expect(result.status).toBe("FAILED");
     expect(result.error).toBe("STORE_WRITE_FAILED");
     expect(result.evidence).toContain("RESULT_NOT_DURABLY_PERSISTED");
+    expect(retry.status).toBe("BLOCKED");
+    expect(retry.error).toBe("EXECUTION_IDEMPOTENCY_RESERVATION_EXISTS");
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("releases the reservation after provider failure so a controlled retry is possible", async () => {
+    const store = new InMemoryExecutionResultStore();
+    const runtime = new ExecutionRuntime(store);
+    const execute = vi.fn()
+      .mockRejectedValueOnce(new Error("TRANSIENT_PROVIDER_FAILURE"))
+      .mockResolvedValueOnce({ output: "recovered", evidence: ["ADAPTER:RECOVERED"] });
+    runtime.registerAdapter({ providerId: provider.providerId, execute });
+
+    const first = await runtime.execute({ admission, provider, input: {} });
+    const second = await runtime.execute({ admission, provider, input: {} });
+
+    expect(first.status).toBe("FAILED");
+    expect(second.status).toBe("SUCCEEDED");
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 });
