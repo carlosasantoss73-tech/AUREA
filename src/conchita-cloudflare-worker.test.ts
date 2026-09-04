@@ -11,6 +11,7 @@ class FakeKv {
   }
   async put(key: string, value: string): Promise<void> { this.data.set(key, value); }
   async delete(key: string): Promise<void> { this.data.delete(key); }
+  dump(): Record<string, string> { return Object.fromEntries(this.data.entries()); }
 }
 
 function env(kv: FakeKv) {
@@ -34,7 +35,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     const body = await response.json() as { status: string; sessionId: string };
     expect(body.status).toBe('COMPLETED');
     expect(body.sessionId).toBeTruthy();
-    expect(JSON.stringify(kv)).not.toContain('pilot-token');
+    expect(JSON.stringify(kv.dump())).not.toContain('pilot-token');
   });
 
   it('runs phone-shaped message through gate, admission, provider and execution', async () => {
