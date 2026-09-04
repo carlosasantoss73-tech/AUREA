@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aurea-conchita-pilot",
+  "main": "src/conchita-cloudflare-worker.ts",
+  "compatibility_date": "2026-09-04",
+  "workers_dev": true,
+  "kv_namespaces": [
+    {
+      "binding": "CONCHITA_SESSIONS",
+      "id": "REPLACE_WITH_CONCHITA_SESSIONS_NAMESPACE_ID"
+    }
+  ],
+  "vars": {
+    "CONCHITA_ANTHROPIC_MODEL": "claude-sonnet-4-5",
+    "CONCHITA_PILOT_USER_ID": "pilot-user",
+    "CONCHITA_ALLOWED_ORIGIN": "REPLACE_WITH_CONCHITA_PAGES_ORIGIN"
+  },
+  "secrets": {
+    "required": ["ANTHROPIC_API_KEY", "CONCHITA_PILOT_BOOTSTRAP_TOKEN"]
+  }
+}
