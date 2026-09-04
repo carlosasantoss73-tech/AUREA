@@ -5,8 +5,10 @@ import { HealthLedger } from "./health-ledger.js";
 import { AureaSentinel } from "./sentinel.js";
 import { ProviderRuntime } from "./provider-runtime.js";
 import { AureaExecutionGate } from "./execution-gate.js";
+import { ExecutionStateBridge } from "./execution-state-bridge.js";
 import { RuntimeAdmission } from "./runtime-admission.js";
 import { WorkCell } from "./work-cell.js";
+import { WorkCellRegistry } from "./work-cell-registry.js";
 
 const cell: WorkCell = {
   workCellId: "WC-RUNTIME-001", projectId: "PRJ-001", companyId: "CO-001", objective: "runtime admission",
@@ -33,13 +35,14 @@ const contextProvider = {
   },
 };
 
-function admission() {
+function admission(registry?: WorkCellRegistry) {
   const platform = new AureaPlatformIntegration();
   platform.register(platformAdapter);
   const providers = new ProviderRuntime();
   providers.register({ providerId: "provider-live", modelId: "model-live", status: "EXECUTABLE", capabilities: ["text"], healthEvidence: ["health:pass"] });
   const executionGate = new AureaExecutionGate(new AureaSentinel(new HealthLedger()));
-  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate);
+  const bridge = registry ? new ExecutionStateBridge(executionGate, registry) : undefined;
+  return new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, executionGate, bridge);
 }
 
 describe("RuntimeAdmission", () => {
@@ -53,6 +56,23 @@ describe("RuntimeAdmission", () => {
     expect(result.status).toBe("ADMITTED");
     expect(result.providerId).toBe("provider-live");
     expect(result.execution?.workCell.state).toBe("RUNNING");
+  });
+
+  it("commits READY -> RUNNING to the authoritative registry when the state bridge is configured", async () => {
+    const registry = new WorkCellRegistry();
+    registry.register(cell);
+
+    const result = await admission(registry).admit({
+      traceId: "TRACE-RUNTIME-COMMIT-001", integrationId: "INT-RUNTIME", workCell: cell,
+      contextQuery: "continúa con el trabajo anterior", actorId: "AGT-001", actorRole: "ROLE-001",
+      capabilityId: "CAP-001", toolId: "TOOL-001", action: "execute", effectClass: "READ",
+      providerCapability: "text", allowedProjects: ["PRJ-001"], allowedCapabilities: ["CAP-001"], allowedTools: ["TOOL-001"],
+    });
+
+    expect(result.status).toBe("ADMITTED");
+    expect(registry.get(cell.workCellId).state).toBe("RUNNING");
+    expect(registry.history(cell.workCellId).at(-1)?.to).toBe("RUNNING");
+    expect(result.evidence).toContain("EXECUTION_STATE_COMMITTED");
   });
 
   it("fails closed when no executable provider exists", async () => {
