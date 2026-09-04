@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ExecutionResultLifecycle } from "./execution-result-lifecycle.js";
+import { ExecutionResultQA } from "./execution-result-qa.js";
 import { WorkCell } from "./work-cell.js";
 import { WorkCellRegistry } from "./work-cell-registry.js";
 
@@ -47,6 +48,32 @@ describe("ExecutionResultLifecycle", () => {
     expect(registry.get(cell.workCellId).qaStatus).toBe("PASS");
     expect(registry.get(cell.workCellId).auditStatus).toBe("PASS");
     expect(registry.history(cell.workCellId).map((x) => x.to)).toEqual(["QA", "COMPLETED", "CLOSED"]);
+  });
+
+  it("moves a durable replay through the same independent QA gate", () => {
+    const registry = new WorkCellRegistry();
+    registry.register({ ...cell, workCellId: "WC-REPLAY-001" });
+    const lifecycle = new ExecutionResultLifecycle(registry);
+    const validator = new ExecutionResultQA();
+    const replay = { ...success, status: "REPLAYED" as const, evidence: [...success.evidence, "IDEMPOTENT_REPLAY:trace-life-001"] };
+
+    const validation = validator.validate({
+      result: replay,
+      expectedTraceId: replay.traceId,
+      expectedProviderId: replay.providerId,
+      requiredEvidence: ["RESULT_CAPTURED", "IDEMPOTENT_REPLAY:trace-life-001"],
+    });
+    expect(validation.qaStatus).toBe("PASS");
+
+    const result = lifecycle.apply({
+      workCellId: "WC-REPLAY-001",
+      traceId: replay.traceId,
+      execution: replay,
+      validation,
+    });
+
+    expect(result.status).toBe("CLOSED");
+    expect(registry.get("WC-REPLAY-001").state).toBe("CLOSED");
   });
 
   it("stops at QA when validation is missing", () => {
