@@ -1,34 +1,47 @@
-import type { ConchitaMessageResponse } from "./conchita-personal-v0-contract.js";
-import type { ExecutionRuntime } from "./execution-runtime.js";
-import type { ExecutionRuntimeResult } from "./execution-runtime.js";
+import type {
+  ConchitaMessageResponse,
+  ConchitaMode,
+  ConchitaPersonalRequestHandler,
+  ConchitaSession,
+} from "./conchita-personal-v0-gateway.js";
+import type { ExecutionRuntime, ExecutionRuntimeResult } from "./execution-runtime.js";
 import type { RuntimeAdmission, RuntimeAdmissionRequest } from "./runtime-admission.js";
 import type { ProviderRuntime } from "./provider-runtime.js";
 
-export interface ConchitaRuntimeRequest {
-  admission: RuntimeAdmissionRequest;
-  message: string;
+export interface ConchitaRuntimeAdmissionFactory {
+  build(request: {
+    session: ConchitaSession;
+    message: string;
+    mode: ConchitaMode;
+    traceId: string;
+  }): RuntimeAdmissionRequest;
 }
 
 /**
  * Server-side convergence point for Conchita Personal V0.
- * It deliberately keeps transport/session concerns outside the execution path:
- * admission remains authoritative, provider selection remains deterministic,
- * and ExecutionRuntime remains the only component allowed to execute an adapter.
+ * The Gateway remains responsible for session authorization; this bridge only
+ * maps an authorized Conchita request into the existing AUREA admission and
+ * execution controls. No provider/tool is callable before admission succeeds.
  */
-export class ConchitaRuntimeBridge {
+export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
   constructor(
     private readonly admission: RuntimeAdmission,
     private readonly providers: ProviderRuntime,
     private readonly execution: ExecutionRuntime,
+    private readonly admissionFactory: ConchitaRuntimeAdmissionFactory,
   ) {}
 
-  async handle(request: ConchitaRuntimeRequest): Promise<ConchitaMessageResponse> {
-    const admitted = await this.admission.admit(request.admission);
+  async handle(request: {
+    session: ConchitaSession;
+    message: string;
+    mode: ConchitaMode;
+    traceId: string;
+  }): Promise<Pick<ConchitaMessageResponse, "status" | "response" | "evidence" | "blockers">> {
+    const admissionRequest = this.admissionFactory.build(request);
+    const admitted = await this.admission.admit(admissionRequest);
+
     if (admitted.status !== "ADMITTED" || !admitted.providerId) {
       return {
-        sessionId: request.admission.workCell.workCellId,
-        clientRequestId: request.admission.traceId,
-        traceId: request.admission.traceId,
         status: "BLOCKED",
         evidence: [...admitted.evidence],
         blockers: [...admitted.blockers],
@@ -36,16 +49,13 @@ export class ConchitaRuntimeBridge {
     }
 
     const selected = this.providers.select({
-      requiredCapability: request.admission.providerCapability,
+      requiredCapability: admissionRequest.providerCapability,
       preferredProviderId: admitted.providerId,
-      allowedProviderIds: request.admission.allowedProviderIds,
+      allowedProviderIds: admissionRequest.allowedProviderIds,
     });
 
     if (selected.status !== "SELECTED" || !selected.provider) {
       return {
-        sessionId: request.admission.workCell.workCellId,
-        clientRequestId: request.admission.traceId,
-        traceId: request.admission.traceId,
         status: "BLOCKED",
         evidence: [...admitted.evidence, ...selected.evidence],
         blockers: [...selected.blockers],
@@ -55,21 +65,17 @@ export class ConchitaRuntimeBridge {
     const result = await this.execution.execute({
       admission: admitted,
       provider: selected.provider,
-      input: { message: request.message },
+      input: { message: request.message, mode: request.mode },
     });
 
-    return this.toConchitaResponse(result, request.admission);
+    return this.toConchitaResult(result);
   }
 
-  private toConchitaResponse(
+  private toConchitaResult(
     result: ExecutionRuntimeResult,
-    admission: RuntimeAdmissionRequest,
-  ): ConchitaMessageResponse {
+  ): Pick<ConchitaMessageResponse, "status" | "response" | "evidence" | "blockers"> {
     const completed = result.status === "SUCCEEDED" || result.status === "REPLAYED";
     return {
-      sessionId: admission.workCell.workCellId,
-      clientRequestId: admission.traceId,
-      traceId: result.traceId,
       status: completed ? "COMPLETED" : "BLOCKED",
       response: completed && typeof result.output === "string" ? result.output : undefined,
       evidence: [...result.evidence],
