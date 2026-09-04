@@ -3,8 +3,8 @@
  *
  * Admission/authorization and provider selection already exist elsewhere.
  * This module invokes an explicitly registered execution adapter and returns
- * a traceable result envelope. Completed results may also be hydrated from a
- * durable store so traceId idempotency survives runtime restart.
+ * a traceable result envelope. Durable reservation/commit semantics prevent a
+ * second provider call after a restart when a previous execution is ambiguous.
  */
 
 import type { RuntimeAdmissionResult } from "./runtime-admission.js";
@@ -49,11 +49,12 @@ export interface ExecutionRuntimeRequest {
 /**
  * Executes only an already-admitted request. Unknown adapters and malformed
  * success responses fail closed. A traceId is an idempotency key for the
- * lifetime of this runtime and, when configured, across restarts.
+ * lifetime of this runtime and, when a result store is configured, across restarts.
  */
 export class ExecutionRuntime {
   private readonly adapters = new Map<string, ExecutionAdapter>();
   private readonly completed = new Map<string, ExecutionRuntimeResult>();
+  private readonly reserved = new Set<string>();
   private hydrated = false;
 
   constructor(private readonly resultStore?: ExecutionResultStore) {}
@@ -122,8 +123,21 @@ export class ExecutionRuntime {
       };
     }
 
+    const reservation = await this.reserveTrace(traceId);
+    if (reservation === "BLOCKED") {
+      return {
+        status: "BLOCKED",
+        traceId,
+        providerId: provider.providerId,
+        modelId: provider.modelId,
+        evidence: [...admission.evidence, "EXECUTION_TRACE_RESERVED"],
+        error: "EXECUTION_IDEMPOTENCY_RESERVATION_EXISTS",
+      };
+    }
+
     const adapter = this.adapters.get(provider.providerId);
     if (!adapter) {
+      await this.releaseTrace(traceId);
       return {
         status: "BLOCKED",
         traceId,
@@ -137,6 +151,7 @@ export class ExecutionRuntime {
     try {
       const response = await adapter.execute({ traceId, provider, input });
       if (!response || !Array.isArray(response.evidence) || response.evidence.length === 0) {
+        await this.releaseTrace(traceId);
         return {
           status: "FAILED",
           traceId,
@@ -158,22 +173,26 @@ export class ExecutionRuntime {
 
       if (this.resultStore) {
         try {
-          await this.resultStore.saveCompleted(result);
+          await this.resultStore.commitCompleted(result);
         } catch (error) {
+          // Keep the durable reservation: a retry must not invoke the provider
+          // again until the ambiguous result is reconciled.
           return {
             status: "FAILED",
             traceId,
             providerId: provider.providerId,
             modelId: provider.modelId,
-            evidence: [...result.evidence, "RESULT_NOT_DURABLY_PERSISTED"],
+            evidence: [...result.evidence, "RESULT_NOT_DURABLY_PERSISTED", "TRACE_RESERVATION_RETAINED"],
             error: error instanceof Error ? error.message : "EXECUTION_RESULT_PERSISTENCE_FAILED",
           };
         }
       }
 
       this.completed.set(traceId, result);
+      this.reserved.delete(traceId);
       return result;
     } catch (error) {
+      await this.releaseTrace(traceId);
       return {
         status: "FAILED",
         traceId,
@@ -188,14 +207,36 @@ export class ExecutionRuntime {
   private async ensureHydrated(): Promise<string | undefined> {
     if (!this.resultStore || this.hydrated) return undefined;
     try {
-      const results = await this.resultStore.loadCompleted();
-      for (const result of results) {
+      const state = await this.resultStore.loadState();
+      for (const result of state.completed) {
         if (result.status === "SUCCEEDED") this.completed.set(result.traceId, { ...result, evidence: [...result.evidence] });
       }
+      for (const traceId of state.reservedTraceIds) this.reserved.add(traceId);
       this.hydrated = true;
       return undefined;
     } catch (error) {
       return error instanceof Error ? error.message : "RESULT_STORE_LOAD_FAILED";
     }
+  }
+
+  private async reserveTrace(traceId: string): Promise<"RESERVED" | "COMPLETED" | "BLOCKED"> {
+    if (this.reserved.has(traceId)) return "BLOCKED";
+    if (!this.resultStore) {
+      this.reserved.add(traceId);
+      return "RESERVED";
+    }
+    try {
+      const status = await this.resultStore.reserve(traceId);
+      if (status === "COMPLETED") return "COMPLETED";
+      this.reserved.add(traceId);
+      return "RESERVED";
+    } catch {
+      return "BLOCKED";
+    }
+  }
+
+  private async releaseTrace(traceId: string): Promise<void> {
+    this.reserved.delete(traceId);
+    if (this.resultStore) await this.resultStore.releaseReservation(traceId);
   }
 }
