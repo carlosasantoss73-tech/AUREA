@@ -92,6 +92,30 @@ export class WorkCellRegistry {
     return this.get(workCellId);
   }
 
+  /** Restore persisted cells and lifecycle history as one validated snapshot. */
+  restore(cells: WorkCell[], transitions: WorkCellTransition[]): void {
+    const restoredCells = new Map<string, WorkCell>();
+    for (const cell of cells) {
+      if (!cell.workCellId) throw new Error("WORK_CELL_ID_REQUIRED_FOR_RECOVERY");
+      if (restoredCells.has(cell.workCellId)) throw new Error(`DUPLICATE_WORK_CELL_RECOVERY:${cell.workCellId}`);
+      restoredCells.set(cell.workCellId, structuredClone(cell));
+    }
+
+    for (const transition of transitions) {
+      if (!restoredCells.has(transition.workCellId)) {
+        throw new Error(`TRANSITION_WITHOUT_WORK_CELL:${transition.workCellId}`);
+      }
+      if (!transition.traceId || transition.evidence.length === 0) {
+        throw new Error(`INVALID_WORK_CELL_TRANSITION_EVIDENCE:${transition.workCellId}`);
+      }
+    }
+
+    this.cells.clear();
+    this.transitions.length = 0;
+    for (const [id, cell] of restoredCells) this.cells.set(id, cell);
+    this.transitions.push(...transitions.map(item => structuredClone(item)));
+  }
+
   history(workCellId?: string): WorkCellTransition[] {
     return this.transitions
       .filter((item) => !workCellId || item.workCellId === workCellId)
