@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/a2a-live-interoperability
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
