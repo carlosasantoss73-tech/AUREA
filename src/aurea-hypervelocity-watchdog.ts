@@ -70,7 +70,7 @@ export class HypervelocityMeshWatchdog {
     ) {
       reasons.push("EXECUTION_SCORE_DECAY");
     }
-    if (pulse.blockers > 0 && !progress) {
+    if (pulse.blockers > 0 && !pulse.nextActionDefined) {
       reasons.push("BLOCKER_WITHOUT_RECOVERY_ACTION");
     }
 
@@ -86,7 +86,7 @@ export class HypervelocityMeshWatchdog {
     }
 
     const status: HypervelocityWatchdogStatus =
-      pulse.blockers > 0 && pulse.nextActionDefined === false
+      pulse.blockers > 0 && !pulse.nextActionDefined
         ? "BLOCKED_EXTERNAL"
         : "DRIFT";
 
