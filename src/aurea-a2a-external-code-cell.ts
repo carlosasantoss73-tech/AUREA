@@ -17,6 +17,7 @@ export interface A2AExternalCellConfig {
   cellId: string;
   providerId: string;
   endpoint: string;
+  tenant?: string;
   bearerToken?: string;
   fetchImpl?: A2AFetch;
 }
@@ -66,14 +67,19 @@ export function createA2AExternalCodeCell(
     providerId: config.providerId,
     status: "EXECUTABLE",
     capabilities: ["coding", "a2a-v1"],
-    healthEvidence: [`endpoint:${endpoint.origin}`, "protocol:A2A-1.0"],
+    healthEvidence: [
+      `endpoint:${endpoint.origin}`,
+      "protocol:A2A-1.0",
+      ...(config.tenant ? [`tenant:${config.tenant}`] : []),
+    ],
     execute: async (request) =>
-      executeA2AMission(endpoint, config.bearerToken, fetchImpl, request),
+      executeA2AMission(endpoint, config.tenant, config.bearerToken, fetchImpl, request),
   };
 }
 
 async function executeA2AMission(
   endpoint: URL,
+  tenant: string | undefined,
   bearerToken: string | undefined,
   fetchImpl: A2AFetch,
   request: ExternalCodeCellRequest,
@@ -82,6 +88,7 @@ async function executeA2AMission(
     message: {
       role: "ROLE_USER",
       messageId: request.traceId,
+      ...(tenant ? { tenant } : {}),
       parts: [{ text: buildMission(request) }],
     },
     configuration: {
@@ -185,6 +192,7 @@ async function executeA2AMission(
     `A2A_HTTP:${response.status}`,
     `A2A_ENDPOINT:${endpoint.origin}`,
     "A2A_VERSION:1.0",
+    ...(tenant ? [`A2A_TENANT:${tenant}`] : []),
     ...(task?.id ? [`A2A_TASK:${task.id}`] : []),
     ...(message?.messageId ? [`A2A_MESSAGE:${message.messageId}`] : []),
     ...(task?.status?.state ? [`A2A_STATE:${task.status.state}`] : []),
