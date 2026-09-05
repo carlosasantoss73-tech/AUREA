@@ -44,6 +44,13 @@ interface A2AMessageResponse {
   };
 }
 
+const TERMINAL_TASK_STATES = new Set([
+  "TASK_STATE_COMPLETED",
+  "TASK_STATE_CANCELED",
+  "TASK_STATE_REJECTED",
+  "TASK_STATE_FAILED",
+]);
+
 export function createA2AExternalCodeCell(
   config: A2AExternalCellConfig,
 ): ExternalCodeCellAdapter {
@@ -134,6 +141,26 @@ async function executeA2AMission(
 
   const task = body.task;
   const message = body.message;
+  if (task) {
+    const state = task.status?.state;
+    if (!state || !TERMINAL_TASK_STATES.has(state)) {
+      return blockedResult(request, "A2A_TASK_NON_TERMINAL", [
+        `A2A_HTTP:${response.status}`,
+        `A2A_ENDPOINT:${endpoint.origin}`,
+        ...(task.id ? [`A2A_TASK:${task.id}`] : []),
+        ...(state ? [`A2A_STATE:${state}`] : []),
+      ]);
+    }
+    if (state !== "TASK_STATE_COMPLETED") {
+      return blockedResult(request, `A2A_TASK_${state.replace("TASK_STATE_", "")}`, [
+        `A2A_HTTP:${response.status}`,
+        `A2A_ENDPOINT:${endpoint.origin}`,
+        ...(task.id ? [`A2A_TASK:${task.id}`] : []),
+        `A2A_STATE:${state}`,
+      ]);
+    }
+  }
+
   const output =
     message?.parts?.map((part) => part.text ?? "").join("\n").trim() ||
     task?.status?.message?.parts
