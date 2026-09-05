@@ -25,6 +25,7 @@ describe("A2A live interoperability", () => {
     const runtime = new ExternalCodeCellRuntime();
     runtime.register(adapter);
 
+    // User-authorized live consultation: no writes or publishing are requested.
     const result = await runtime.execute({
       cellId: "aurea-live-a2a-interop",
       traceId: `aurea-live-${Date.now()}`,
