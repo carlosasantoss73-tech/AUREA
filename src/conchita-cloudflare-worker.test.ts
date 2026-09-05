@@ -14,6 +14,10 @@ class FakeKv {
   dump(): Record<string, string> { return Object.fromEntries(this.data.entries()); }
 }
 
+function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json; charset=utf-8' }, ...init });
+}
+
 function executionState() {
   const completed = new Map<string, Stored>();
   const reserved = new Set<string>();
@@ -22,23 +26,23 @@ function executionState() {
     get: (_id: unknown) => ({
       fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
         const body = JSON.parse(String(init?.body ?? '{}')) as { operation?: string; traceId?: string; result?: Stored };
-        if (body.operation === 'loadState') return Response.json({ status: 'OK', state: { completed: [...completed.values()], reservedTraceIds: [...reserved] } });
+        if (body.operation === 'loadState') return jsonResponse({ status: 'OK', state: { completed: [...completed.values()], reservedTraceIds: [...reserved] } });
         if (body.operation === 'reserve' && body.traceId) {
-          if (completed.has(body.traceId)) return Response.json({ status: 'OK', reservation: 'COMPLETED' });
-          if (reserved.has(body.traceId)) return Response.json({ status: 'OK', reservation: 'BLOCKED' });
+          if (completed.has(body.traceId)) return jsonResponse({ status: 'OK', reservation: 'COMPLETED' });
+          if (reserved.has(body.traceId)) return jsonResponse({ status: 'OK', reservation: 'BLOCKED' });
           reserved.add(body.traceId);
-          return Response.json({ status: 'OK', reservation: 'RESERVED' });
+          return jsonResponse({ status: 'OK', reservation: 'RESERVED' });
         }
         if (body.operation === 'commitCompleted' && body.result?.traceId) {
           completed.set(body.result.traceId, body.result);
           reserved.delete(body.result.traceId);
-          return Response.json({ status: 'OK' });
+          return jsonResponse({ status: 'OK' });
         }
         if (body.operation === 'releaseReservation' && body.traceId) {
           reserved.delete(body.traceId);
-          return Response.json({ status: 'OK' });
+          return jsonResponse({ status: 'OK' });
         }
-        return Response.json({ status: 'BLOCKED' }, { status: 400 });
+        return jsonResponse({ status: 'BLOCKED' }, { status: 400 });
       },
     }),
   };
