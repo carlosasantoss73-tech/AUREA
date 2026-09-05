@@ -10,6 +10,12 @@ export interface ConchitaPersonalRequestHandler {
 
 type ConchitaSessionBackend = ConchitaSessionStore | ConchitaDurableSessionRepository;
 
+async function executionTraceId(sessionId: string, clientRequestId: string): Promise<string> {
+  const source = new TextEncoder().encode(`${sessionId}:${clientRequestId}`);
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  return `client-${Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
   constructor(private readonly handler: ConchitaPersonalRequestHandler, private readonly sessions: ConchitaSessionBackend, private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
 
@@ -29,7 +35,11 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     const active = session ? await this.isSessionActive(request.sessionId) : false;
     if (!session || !active) return this.blocked(request, ['SESSION_NOT_ACTIVE']);
     if (session.userId !== principal!.userId) return this.blocked(request, ['SESSION_PRINCIPAL_MISMATCH']);
-    const traceId = this.id();
+
+    // The client request identity is the idempotency identity. Hashing it with
+    // the authenticated session prevents the same clientRequestId from
+    // colliding across sessions while keeping the raw identifiers out of the trace.
+    const traceId = await executionTraceId(session.sessionId, request.clientRequestId);
     const mode = request.mode ?? session.mode;
     const result = await this.handler.handle({ session: { ...session, mode }, message: request.message.trim(), mode, traceId });
     return { sessionId: session.sessionId, clientRequestId: request.clientRequestId, traceId, status: result.status, response: result.response, evidence: [...new Set(result.evidence)], blockers: [...result.blockers] };
@@ -46,17 +56,9 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     return await Promise.resolve(result);
   }
 
-  private async saveSession(session: ConchitaSession): Promise<void> {
-    await Promise.resolve(this.sessions.save(session));
-  }
-
-  private async revokeSession(sessionId: string): Promise<boolean> {
-    return await Promise.resolve(this.sessions.revoke(sessionId));
-  }
-
-  private async isSessionActive(sessionId: string): Promise<boolean> {
-    return await Promise.resolve(this.sessions.isActive(sessionId));
-  }
+  private async saveSession(session: ConchitaSession): Promise<void> { await Promise.resolve(this.sessions.save(session)); }
+  private async revokeSession(sessionId: string): Promise<boolean> { return await Promise.resolve(this.sessions.revoke(sessionId)); }
+  private async isSessionActive(sessionId: string): Promise<boolean> { return await Promise.resolve(this.sessions.isActive(sessionId)); }
 
   private blocked(request: ConchitaMessageRequest, blockers: string[]): ConchitaMessageResponse {
     return { sessionId: request.sessionId ?? '', clientRequestId: request.clientRequestId ?? '', traceId: 'BLOCKED', status: 'BLOCKED', evidence: ['CONCHITA_GATEWAY_SECURITY'], blockers };
