@@ -34,6 +34,8 @@ describe("A2A external code cell", () => {
     const fetchImpl = vi.fn<typeof fetch>(async (_input, init) => {
       expect(init?.method).toBe("POST");
       expect(new Headers(init?.headers).get("a2a-version")).toBe("1.0");
+      expect(new Headers(init?.headers).get("content-type")).toBe("application/a2a+json");
+      expect(new Headers(init?.headers).get("accept")).toBe("application/a2a+json");
       const body = JSON.parse(String(init?.body)) as {
         message: { messageId: string; parts: Array<{ text: string }> };
       };
@@ -46,14 +48,14 @@ describe("A2A external code cell", () => {
             parts: [{ text: "External agent completed the bounded mission." }],
           },
         }),
-        { status: 200, headers: { "content-type": "application/json" } },
+        { status: 200, headers: { "content-type": "application/a2a+json" } },
       );
     });
 
     const cell = createA2AExternalCodeCell({
       cellId: request.cellId,
       providerId: "a2a-test",
-      endpoint: "https://agent.example.com/v1/message:send",
+      endpoint: "https://agent.example.com/message:send",
       bearerToken: "test-secret",
       fetchImpl,
     });
@@ -69,18 +71,63 @@ describe("A2A external code cell", () => {
     expect(JSON.stringify(result)).not.toContain("test-secret");
   });
 
-  it("fails closed on an empty remote response", async () => {
+  it("fails closed when a successful response contains both task and message", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () =>
-      new Response(JSON.stringify({ message: { messageId: "empty" } }), {
+      new Response(JSON.stringify({
+        task: { id: "task-1", artifacts: [{ parts: [{ text: "task output" }] }] },
+        message: { messageId: "message-1", parts: [{ text: "message output" }] },
+      }), {
         status: 200,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/a2a+json" },
       }),
     );
 
     const cell = createA2AExternalCodeCell({
       cellId: request.cellId,
       providerId: "a2a-test",
-      endpoint: "https://agent.example.com/v1/message:send",
+      endpoint: "https://agent.example.com/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("A2A_RESPONSE_SHAPE_INVALID");
+  });
+
+  it("fails closed when a successful response contains neither task nor message", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "content-type": "application/a2a+json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("A2A_RESPONSE_SHAPE_INVALID");
+  });
+
+  it("fails closed on an empty remote response", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({ message: { messageId: "empty" } }), {
+        status: 200,
+        headers: { "content-type": "application/a2a+json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/message:send",
       fetchImpl,
     });
 
@@ -94,14 +141,14 @@ describe("A2A external code cell", () => {
     const fetchImpl = vi.fn<typeof fetch>(async () =>
       new Response("not-json", {
         status: 200,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/a2a+json" },
       }),
     );
 
     const cell = createA2AExternalCodeCell({
       cellId: request.cellId,
       providerId: "a2a-test",
-      endpoint: "https://agent.example.com/v1/message:send",
+      endpoint: "https://agent.example.com/message:send",
       fetchImpl,
     });
 
