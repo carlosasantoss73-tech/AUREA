@@ -28,16 +28,17 @@ describe("A2A live interoperability", () => {
     const result = await runtime.execute({
       cellId: "aurea-live-a2a-interop",
       traceId: `aurea-live-${Date.now()}`,
-      objective: "Find official datasets about public schools in Ecuador.",
+      objective:
+        "How could we design a living digital platform and living ecosystem that feels surprising, beautiful and deeply engaging, so that visitors become curious, emotionally connected, keep exploring, and do not want to leave? Give one concrete example of the experience, interaction model, and visual behavior that could make it memorable.",
       companyScope: "AUREA interoperability validation",
       projectScope: "A2A v1 live external agent test",
-      responsibility: "Ask the remote agent for one bounded public-data search and return its response.",
-      requiredCapabilities: ["a2a-v1", "public-data-search"],
+      responsibility: "Ask the remote agent for one bounded product-design concept and return its response.",
+      requiredCapabilities: ["a2a-v1"],
       authorityLevel: "test-only",
       allowedKnowledge: ["The user-authorized live interoperability test"],
       restrictions: ["Do not publish or modify anything; return only the remote agent result."],
       dependencies: ["Public A2A v1 endpoint"],
-      inputEvidence: ["Ecuador", "public schools"],
+      inputEvidence: ["living digital platform", "living ecosystem", "memorable experience"],
       expectedOutput: ["A non-empty response from the remote A2A agent"],
       validationCriteria: [
         "AUREA discovers a v1 Agent Card",
