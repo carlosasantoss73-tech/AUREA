@@ -2,8 +2,8 @@
  * Minimal A2A v1 Agent Card discovery for AUREA external cells.
  *
  * Scope: discover an HTTPS A2A v1.0 interface from the public
- * well-known Agent Card. HTTP+JSON is preferred; JSONRPC is supported
- * as a standards-compliant fallback when HTTP+JSON is not advertised.
+ * well-known Agent Card. AUREA follows the Agent Card interface order
+ * and selects the first supported v1 binding it can execute.
  */
 
 type A2AFetch = typeof fetch;
@@ -73,21 +73,13 @@ export async function discoverA2AAgent(
     throw new Error("A2A_DISCOVERY_CARD_INVALID");
   }
 
-  const supported =
-    card.supportedInterfaces.find(
-      (item) =>
-        item &&
-        item.protocolBinding === "HTTP+JSON" &&
-        item.protocolVersion === "1.0" &&
-        typeof item.url === "string",
-    ) ??
-    card.supportedInterfaces.find(
-      (item) =>
-        item &&
-        item.protocolBinding === "JSONRPC" &&
-        item.protocolVersion === "1.0" &&
-        typeof item.url === "string",
-    );
+  const supported = card.supportedInterfaces.find(
+    (item) =>
+      item &&
+      item.protocolVersion === "1.0" &&
+      (item.protocolBinding === "HTTP+JSON" || item.protocolBinding === "JSONRPC") &&
+      typeof item.url === "string",
+  );
 
   if (!supported) {
     throw new Error("A2A_DISCOVERY_V1_UNSUPPORTED");
