@@ -1,12 +1,14 @@
 /**
  * Minimal A2A v1 Agent Card discovery for AUREA external cells.
  *
- * Scope: discover an HTTPS HTTP+JSON v1.0 interface from the public
- * well-known Agent Card. Authentication and long-running task orchestration
- * remain execution-layer concerns.
+ * Scope: discover an HTTPS A2A v1.0 interface from the public
+ * well-known Agent Card. HTTP+JSON is preferred; JSONRPC is supported
+ * as a standards-compliant fallback when HTTP+JSON is not advertised.
  */
 
 type A2AFetch = typeof fetch;
+
+export type A2AProtocolBinding = "HTTP+JSON" | "JSONRPC";
 
 export interface A2AAgentInterface {
   url: string;
@@ -30,7 +32,7 @@ export interface A2ADiscoveredAgent {
   agentName?: string;
   agentVersion?: string;
   endpoint: string;
-  protocolBinding: "HTTP+JSON";
+  protocolBinding: A2AProtocolBinding;
   protocolVersion: "1.0";
   tenant?: string;
   capabilities: Record<string, unknown>;
@@ -71,16 +73,24 @@ export async function discoverA2AAgent(
     throw new Error("A2A_DISCOVERY_CARD_INVALID");
   }
 
-  const supported = card.supportedInterfaces.find(
-    (item) =>
-      item &&
-      item.protocolBinding === "HTTP+JSON" &&
-      item.protocolVersion === "1.0" &&
-      typeof item.url === "string",
-  );
+  const supported =
+    card.supportedInterfaces.find(
+      (item) =>
+        item &&
+        item.protocolBinding === "HTTP+JSON" &&
+        item.protocolVersion === "1.0" &&
+        typeof item.url === "string",
+    ) ??
+    card.supportedInterfaces.find(
+      (item) =>
+        item &&
+        item.protocolBinding === "JSONRPC" &&
+        item.protocolVersion === "1.0" &&
+        typeof item.url === "string",
+    );
 
   if (!supported) {
-    throw new Error("A2A_DISCOVERY_HTTP_JSON_V1_UNSUPPORTED");
+    throw new Error("A2A_DISCOVERY_V1_UNSUPPORTED");
   }
 
   const endpoint = new URL(supported.url);
@@ -88,12 +98,14 @@ export async function discoverA2AAgent(
     throw new Error("A2A_DISCOVERY_ENDPOINT_HTTPS_REQUIRED");
   }
 
+  const protocolBinding = supported.protocolBinding as A2AProtocolBinding;
+
   return {
     agentCardUrl: cardUrl.toString(),
     agentName: card.name,
     agentVersion: card.version,
     endpoint: endpoint.toString(),
-    protocolBinding: "HTTP+JSON",
+    protocolBinding,
     protocolVersion: "1.0",
     tenant: supported.tenant,
     capabilities: card.capabilities ?? {},
