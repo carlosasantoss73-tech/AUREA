@@ -90,8 +90,8 @@ async function executeA2AMission(
   const response = await fetchImpl(endpoint, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
-      accept: "application/json",
+      "content-type": "application/a2a+json",
+      accept: "application/a2a+json",
       "a2a-version": "1.0",
       ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
     },
@@ -121,6 +121,15 @@ async function executeA2AMission(
       `A2A_ERROR:${body.error.code ?? "UNKNOWN"}`,
       [`A2A_ENDPOINT:${endpoint.origin}`],
     );
+  }
+
+  const hasTask = Boolean(body.task);
+  const hasMessage = Boolean(body.message);
+  if (hasTask === hasMessage) {
+    return blockedResult(request, "A2A_RESPONSE_SHAPE_INVALID", [
+      `A2A_HTTP:${response.status}`,
+      `A2A_ENDPOINT:${endpoint.origin}`,
+    ]);
   }
 
   const task = body.task;
