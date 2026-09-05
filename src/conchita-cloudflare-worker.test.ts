@@ -14,9 +14,40 @@ class FakeKv {
   dump(): Record<string, string> { return Object.fromEntries(this.data.entries()); }
 }
 
+function executionState() {
+  const completed = new Map<string, Stored>();
+  const reserved = new Set<string>();
+  return {
+    idFromName: (_name: string) => 'execution-state',
+    get: (_id: unknown) => ({
+      fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { operation?: string; traceId?: string; result?: Stored };
+        if (body.operation === 'loadState') return Response.json({ status: 'OK', state: { completed: [...completed.values()], reservedTraceIds: [...reserved] } });
+        if (body.operation === 'reserve' && body.traceId) {
+          if (completed.has(body.traceId)) return Response.json({ status: 'OK', reservation: 'COMPLETED' });
+          if (reserved.has(body.traceId)) return Response.json({ status: 'OK', reservation: 'BLOCKED' });
+          reserved.add(body.traceId);
+          return Response.json({ status: 'OK', reservation: 'RESERVED' });
+        }
+        if (body.operation === 'commitCompleted' && body.result?.traceId) {
+          completed.set(body.result.traceId, body.result);
+          reserved.delete(body.result.traceId);
+          return Response.json({ status: 'OK' });
+        }
+        if (body.operation === 'releaseReservation' && body.traceId) {
+          reserved.delete(body.traceId);
+          return Response.json({ status: 'OK' });
+        }
+        return Response.json({ status: 'BLOCKED' }, { status: 400 });
+      },
+    }),
+  };
+}
+
 function env(kv: FakeKv) {
   return {
     CONCHITA_SESSIONS: kv,
+    CONCHITA_EXECUTION_STATE: executionState(),
     CONCHITA_ANTHROPIC_MODEL: 'claude-sonnet-5',
     ANTHROPIC_API_KEY: 'test-secret',
     CONCHITA_PILOT_USER_ID: 'pilot-user',
