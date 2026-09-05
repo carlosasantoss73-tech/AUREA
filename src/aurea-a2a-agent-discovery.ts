@@ -12,6 +12,7 @@ export interface A2AAgentInterface {
   url: string;
   protocolBinding: string;
   protocolVersion: string;
+  tenant?: string;
 }
 
 export interface A2AAgentCard {
@@ -31,6 +32,7 @@ export interface A2ADiscoveredAgent {
   endpoint: string;
   protocolBinding: "HTTP+JSON";
   protocolVersion: "1.0";
+  tenant?: string;
   capabilities: Record<string, unknown>;
   skills: unknown[];
   securitySchemes: Record<string, unknown>;
@@ -93,6 +95,7 @@ export async function discoverA2AAgent(
     endpoint: endpoint.toString(),
     protocolBinding: "HTTP+JSON",
     protocolVersion: "1.0",
+    tenant: supported.tenant,
     capabilities: card.capabilities ?? {},
     skills: card.skills ?? [],
     securitySchemes: card.securitySchemes ?? {},
