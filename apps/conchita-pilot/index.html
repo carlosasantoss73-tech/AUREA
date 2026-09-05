@@ -41,9 +41,21 @@
   <section id="messages" aria-live="polite"><div class="msg assistant">Hola. Soy Conchita. Este es tu acceso piloto.</div></section>
   <form id="chat" class="chat"><input id="message" autocomplete="off" placeholder="Habla o escribe a Conchita…" /><button>Enviar</button></form>
 </main>
+<script src="./config.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const API_BASE = (params.get('api') || localStorage.getItem('CONCHITA_API_BASE') || '').replace(/\/$/, '');
+const configuredOrigins = Array.isArray(window.CONCHITA_CONFIG?.allowedApiOrigins) ? window.CONCHITA_CONFIG.allowedApiOrigins : [];
+function normalizeApiBase(value) {
+  const base = value.trim().replace(/\/$/, '');
+  if (!base) return '';
+  let url;
+  try { url = new URL(base); } catch { throw new Error('PILOT_API_URL_INVALID'); }
+  if (url.protocol !== 'https:') throw new Error('PILOT_API_HTTPS_REQUIRED');
+  if (!configuredOrigins.includes(url.origin)) throw new Error('PILOT_API_ORIGIN_NOT_ALLOWED');
+  return url.origin + url.pathname.replace(/\/$/, '');
+}
+let API_BASE = '';
+try { API_BASE = normalizeApiBase(params.get('api') || localStorage.getItem('CONCHITA_API_BASE') || ''); } catch { API_BASE = ''; }
 const status = document.querySelector('#status');
 const messages = document.querySelector('#messages');
 const input = document.querySelector('#message');
@@ -54,9 +66,8 @@ const add = (text, role) => { const el=document.createElement('div'); el.classNa
 const sessionId = () => sessionStorage.getItem('CONCHITA_SESSION_ID') || '';
 const clientRequestId = () => crypto.randomUUID();
 apiInput.value = API_BASE;
-if (API_BASE) localStorage.setItem('CONCHITA_API_BASE', API_BASE);
 async function activate() {
-  const base = apiInput.value.trim().replace(/\/$/, '');
+  const base = normalizeApiBase(apiInput.value);
   const token = tokenInput.value;
   if (!base || !token) throw new Error('PILOT_CONFIGURATION_REQUIRED');
   const response = await fetch(`${base}/conchita/v1/session`, { method:'POST', headers:{ Authorization:`Bearer ${token}` } });
@@ -70,7 +81,7 @@ async function activate() {
   status.textContent = 'Conectada';
 }
 async function send(text) {
-  const base = (localStorage.getItem('CONCHITA_API_BASE') || API_BASE).replace(/\/$/, '');
+  const base = normalizeApiBase(localStorage.getItem('CONCHITA_API_BASE') || API_BASE);
   if (!base || !sessionId()) throw new Error('CONCHITA_SESSION_REQUIRED');
   const response = await fetch(`${base}/conchita/v1/message`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({ message:text, sessionId:sessionId(), clientRequestId:clientRequestId(), mode:'PERSONAL' }) });
   if (!response.ok) throw new Error(`HTTP_${response.status}`);
@@ -78,7 +89,7 @@ async function send(text) {
 }
 document.querySelector('#setup-form').addEventListener('submit', async e => {
   e.preventDefault(); status.textContent='Activando…';
-  try { await activate(); } catch { status.textContent='No se pudo activar el piloto'; }
+  try { await activate(); } catch { status.textContent='Endpoint no autorizado o piloto no disponible'; }
 });
 document.querySelector('#chat').addEventListener('submit', async e => {
   e.preventDefault(); const text=input.value.trim(); if(!text) return; input.value=''; add(text,'user'); status.textContent='Conectando…';
