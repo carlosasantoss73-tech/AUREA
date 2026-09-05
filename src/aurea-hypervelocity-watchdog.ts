@@ -70,8 +70,19 @@ export class HypervelocityMeshWatchdog {
     ) {
       reasons.push("EXECUTION_SCORE_DECAY");
     }
-    if (pulse.blockers > 0 && !progress) {
+    if (pulse.blockers > 0 && !pulse.nextActionDefined) {
       reasons.push("BLOCKER_WITHOUT_RECOVERY_ACTION");
+    }
+
+    if (pulse.blockers > 0 && !pulse.nextActionDefined) {
+      return {
+        status: "BLOCKED_EXTERNAL",
+        score,
+        baselineScore: this.baselineScore ?? score,
+        consecutiveNoProgress: this.consecutiveNoProgress,
+        reasons,
+        directive: "DECLARE_BLOCKED_EXTERNAL_WITH_EXACT_DEPENDENCY_AND_EVIDENCE",
+      };
     }
 
     if (reasons.length === 0) {
@@ -85,21 +96,13 @@ export class HypervelocityMeshWatchdog {
       };
     }
 
-    const status: HypervelocityWatchdogStatus =
-      pulse.blockers > 0 && pulse.nextActionDefined === false
-        ? "BLOCKED_EXTERNAL"
-        : "DRIFT";
-
     return {
-      status,
+      status: "DRIFT",
       score,
       baselineScore: this.baselineScore ?? score,
       consecutiveNoProgress: this.consecutiveNoProgress,
       reasons,
-      directive:
-        status === "BLOCKED_EXTERNAL"
-          ? "DECLARE_BLOCKED_EXTERNAL_WITH_EXACT_DEPENDENCY_AND_EVIDENCE"
-          : "RETAKE_CONTROL:INSPECT_STATE_EXECUTE_WORK_VERIFY_EVIDENCE_CLOSE_OR_BLOCK",
+      directive: "RETAKE_CONTROL:INSPECT_STATE_EXECUTE_WORK_VERIFY_EVIDENCE_CLOSE_OR_BLOCK",
     };
   }
 }
