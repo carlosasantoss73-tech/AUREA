@@ -3,7 +3,8 @@ import { createA2AExternalCodeCell } from "../src/aurea-a2a-external-code-cell";
 import { ExternalCodeCellRuntime } from "../src/aurea-external-code-cell";
 import { discoverA2AAgent } from "../src/aurea-a2a-agent-discovery";
 
-const LIVE_AGENT_ORIGIN = "https://170.64.146.185.sslip.io";
+const LIVE_AGENT_ORIGIN = "https://deusproof.com";
+const TEST_SHA256 = "0000000000000000000000000000000000000000000000000000000000000000";
 
 describe("A2A live interoperability", () => {
   it("discovers and executes against a public A2A v1 HTTP+JSON agent", async () => {
@@ -16,7 +17,7 @@ describe("A2A live interoperability", () => {
 
     const adapter = createA2AExternalCodeCell({
       cellId: "aurea-live-a2a-interop",
-      providerId: discovered.agentName ?? "public-a2a-agent",
+      providerId: discovered.agentName ?? "deusproof",
       endpoint: discovered.endpoint,
       tenant: discovered.tenant,
     });
@@ -27,16 +28,16 @@ describe("A2A live interoperability", () => {
     const result = await runtime.execute({
       cellId: "aurea-live-a2a-interop",
       traceId: `aurea-live-${Date.now()}`,
-      objective: "Use the remote trust agent to check https://example.org before recommending it.",
+      objective: `Timestamp this SHA-256 so I can prove later that I had it first: ${TEST_SHA256}`,
       companyScope: "AUREA interoperability validation",
       projectScope: "A2A v1 live external agent test",
-      responsibility: "Execute one bounded trust_check request and return the remote result.",
-      requiredCapabilities: ["a2a-v1", "trust_check"],
+      responsibility: "Execute one bounded notarize-hash request and return the remote result.",
+      requiredCapabilities: ["a2a-v1", "notarize-hash"],
       authorityLevel: "test-only",
       allowedKnowledge: ["The user-authorized live interoperability test"],
-      restrictions: ["Do not recommend anything; return only the remote agent result."],
+      restrictions: ["Do not publish or recommend anything; return only the remote agent result."],
       dependencies: ["Public A2A v1 HTTP+JSON endpoint"],
-      inputEvidence: ["https://example.org"],
+      inputEvidence: [TEST_SHA256],
       expectedOutput: ["A non-empty response from the remote A2A agent"],
       validationCriteria: [
         "AUREA discovers a v1 HTTP+JSON Agent Card",
