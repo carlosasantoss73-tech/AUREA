@@ -85,9 +85,10 @@ describe('Conchita Cloudflare pilot worker', () => {
 
   it('runs phone-shaped message through gate, admission, provider and execution', async () => {
     const kv = new FakeKv();
+    const runtimeEnv = env(kv);
     const sessionResponse = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
       method: 'POST', headers: { Origin: 'https://pilot.example', Authorization: 'Bearer pilot-token' },
-    }), env(kv));
+    }), runtimeEnv);
     const session = await sessionResponse.json() as { sessionId: string };
 
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hola desde Claude' }] }), { status: 200, headers: { 'Content-Type': 'application/json', 'request-id': 'req_test_123' } })));
@@ -95,7 +96,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
       method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), env(kv));
+    }), runtimeEnv);
 
     expect(response.status).toBe(200);
     const body = await response.json() as { status: string; response: string; evidence: string[]; traceId: string };
@@ -107,7 +108,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     const second = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
       method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), env(kv));
+    }), runtimeEnv);
     const replay = await second.json() as { status: string; traceId: string; response: string; evidence: string[] };
     expect(second.status).toBe(200);
     expect(replay.status).toBe('COMPLETED');
