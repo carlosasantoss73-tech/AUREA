@@ -9,9 +9,22 @@ export interface ConchitaPersonalRequestHandler {
 }
 
 type ConchitaSessionBackend = ConchitaSessionStore | ConchitaDurableSessionRepository;
+type TraceForRequest = (sessionId: string, clientRequestId: string) => string | Promise<string>;
+
+export async function conchitaExecutionTraceId(sessionId: string, clientRequestId: string): Promise<string> {
+  const source = new TextEncoder().encode(`${sessionId}:${clientRequestId}`);
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  return `client-${Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
 
 export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
-  constructor(private readonly handler: ConchitaPersonalRequestHandler, private readonly sessions: ConchitaSessionBackend, private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
+  constructor(
+    private readonly handler: ConchitaPersonalRequestHandler,
+    private readonly sessions: ConchitaSessionBackend,
+    private readonly now: () => string = () => new Date().toISOString(),
+    private readonly id: () => string = () => crypto.randomUUID(),
+    private readonly traceForRequest?: TraceForRequest,
+  ) {}
 
   async openSession(userId: string, mode: ConchitaMode): Promise<ConchitaSession> {
     if (!userId.trim()) throw new Error('USER_REQUIRED');
@@ -29,36 +42,19 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     const active = session ? await this.isSessionActive(request.sessionId) : false;
     if (!session || !active) return this.blocked(request, ['SESSION_NOT_ACTIVE']);
     if (session.userId !== principal!.userId) return this.blocked(request, ['SESSION_PRINCIPAL_MISMATCH']);
-    const traceId = this.id();
+    const traceId = this.traceForRequest
+      ? await this.traceForRequest(session.sessionId, request.clientRequestId)
+      : this.id();
     const mode = request.mode ?? session.mode;
     const result = await this.handler.handle({ session: { ...session, mode }, message: request.message.trim(), mode, traceId });
     return { sessionId: session.sessionId, clientRequestId: request.clientRequestId, traceId, status: result.status, response: result.response, evidence: [...new Set(result.evidence)], blockers: [...result.blockers] };
   }
 
-  async sendMessage(request: ConchitaMessageRequest): Promise<ConchitaMessageResponse> {
-    return this.sendAuthenticatedMessage(undefined, request);
-  }
-
+  async sendMessage(request: ConchitaMessageRequest): Promise<ConchitaMessageResponse> { return this.sendAuthenticatedMessage(undefined, request); }
   async closeSession(sessionId: string): Promise<void> { await this.revokeSession(sessionId); }
-
-  private async getSession(sessionId: string): Promise<ConchitaSession | undefined> {
-    const result = this.sessions.get(sessionId);
-    return await Promise.resolve(result);
-  }
-
-  private async saveSession(session: ConchitaSession): Promise<void> {
-    await Promise.resolve(this.sessions.save(session));
-  }
-
-  private async revokeSession(sessionId: string): Promise<boolean> {
-    return await Promise.resolve(this.sessions.revoke(sessionId));
-  }
-
-  private async isSessionActive(sessionId: string): Promise<boolean> {
-    return await Promise.resolve(this.sessions.isActive(sessionId));
-  }
-
-  private blocked(request: ConchitaMessageRequest, blockers: string[]): ConchitaMessageResponse {
-    return { sessionId: request.sessionId ?? '', clientRequestId: request.clientRequestId ?? '', traceId: 'BLOCKED', status: 'BLOCKED', evidence: ['CONCHITA_GATEWAY_SECURITY'], blockers };
-  }
+  private async getSession(sessionId: string): Promise<ConchitaSession | undefined> { return await Promise.resolve(this.sessions.get(sessionId)); }
+  private async saveSession(session: ConchitaSession): Promise<void> { await Promise.resolve(this.sessions.save(session)); }
+  private async revokeSession(sessionId: string): Promise<boolean> { return await Promise.resolve(this.sessions.revoke(sessionId)); }
+  private async isSessionActive(sessionId: string): Promise<boolean> { return await Promise.resolve(this.sessions.isActive(sessionId)); }
+  private blocked(request: ConchitaMessageRequest, blockers: string[]): ConchitaMessageResponse { return { sessionId: request.sessionId ?? '', clientRequestId: request.clientRequestId ?? '', traceId: 'BLOCKED', status: 'BLOCKED', evidence: ['CONCHITA_GATEWAY_SECURITY'], blockers }; }
 }
