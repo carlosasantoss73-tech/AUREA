@@ -45,10 +45,10 @@ describe("A2A live interoperability", () => {
       ],
     });
 
-    expect(result.status).toBe("COMPLETED");
-    expect(result.result).toBeTruthy();
-    expect(result.evidence).toContain("A2A_VERSION:1.0");
-    expect(result.evidence.some((item) => item.startsWith("A2A_HTTP:"))).toBe(true);
-    expect(result.evidence.some((item) => item.startsWith("A2A_ENDPOINT:"))).toBe(true);
+    expect(result.status, JSON.stringify(result)).toBe("COMPLETED");
+    expect(result.result, JSON.stringify(result)).toBeTruthy();
+    expect(result.evidence, JSON.stringify(result)).toContain("A2A_VERSION:1.0");
+    expect(result.evidence.some((item) => item.startsWith("A2A_HTTP:")), JSON.stringify(result)).toBe(true);
+    expect(result.evidence.some((item) => item.startsWith("A2A_ENDPOINT:")), JSON.stringify(result)).toBe(true);
   }, 30_000);
 });
