@@ -98,7 +98,15 @@ async function executeA2AMission(
     body: JSON.stringify(payload),
   });
 
-  const body = (await response.json()) as A2AMessageResponse;
+  let body: A2AMessageResponse;
+  try {
+    body = (await response.json()) as A2AMessageResponse;
+  } catch {
+    return blockedResult(request, "A2A_RESPONSE_MALFORMED_JSON", [
+      `A2A_HTTP:${response.status}`,
+      `A2A_ENDPOINT:${endpoint.origin}`,
+    ]);
+  }
   if (!response.ok) {
     return blockedResult(
       request,

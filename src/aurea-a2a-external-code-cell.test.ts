@@ -89,4 +89,25 @@ describe("A2A external code cell", () => {
     expect(result.status).toBe("BLOCKED");
     expect(result.blockers).toContain("A2A_RESULT_EMPTY");
   });
+
+  it("fails closed on malformed JSON from a successful response", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response("not-json", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/v1/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("A2A_RESPONSE_MALFORMED_JSON");
+  });
 });
