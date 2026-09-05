@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/a2a-live-interoperability
+      - feat/a2a-living-platform-live
   pull_request:
     branches:
       - main
