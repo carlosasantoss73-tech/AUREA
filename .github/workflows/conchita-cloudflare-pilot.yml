@@ -14,3 +14,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            ANTHROPIC_API_KEY
+            CONCHITA_PILOT_BOOTSTRAP_TOKEN
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CONCHITA_PILOT_BOOTSTRAP_TOKEN: ${{ secrets.CONCHITA_PILOT_BOOTSTRAP_TOKEN }}
