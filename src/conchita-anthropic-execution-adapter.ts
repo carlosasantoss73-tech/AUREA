@@ -39,11 +39,7 @@ export class ConchitaAnthropicExecutionAdapter implements ExecutionAdapter {
         "x-api-key": this.apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({
-        model: request.provider.modelId,
-        max_tokens: this.maxTokens,
-        messages: [{ role: "user", content: input.message }],
-      }),
+      body: JSON.stringify({ model: request.provider.modelId, max_tokens: this.maxTokens, messages: [{ role: "user", content: input.message }] }),
     });
 
     if (!response.ok) {
@@ -56,14 +52,15 @@ export class ConchitaAnthropicExecutionAdapter implements ExecutionAdapter {
     const text = this.extractText(payload);
     if (!text) throw new Error("ANTHROPIC_RESPONSE_TEXT_MISSING");
 
-    return {
-      output: text,
-      evidence: [
-        "PROVIDER_HTTP:anthropic",
-        `PROVIDER_MODEL:${request.provider.modelId}`,
-        `TRACE:${request.traceId}`,
-      ],
-    };
+    const requestId = response.headers.get("request-id");
+    const evidence = [
+      "PROVIDER_HTTP:anthropic",
+      `PROVIDER_MODEL:${request.provider.modelId}`,
+      `TRACE:${request.traceId}`,
+      ...(requestId ? [`PROVIDER_REQUEST_ID:${requestId}`] : []),
+    ];
+
+    return { output: text, evidence };
   }
 
   private readInput(input: unknown): { message: string } {
