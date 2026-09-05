@@ -46,6 +46,19 @@ function json(body: unknown, status: number, headers: Record<string, string> = {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
 }
 
+function runtimeHealth(env: Env): { status: 'HEALTHY' | 'BLOCKED'; checks: Record<string, boolean>; blockers: string[] } {
+  const checks = {
+    kv: Boolean(env.CONCHITA_SESSIONS),
+    providerCredentials: Boolean(env.ANTHROPIC_API_KEY),
+    providerModel: Boolean(env.CONCHITA_ANTHROPIC_MODEL),
+    pilotUser: Boolean(env.CONCHITA_PILOT_USER_ID),
+    bootstrapAuth: Boolean(env.CONCHITA_PILOT_BOOTSTRAP_TOKEN),
+    allowedOrigin: Boolean(env.CONCHITA_ALLOWED_ORIGIN),
+  };
+  const blockers = Object.entries(checks).filter(([, healthy]) => !healthy).map(([name]) => `CONFIG_${name.toUpperCase()}_MISSING`);
+  return { status: blockers.length === 0 ? 'HEALTHY' : 'BLOCKED', checks, blockers };
+}
+
 function makePilotMessageHandler(env: Env): (request: Request) => Promise<Response> {
   const sessions = new ConchitaKvSessionRepository(env.CONCHITA_SESSIONS);
   const authenticator = new ConchitaKvSessionAuthenticator(sessions);
@@ -68,14 +81,10 @@ function makePilotMessageHandler(env: Env): (request: Request) => Promise<Respon
   const platform = new AureaPlatformIntegration();
   platform.register({
     manifest: {
-      integrationId: 'conchita-cloudflare-edge',
-      componentId: 'conchita-cloudflare-worker',
-      version: '1',
-      boundaries: ['OPERATIONS', 'EXECUTION', 'PERMISSION', 'WORK_CELL'],
-      requiredCapabilities: ['conchita.chat'],
+      integrationId: 'conchita-cloudflare-edge', componentId: 'conchita-cloudflare-worker', version: '1',
+      boundaries: ['OPERATIONS', 'EXECUTION', 'PERMISSION', 'WORK_CELL'], requiredCapabilities: ['conchita.chat'],
       requiredConfiguration: ['CONCHITA_SESSIONS', 'ANTHROPIC_API_KEY', 'CONCHITA_PILOT_USER_ID'],
-      healthChecks: ['https', 'kv', 'provider'],
-      rollbackPlan: 'Disable the Worker deployment and preserve KV state.',
+      healthChecks: ['https', 'kv', 'provider'], rollbackPlan: 'Disable the Worker deployment and preserve KV state.',
     },
     inspect: () => ({
       integrationId: 'conchita-cloudflare-edge',
@@ -87,50 +96,19 @@ function makePilotMessageHandler(env: Env): (request: Request) => Promise<Respon
     }),
   });
 
-  const admission = new RuntimeAdmission(
-    platform,
-    new ContextRetrievalGate(contextProvider),
-    providers,
-    new AureaExecutionGate(sentinel),
-  );
+  const admission = new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, new AureaExecutionGate(sentinel));
   const admissionFactory = {
     build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) {
       return {
-        traceId: request.traceId,
-        integrationId: 'conchita-cloudflare-edge',
-        workCell: {
-          workCellId: `CONCHITA-${request.traceId}`,
-          projectId: 'CONCHITA-PILOT',
-          companyId: 'AUREA',
-          objective: request.message,
-          owner: request.session.userId,
-          planner: 'conchita-cloud',
-          agents: ['conchita'],
-          dependencies: [],
-          restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'],
-          state: 'READY' as const,
-          deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const,
-        },
-        contextQuery: request.message,
-        actorId: request.session.userId,
-        actorRole: 'USER',
-        capabilityId: 'conchita.chat',
-        toolId: 'conchita.message',
-        action: 'respond_to_user',
-        effectClass: 'EXTERNAL' as const,
-        providerCapability: 'conchita.chat',
-        allowedProjects: ['CONCHITA-PILOT'],
-        allowedCapabilities: ['conchita.chat'],
-        allowedTools: ['conchita.message'],
+        traceId: request.traceId, integrationId: 'conchita-cloudflare-edge',
+        workCell: { workCellId: `CONCHITA-${request.traceId}`, projectId: 'CONCHITA-PILOT', companyId: 'AUREA', objective: request.message, owner: request.session.userId, planner: 'conchita-cloud', agents: ['conchita'], dependencies: [], restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'], state: 'READY' as const, deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const },
+        contextQuery: request.message, actorId: request.session.userId, actorRole: 'USER', capabilityId: 'conchita.chat', toolId: 'conchita.message', action: 'respond_to_user', effectClass: 'EXTERNAL' as const, providerCapability: 'conchita.chat', allowedProjects: ['CONCHITA-PILOT'], allowedCapabilities: ['conchita.chat'], allowedTools: ['conchita.message'],
       };
     },
   };
   const bridge = new ConchitaRuntimeBridge(admission, providers, execution, admissionFactory);
   const gateway = new ConchitaPersonalV0Gateway(bridge, sessions);
-  return createConchitaHttpEdgeHandler(
-    { gate: new ConchitaCloudMessageGate(authenticator, gateway) },
-    { allowedOrigins: [env.CONCHITA_ALLOWED_ORIGIN] },
-  );
+  return createConchitaHttpEdgeHandler({ gate: new ConchitaCloudMessageGate(authenticator, gateway) }, { allowedOrigins: [env.CONCHITA_ALLOWED_ORIGIN] });
 }
 
 async function handleSession(request: Request, env: Env): Promise<Response> {
@@ -139,21 +117,11 @@ async function handleSession(request: Request, env: Env): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: origin && !headers['Access-Control-Allow-Origin'] ? 403 : 204, headers });
   if (request.method !== 'POST') return json({ status: 'BLOCKED', error: 'METHOD_NOT_ALLOWED' }, 405, headers);
   if (origin && !headers['Access-Control-Allow-Origin']) return json({ status: 'BLOCKED', error: 'ORIGIN_NOT_ALLOWED' }, 403, headers);
-
   const authorization = request.headers.get('Authorization') ?? '';
-  if (!env.CONCHITA_PILOT_BOOTSTRAP_TOKEN || authorization !== `Bearer ${env.CONCHITA_PILOT_BOOTSTRAP_TOKEN}`) {
-    return json({ status: 'BLOCKED', error: 'BOOTSTRAP_AUTH_REQUIRED' }, 401, headers);
-  }
+  if (!env.CONCHITA_PILOT_BOOTSTRAP_TOKEN || authorization !== `Bearer ${env.CONCHITA_PILOT_BOOTSTRAP_TOKEN}`) return json({ status: 'BLOCKED', error: 'BOOTSTRAP_AUTH_REQUIRED' }, 401, headers);
   if (!env.CONCHITA_PILOT_USER_ID) return json({ status: 'BLOCKED', error: 'PILOT_USER_NOT_CONFIGURED' }, 503, headers);
-
   const sessions = new ConchitaKvSessionRepository(env.CONCHITA_SESSIONS);
-  const session = createConchitaSessionRecord(
-    crypto.randomUUID(),
-    env.CONCHITA_PILOT_USER_ID,
-    'PERSONAL',
-    new Date(),
-    new Date(Date.now() + 24 * 60 * 60 * 1000),
-  );
+  const session = createConchitaSessionRecord(crypto.randomUUID(), env.CONCHITA_PILOT_USER_ID, 'PERSONAL', new Date(), new Date(Date.now() + 24 * 60 * 60 * 1000));
   await sessions.save(session);
   return json({ status: 'COMPLETED', sessionId: session.sessionId, expiresAt: session.expiresAt }, 200, headers);
 }
@@ -162,7 +130,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
-      if (url.pathname === '/health') return json({ status: 'OK', service: 'conchita-cloudflare-worker' }, 200);
+      if (url.pathname === '/health') {
+        const health = runtimeHealth(env);
+        return json({ status: health.status, service: 'conchita-cloudflare-worker', checks: health.checks, blockers: health.blockers }, health.status === 'HEALTHY' ? 200 : 503);
+      }
       if (url.pathname === '/conchita/v1/session') return handleSession(request, env);
       const messageHandler = makePilotMessageHandler(env);
       return await messageHandler(request);
