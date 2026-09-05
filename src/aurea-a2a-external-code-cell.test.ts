@@ -71,6 +71,86 @@ describe("A2A external code cell", () => {
     expect(JSON.stringify(result)).not.toContain("test-secret");
   });
 
+  it("completes a task only when the remote task is terminal and completed", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        task: {
+          id: "task-complete",
+          status: { state: "TASK_STATE_COMPLETED" },
+          artifacts: [{ parts: [{ text: "Completed task output" }] }],
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/a2a+json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("COMPLETED");
+    expect(result.evidence).toContain("A2A_STATE:TASK_STATE_COMPLETED");
+  });
+
+  it("fails closed instead of claiming completion for a working task", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        task: {
+          id: "task-working",
+          status: {
+            state: "TASK_STATE_WORKING",
+            message: { parts: [{ text: "Still processing" }] },
+          },
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/a2a+json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("A2A_TASK_NON_TERMINAL");
+    expect(result.evidence).toContain("A2A_STATE:TASK_STATE_WORKING");
+  });
+
+  it("fails closed when a task has no state", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      new Response(JSON.stringify({
+        task: { id: "task-no-state", artifacts: [{ parts: [{ text: "ambiguous" }] }] },
+      }), {
+        status: 200,
+        headers: { "content-type": "application/a2a+json" },
+      }),
+    );
+
+    const cell = createA2AExternalCodeCell({
+      cellId: request.cellId,
+      providerId: "a2a-test",
+      endpoint: "https://agent.example.com/message:send",
+      fetchImpl,
+    });
+
+    const result = await cell.execute(request);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("A2A_TASK_NON_TERMINAL");
+  });
+
   it("fails closed when a successful response contains both task and message", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({
