@@ -26,20 +26,21 @@ function executionState() {
     get: (_id: unknown) => ({
       fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
         const body = JSON.parse(String(init?.body ?? '{}')) as { operation?: string; traceId?: string; result?: Stored };
+        const traceId = typeof body.traceId === 'string' ? body.traceId : '';
         if (body.operation === 'loadState') return jsonResponse({ status: 'OK', state: { completed: [...completed.values()], reservedTraceIds: [...reserved] } });
-        if (body.operation === 'reserve' && body.traceId) {
-          if (completed.has(body.traceId)) return jsonResponse({ status: 'OK', reservation: 'COMPLETED' });
-          if (reserved.has(body.traceId)) return jsonResponse({ status: 'OK', reservation: 'BLOCKED' });
-          reserved.add(body.traceId);
+        if (body.operation === 'reserve' && traceId) {
+          if (completed.has(traceId)) return jsonResponse({ status: 'OK', reservation: 'COMPLETED' });
+          if (reserved.has(traceId)) return jsonResponse({ status: 'OK', reservation: 'BLOCKED' });
+          reserved.add(traceId);
           return jsonResponse({ status: 'OK', reservation: 'RESERVED' });
         }
-        if (body.operation === 'commitCompleted' && body.result?.traceId) {
+        if (body.operation === 'commitCompleted' && typeof body.result?.traceId === 'string') {
           completed.set(body.result.traceId, body.result);
           reserved.delete(body.result.traceId);
           return jsonResponse({ status: 'OK' });
         }
-        if (body.operation === 'releaseReservation' && body.traceId) {
-          reserved.delete(body.traceId);
+        if (body.operation === 'releaseReservation' && traceId) {
+          reserved.delete(traceId);
           return jsonResponse({ status: 'OK' });
         }
         return jsonResponse({ status: 'BLOCKED' }, { status: 400 });
