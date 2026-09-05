@@ -11,7 +11,7 @@ export interface ConchitaPersonalRequestHandler {
 type ConchitaSessionBackend = ConchitaSessionStore | ConchitaDurableSessionRepository;
 type TraceForRequest = (sessionId: string, clientRequestId: string) => string | Promise<string>;
 
-async function executionTraceId(sessionId: string, clientRequestId: string): Promise<string> {
+export async function conchitaExecutionTraceId(sessionId: string, clientRequestId: string): Promise<string> {
   const source = new TextEncoder().encode(`${sessionId}:${clientRequestId}`);
   const digest = await crypto.subtle.digest('SHA-256', source);
   return `client-${Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
@@ -23,7 +23,7 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     private readonly sessions: ConchitaSessionBackend,
     private readonly now: () => string = () => new Date().toISOString(),
     private readonly id: () => string = () => crypto.randomUUID(),
-    private readonly traceForRequest: TraceForRequest = executionTraceId,
+    private readonly traceForRequest?: TraceForRequest,
   ) {}
 
   async openSession(userId: string, mode: ConchitaMode): Promise<ConchitaSession> {
@@ -42,7 +42,9 @@ export class ConchitaPersonalV0Gateway implements ConchitaPersonalGateway {
     const active = session ? await this.isSessionActive(request.sessionId) : false;
     if (!session || !active) return this.blocked(request, ['SESSION_NOT_ACTIVE']);
     if (session.userId !== principal!.userId) return this.blocked(request, ['SESSION_PRINCIPAL_MISMATCH']);
-    const traceId = await this.traceForRequest(session.sessionId, request.clientRequestId);
+    const traceId = this.traceForRequest
+      ? await this.traceForRequest(session.sessionId, request.clientRequestId)
+      : this.id();
     const mode = request.mode ?? session.mode;
     const result = await this.handler.handle({ session: { ...session, mode }, message: request.message.trim(), mode, traceId });
     return { sessionId: session.sessionId, clientRequestId: request.clientRequestId, traceId, status: result.status, response: result.response, evidence: [...new Set(result.evidence)], blockers: [...result.blockers] };
