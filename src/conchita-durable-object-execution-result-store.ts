@@ -69,7 +69,8 @@ export class ConchitaExecutionStateDurableObject {
         case 'reserve': {
           if (!body.traceId) return response({ status: 'BLOCKED', error: 'TRACE_ID_REQUIRED' }, 400);
           if (sql.exec('SELECT trace_id FROM execution_results WHERE trace_id = ?', body.traceId).toArray().length > 0) return response({ status: 'OK', reservation: 'COMPLETED' });
-          if (sql.exec('SELECT trace_id FROM execution_reservations WHERE trace_id = ?', body.traceId).toArray().length === 0) sql.exec('INSERT INTO execution_reservations (trace_id) VALUES (?)', body.traceId);
+          if (sql.exec('SELECT trace_id FROM execution_reservations WHERE trace_id = ?', body.traceId).toArray().length > 0) return response({ status: 'OK', reservation: 'BLOCKED' });
+          sql.exec('INSERT INTO execution_reservations (trace_id) VALUES (?)', body.traceId);
           return response({ status: 'OK', reservation: 'RESERVED' });
         }
         case 'commitCompleted': {
