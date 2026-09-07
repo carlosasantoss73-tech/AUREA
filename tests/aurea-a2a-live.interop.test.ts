@@ -4,9 +4,10 @@ import { ExternalCodeCellRuntime } from "../src/aurea-external-code-cell";
 import { discoverA2AAgent } from "../src/aurea-a2a-agent-discovery";
 
 const LIVE_AGENT_ORIGIN = "https://170.64.146.185.sslip.io";
+const RUN_LIVE_A2A = process.env.AUREA_LIVE_A2A === "1";
 
 describe("A2A live interoperability", () => {
-  it("discovers and executes against a public A2A v1 HTTP+JSON agent", async () => {
+  it.skipIf(!RUN_LIVE_A2A)("discovers and executes against a public A2A v1 HTTP+JSON agent", async () => {
     const discovered = await discoverA2AAgent(LIVE_AGENT_ORIGIN);
 
     expect(discovered.protocolBinding).toBe("HTTP+JSON");
