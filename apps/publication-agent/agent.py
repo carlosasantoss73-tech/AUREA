@@ -7,48 +7,64 @@ import os
 from agents import Agent, Runner, function_tool
 
 
-@function_tool
-def inspect_business_state(platform: str, business: str) -> str:
-    """Report platform connection state without pretending to have access."""
-    return json.dumps({
+def _inspect_business_state(platform: str, business: str) -> dict:
+    return {
         "platform": platform,
         "business": business,
         "status": "adapter_not_connected",
         "action": "request_or_connect_platform_adapter",
-    })
+    }
 
 
-@function_tool
-def build_publication_plan(platform: str, market: str, objective: str) -> str:
-    """Build a non-destructive publication plan before any launch action."""
-    return json.dumps({
+def _build_publication_plan(platform: str, market: str, objective: str) -> dict:
+    return {
         "platform": platform,
         "market": market,
         "objective": objective,
         "mode": "draft_only",
         "requires_human_approval": True,
         "steps": ["diagnose", "validate_assets", "prepare", "show_preview", "approve", "publish", "verify"],
-    })
+    }
+
+
+def _request_human_approval(summary: str) -> dict:
+    return {
+        "status": "approval_required",
+        "summary": summary,
+        "publish_allowed": False,
+    }
+
+
+def _record_learning(result: str, evidence: str, reusable_rule: str) -> dict:
+    return {
+        "result": result,
+        "evidence": evidence,
+        "reusable_rule": reusable_rule,
+    }
+
+
+@function_tool
+def inspect_business_state(platform: str, business: str) -> str:
+    """Report platform connection state without pretending to have access."""
+    return json.dumps(_inspect_business_state(platform, business))
+
+
+@function_tool
+def build_publication_plan(platform: str, market: str, objective: str) -> str:
+    """Build a non-destructive publication plan before any launch action."""
+    return json.dumps(_build_publication_plan(platform, market, objective))
 
 
 @function_tool
 def request_human_approval(summary: str) -> str:
     """Create an approval checkpoint; never publishes by itself."""
-    return json.dumps({
-        "status": "approval_required",
-        "summary": summary,
-        "publish_allowed": False,
-    })
+    return json.dumps(_request_human_approval(summary))
 
 
 @function_tool
 def record_learning(result: str, evidence: str, reusable_rule: str) -> str:
     """Record the AUREA result/evidence/learning loop in machine-readable form."""
-    return json.dumps({
-        "result": result,
-        "evidence": evidence,
-        "reusable_rule": reusable_rule,
-    })
+    return json.dumps(_record_learning(result, evidence, reusable_rule))
 
 
 AGENT_INSTRUCTIONS = """
