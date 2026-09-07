@@ -1,24 +1,13 @@
 """Deterministic tests for the publication agent safety contract."""
 
-import asyncio
-import json
-
 from agent import (
     AGENT_INSTRUCTIONS,
+    _build_publication_plan,
+    _inspect_business_state,
+    _record_learning,
+    _request_human_approval,
     build_agent,
-    build_publication_plan,
-    inspect_business_state,
-    record_learning,
-    request_human_approval,
 )
-
-
-def _tool_output(tool, **kwargs):
-    """Invoke an Agents SDK function tool through its real async runtime contract."""
-    async def invoke():
-        return await tool.on_invoke_tool(None, json.dumps(kwargs))
-
-    return json.loads(asyncio.run(invoke()))
 
 
 def test_agent_contract():
@@ -32,8 +21,7 @@ def test_agent_contract():
 
 
 def test_inspection_never_claims_access():
-    result = _tool_output(
-        inspect_business_state,
+    result = _inspect_business_state(
         platform="TikTok",
         business="TERRAZAS COSTA LIMÓN",
     )
@@ -42,8 +30,7 @@ def test_inspection_never_claims_access():
 
 
 def test_plan_is_non_destructive_and_requires_approval():
-    result = _tool_output(
-        build_publication_plan,
+    result = _build_publication_plan(
         platform="TikTok",
         market="Chile",
         objective="qualified inquiries",
@@ -54,14 +41,13 @@ def test_plan_is_non_destructive_and_requires_approval():
 
 
 def test_approval_never_authorizes_publication():
-    result = _tool_output(request_human_approval, summary="First TCL test")
+    result = _request_human_approval(summary="First TCL test")
     assert result["status"] == "approval_required"
     assert result["publish_allowed"] is False
 
 
 def test_learning_is_machine_readable():
-    result = _tool_output(
-        record_learning,
+    result = _record_learning(
         result="diagnosed",
         evidence="adapter unavailable",
         reusable_rule="stop before mutation",
