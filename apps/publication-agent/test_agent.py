@@ -1,5 +1,6 @@
 """Deterministic tests for the publication agent safety contract."""
 
+import asyncio
 import json
 
 from agent import (
@@ -13,7 +14,11 @@ from agent import (
 
 
 def _tool_output(tool, **kwargs):
-    return json.loads(tool.on_invoke_tool(None, json.dumps(kwargs)))
+    """Invoke an Agents SDK function tool through its real async runtime contract."""
+    async def invoke():
+        return await tool.on_invoke_tool(None, json.dumps(kwargs))
+
+    return json.loads(asyncio.run(invoke()))
 
 
 def test_agent_contract():
