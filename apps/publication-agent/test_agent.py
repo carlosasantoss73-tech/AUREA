@@ -13,7 +13,7 @@ from agent import (
 def test_agent_contract():
     agent = build_agent()
     assert agent.name == "AUREA Agente de Publicación Empresarial"
-    assert len(agent.tools) == 4
+    assert len(agent.tools) == 5
     assert "approval" in AGENT_INSTRUCTIONS.lower()
     assert "never invent" in AGENT_INSTRUCTIONS.lower()
     assert "RESULTADO" in AGENT_INSTRUCTIONS
