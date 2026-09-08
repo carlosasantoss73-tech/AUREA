@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
-import os
 
 from agents import Agent, Runner, function_tool
+
+from tiktok_review import evaluate_tiktok_review_readiness
 
 
 def _inspect_business_state(platform: str, business: str) -> dict:
@@ -23,7 +24,15 @@ def _build_publication_plan(platform: str, market: str, objective: str) -> dict:
         "objective": objective,
         "mode": "draft_only",
         "requires_human_approval": True,
-        "steps": ["diagnose", "validate_assets", "prepare", "show_preview", "approve", "publish", "verify"],
+        "steps": [
+            "diagnose",
+            "validate_assets",
+            "prepare",
+            "show_preview",
+            "approve",
+            "publish",
+            "verify",
+        ],
     }
 
 
@@ -67,6 +76,13 @@ def record_learning(result: str, evidence: str, reusable_rule: str) -> str:
     return json.dumps(_record_learning(result, evidence, reusable_rule))
 
 
+@function_tool
+def check_tiktok_review_readiness(config_json: str) -> str:
+    """Check TikTok app-review prerequisites without contacting or mutating TikTok."""
+    config = json.loads(config_json)
+    return json.dumps(evaluate_tiktok_review_readiness(config))
+
+
 AGENT_INSTRUCTIONS = """
 You are AUREA's Agente de Publicación Empresarial.
 
@@ -84,6 +100,7 @@ Hard rules:
 - Separate diagnosis from mutation.
 - No paid campaign goes live without an explicit approval checkpoint.
 - If a platform adapter is not connected, stop at the exact human/connection step.
+- Treat platform review readiness as configuration evidence only; never infer approval.
 - After every completed action, record evidence and a reusable learning.
 - Do not expose secrets.
 """
@@ -98,6 +115,7 @@ def build_agent() -> Agent:
             build_publication_plan,
             request_human_approval,
             record_learning,
+            check_tiktok_review_readiness,
         ],
     )
 
