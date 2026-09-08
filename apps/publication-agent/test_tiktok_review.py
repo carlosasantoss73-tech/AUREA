@@ -17,7 +17,7 @@ def complete_config() -> dict:
         "demo_video": True,
         "end_to_end_demo": True,
         "products": ["login_kit", "content_posting_api"],
-        "scopes": ["user.info.basic", "video.publish", "video.upload"],
+        "scopes": ["user.info.basic", "video.publish"],
         "direct_post_enabled": True,
         "audience": "public_users",
     }
@@ -46,6 +46,13 @@ def test_web_apps_need_a_redirect_uri():
     config.pop("redirect_uri")
     result = evaluate_tiktok_review_readiness(config)
     assert "redirect_uri" in result["missing"]
+
+
+def test_upload_scope_is_not_required_for_direct_post_only():
+    config = complete_config()
+    assert "video.upload" not in config["scopes"]
+    result = evaluate_tiktok_review_readiness(config)
+    assert result["ready_for_submission"] is True
 
 
 def test_internal_only_use_is_a_blocker():
