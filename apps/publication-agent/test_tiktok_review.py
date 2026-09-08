@@ -27,7 +27,8 @@ def test_incomplete_configuration_is_blocked():
     result = evaluate_tiktok_review_readiness({})
     assert result["ready_for_submission"] is False
     assert "app_icon" in result["missing"]
-    assert "redirect_uri" not in result["missing"]
+    assert "product:login_kit" in result["missing"]
+    assert "scope:video.publish" in result["missing"]
     assert result["approval_status"] == "unknown"
     assert result["publish_status"] == "not_attempted"
 
@@ -38,6 +39,13 @@ def test_complete_configuration_is_ready_but_not_approved():
     assert result["missing"] == []
     assert result["approval_status"] == "unknown"
     assert result["publish_status"] == "not_attempted"
+
+
+def test_web_apps_need_a_redirect_uri():
+    config = complete_config()
+    config.pop("redirect_uri")
+    result = evaluate_tiktok_review_readiness(config)
+    assert "redirect_uri" in result["missing"]
 
 
 def test_internal_only_use_is_a_blocker():
