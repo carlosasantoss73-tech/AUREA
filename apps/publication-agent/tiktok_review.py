@@ -9,16 +9,17 @@ from __future__ import annotations
 from typing import Any
 
 
+# AUREA's first production path is web OAuth + Direct Post. Do not request the
+# Upload API scope unless that separate draft-upload capability is actually needed.
 REQUIRED_PRODUCTS = ("login_kit", "content_posting_api")
-REQUIRED_SCOPES = ("user.info.basic", "video.publish", "video.upload")
+REQUIRED_SCOPES = ("user.info.basic", "video.publish")
 
 
 def evaluate_tiktok_review_readiness(config: dict[str, Any]) -> dict[str, Any]:
     """Return evidence-based blockers for a TikTok app-review submission.
 
-    The function models configuration requirements visible in TikTok's current
-    developer review flow. It deliberately does not infer approval, live access,
-    or successful authorization from configuration alone.
+    Configuration is not approval. The function deliberately reports approval as
+    unknown until TikTok itself provides evidence of approval/live access.
     """
     missing: list[str] = []
     warnings: list[str] = []
@@ -49,9 +50,9 @@ def evaluate_tiktok_review_readiness(config: dict[str, Any]) -> dict[str, Any]:
         if scope not in scopes:
             missing.append(f"scope:{scope}")
 
-    if "web" in set(config.get("platforms", ())):
-        if not config.get("redirect_uri"):
-            missing.append("redirect_uri")
+    platforms = set(config.get("platforms", ()))
+    if "web" in platforms and not config.get("redirect_uri"):
+        missing.append("redirect_uri")
 
     if not config.get("direct_post_enabled"):
         missing.append("direct_post_enabled")
@@ -62,9 +63,8 @@ def evaluate_tiktok_review_readiness(config: dict[str, Any]) -> dict[str, Any]:
     if any(term in app_name.lower() for term in ("tiktok", "tik tok")):
         warnings.append("app_name_should_not_reference_tiktok")
 
-    # TikTok's Direct Post guidelines reject clients that are only an internal
-    # utility for accounts managed by the developer/team. A production design
-    # must therefore describe a genuine user-facing publishing product.
+    # Direct Post is not intended to be a private utility for accounts managed by
+    # the developer/team. A production design must serve genuine authorized users.
     if config.get("audience") != "public_users":
         missing.append("public_user_audience")
 
