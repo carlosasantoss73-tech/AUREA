@@ -70,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, subprocess, urllib.request
+          import json, os, subprocess, urllib.error, urllib.request
           token = subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], text=True).strip()
           if not token:
               raise SystemExit("NO_ACCESS_TOKEN")
@@ -79,8 +79,12 @@ jobs:
               f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=id,name,mimeType,capabilities(canEdit,canDownload,canCopy)",
               headers={"Authorization": f"Bearer {token}"},
           )
-          with urllib.request.urlopen(req, timeout=30) as response:
-              data = json.load(response)
+          try:
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  data = json.load(response)
+          except urllib.error.HTTPError as exc:
+              print(f"DRIVE_READ_FAILED_HTTP_{exc.code}")
+              raise
           safe = {k: data.get(k) for k in ("id", "name", "mimeType", "capabilities")}
           print(json.dumps(safe, indent=2))
           if data.get("id") != file_id:
