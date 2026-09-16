@@ -1,0 +1,74 @@
+name: AUREA GCP Access Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gcp-access-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Report configured GCP federation inputs
+        env:
+          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          echo "=== AUREA GCP ACCESS GATE ==="
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Ref: $GITHUB_REF"
+          echo "OIDC permission: id-token=write"
+          if [ -n "$WIF_PROVIDER" ]; then
+            echo "WIF provider variable: PRESENT"
+          else
+            echo "WIF provider variable: MISSING"
+          fi
+          if [ -n "$SERVICE_ACCOUNT" ]; then
+            echo "Service account variable: PRESENT"
+          else
+            echo "Service account variable: MISSING"
+          fi
+
+      - name: Stop safely when GCP federation is not configured
+        if: ${{ vars.AUREA_GCP_WIF_PROVIDER == '' }}
+        run: |
+          echo "GCP_CONTROL_PLANE_NOT_CONFIGURED"
+          echo "No WIF provider is configured for this repository."
+          echo "No Google credential exchange was attempted."
+          echo "No external resource was modified."
+          exit 0
+
+      - name: Authenticate to Google Cloud through WIF
+        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT != '' }}
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Verify Drive API read path
+        if: ${{ steps.auth.outcome == 'success' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+        run: |
+          set -euo pipefail
+          echo "=== REAL GCP AUTHENTICATION SUCCEEDED ==="
+          gcloud auth list --filter=status:ACTIVE --format='table(account,status)'
+          gcloud auth application-default print-access-token >/dev/null
+          echo "Credential exchange: PASS"
+          echo "Next gate: real Drive API read of AUREA KNOWLEDGE LIBRARY"
+
+      - name: Fail closed on incomplete federation configuration
+        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT == '' }}
+        run: |
+          echo "GCP_WIF_CONFIGURATION_INCOMPLETE"
+          echo "WIF provider exists but no service account is configured."
+          echo "No Google resource was modified."
+          exit 1
