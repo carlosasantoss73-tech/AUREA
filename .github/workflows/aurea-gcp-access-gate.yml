@@ -24,16 +24,8 @@ jobs:
           echo "Repository: $GITHUB_REPOSITORY"
           echo "Ref: $GITHUB_REF"
           echo "OIDC permission: id-token=write"
-          if [ -n "$WIF_PROVIDER" ]; then
-            echo "WIF provider variable: PRESENT"
-          else
-            echo "WIF provider variable: MISSING"
-          fi
-          if [ -n "$SERVICE_ACCOUNT" ]; then
-            echo "Service account variable: PRESENT"
-          else
-            echo "Service account variable: MISSING"
-          fi
+          if [ -n "$WIF_PROVIDER" ]; then echo "WIF provider variable: PRESENT"; else echo "WIF provider variable: MISSING"; fi
+          if [ -n "$SERVICE_ACCOUNT" ]; then echo "Service account variable: PRESENT"; else echo "Service account variable: MISSING"; fi
 
       - name: Stop safely when GCP federation is not configured
         if: ${{ vars.AUREA_GCP_WIF_PROVIDER == '' }}
@@ -44,6 +36,14 @@ jobs:
           echo "No external resource was modified."
           exit 0
 
+      - name: Fail closed on incomplete federation configuration
+        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT == '' }}
+        run: |
+          echo "GCP_WIF_CONFIGURATION_INCOMPLETE"
+          echo "WIF provider exists but no service account is configured."
+          echo "No Google resource was modified."
+          exit 1
+
       - name: Authenticate to Google Cloud through WIF
         if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT != '' }}
         id: auth
@@ -53,7 +53,7 @@ jobs:
           service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
 
-      - name: Verify Drive API read path
+      - name: Verify real Google authentication
         if: ${{ steps.auth.outcome == 'success' }}
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
@@ -64,11 +64,3 @@ jobs:
           gcloud auth application-default print-access-token >/dev/null
           echo "Credential exchange: PASS"
           echo "Next gate: real Drive API read of AUREA KNOWLEDGE LIBRARY"
-
-      - name: Fail closed on incomplete federation configuration
-        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT == '' }}
-        run: |
-          echo "GCP_WIF_CONFIGURATION_INCOMPLETE"
-          echo "WIF provider exists but no service account is configured."
-          echo "No Google resource was modified."
-          exit 1
