@@ -7,6 +7,10 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  AUREA_KNOWLEDGE_OS_ROOT_ID: 1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm
+  AUREA_KNOWLEDGE_OS_INDEX_ID: 19YHMHdlpD-yKA1HK-zyUszVzDhNldkHx
+
 jobs:
   gcp-access-gate:
     runs-on: ubuntu-latest
@@ -55,34 +59,30 @@ jobs:
 
       - name: Verify real Google authentication
         if: ${{ steps.auth.outcome == 'success' }}
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
         run: |
           set -euo pipefail
           echo "=== REAL GCP AUTHENTICATION SUCCEEDED ==="
           gcloud auth list --filter=status:ACTIVE --format='table(account,status)'
-          gcloud auth application-default print-access-token >/dev/null
           echo "Credential exchange: PASS"
 
       - name: Verify Drive API access to the Knowledge OS root
         if: ${{ steps.auth.outcome == 'success' }}
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, urllib.request
-          token = os.popen("gcloud auth application-default print-access-token").read().strip()
+          import json, os, subprocess, urllib.request
+          token = subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], text=True).strip()
           if not token:
               raise SystemExit("NO_ACCESS_TOKEN")
-          file_id = "1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm"
+          file_id = os.environ["AUREA_KNOWLEDGE_OS_ROOT_ID"]
           req = urllib.request.Request(
               f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=id,name,mimeType,capabilities(canEdit,canDownload,canCopy)",
               headers={"Authorization": f"Bearer {token}"},
           )
           with urllib.request.urlopen(req, timeout=30) as response:
               data = json.load(response)
-          print(json.dumps(data, indent=2))
+          safe = {k: data.get(k) for k in ("id", "name", "mimeType", "capabilities")}
+          print(json.dumps(safe, indent=2))
           if data.get("id") != file_id:
               raise SystemExit("KNOWLEDGE_OS_ROOT_ID_MISMATCH")
           print("KNOWLEDGE_OS_ROOT_READ: PASS")
