@@ -63,4 +63,27 @@ jobs:
           gcloud auth list --filter=status:ACTIVE --format='table(account,status)'
           gcloud auth application-default print-access-token >/dev/null
           echo "Credential exchange: PASS"
-          echo "Next gate: real Drive API read of AUREA KNOWLEDGE LIBRARY"
+
+      - name: Verify Drive API access to the Knowledge OS root
+        if: ${{ steps.auth.outcome == 'success' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+          token = os.popen("gcloud auth application-default print-access-token").read().strip()
+          if not token:
+              raise SystemExit("NO_ACCESS_TOKEN")
+          file_id = "1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm"
+          req = urllib.request.Request(
+              f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=id,name,mimeType,capabilities(canEdit,canDownload,canCopy)",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              data = json.load(response)
+          print(json.dumps(data, indent=2))
+          if data.get("id") != file_id:
+              raise SystemExit("KNOWLEDGE_OS_ROOT_ID_MISMATCH")
+          print("KNOWLEDGE_OS_ROOT_READ: PASS")
+          print("Next gate: read INDICE_MAESTRO_v010.json and prove write denial")
