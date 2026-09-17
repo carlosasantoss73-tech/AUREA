@@ -31,25 +31,26 @@ jobs:
           if [ -n "$WIF_PROVIDER" ]; then echo "WIF provider variable: PRESENT"; else echo "WIF provider variable: MISSING"; fi
           if [ -n "$SERVICE_ACCOUNT" ]; then echo "Service account variable: PRESENT"; else echo "Service account variable: MISSING"; fi
 
-      - name: Stop safely when GCP federation is not configured
+      - name: Fail closed when WIF federation is not configured
         if: ${{ vars.AUREA_GCP_WIF_PROVIDER == '' }}
         run: |
+          set -euo pipefail
           echo "GCP_CONTROL_PLANE_NOT_CONFIGURED"
           echo "No WIF provider is configured for this repository."
           echo "No Google credential exchange was attempted."
           echo "No external resource was modified."
-          exit 0
+          exit 1
 
       - name: Fail closed on incomplete federation configuration
         if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT == '' }}
         run: |
+          set -euo pipefail
           echo "GCP_WIF_CONFIGURATION_INCOMPLETE"
           echo "WIF provider exists but no service account is configured."
           echo "No Google resource was modified."
           exit 1
 
       - name: Authenticate to Google Cloud through WIF
-        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT != '' }}
         id: auth
         uses: google-github-actions/auth@v3
         with:
@@ -58,36 +59,69 @@ jobs:
           create_credentials_file: true
 
       - name: Verify real Google authentication
-        if: ${{ steps.auth.outcome == 'success' }}
         run: |
           set -euo pipefail
           echo "=== REAL GCP AUTHENTICATION SUCCEEDED ==="
           gcloud auth list --filter=status:ACTIVE --format='table(account,status)'
+          token="$(gcloud auth application-default print-access-token)"
+          test -n "$token"
           echo "Credential exchange: PASS"
 
-      - name: Verify Drive API access to the Knowledge OS root
-        if: ${{ steps.auth.outcome == 'success' }}
+      - name: Verify Drive access, exact root, read-only capability, and index scope
         run: |
           set -euo pipefail
           python - <<'PY'
           import json, os, subprocess, urllib.error, urllib.request
-          token = subprocess.check_output(["gcloud", "auth", "application-default", "print-access-token"], text=True).strip()
+
+          token = subprocess.check_output(
+              ["gcloud", "auth", "application-default", "print-access-token"], text=True
+          ).strip()
           if not token:
               raise SystemExit("NO_ACCESS_TOKEN")
-          file_id = os.environ["AUREA_KNOWLEDGE_OS_ROOT_ID"]
-          req = urllib.request.Request(
-              f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=id,name,mimeType,capabilities(canEdit,canDownload,canCopy)",
-              headers={"Authorization": f"Bearer {token}"},
+
+          root_id = os.environ["AUREA_KNOWLEDGE_OS_ROOT_ID"]
+          index_id = os.environ["AUREA_KNOWLEDGE_OS_INDEX_ID"]
+          headers = {"Authorization": f"Bearer {token}"}
+
+          def get_file(file_id, fields):
+              url = f"https://www.googleapis.com/drive/v3/files/{file_id}?fields={fields}"
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as exc:
+                  print(f"DRIVE_READ_FAILED_HTTP_{exc.code}: {file_id}")
+                  raise
+
+          root = get_file(
+              root_id,
+              "id,name,mimeType,parents,capabilities(canEdit,canDownload,canCopy)"
           )
-          try:
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  data = json.load(response)
-          except urllib.error.HTTPError as exc:
-              print(f"DRIVE_READ_FAILED_HTTP_{exc.code}")
-              raise
-          safe = {k: data.get(k) for k in ("id", "name", "mimeType", "capabilities")}
-          print(json.dumps(safe, indent=2))
-          if data.get("id") != file_id:
+          if root.get("id") != root_id:
               raise SystemExit("KNOWLEDGE_OS_ROOT_ID_MISMATCH")
+          if root.get("mimeType") != "application/vnd.google-apps.folder":
+              raise SystemExit("KNOWLEDGE_OS_ROOT_NOT_FOLDER")
+          if root.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("KNOWLEDGE_OS_ROOT_WRITE_CAPABILITY_NOT_DENIED")
+
+          index = get_file(
+              index_id,
+              "id,name,mimeType,parents,version,modifiedTime,capabilities(canEdit,canDownload,canCopy)"
+          )
+          if index.get("id") != index_id:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_ID_MISMATCH")
+          if root_id not in (index.get("parents") or []):
+              raise SystemExit("KNOWLEDGE_OS_INDEX_OUTSIDE_ROOT")
+          if index.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
+
+          print(json.dumps({
+              "root": root,
+              "index": index,
+          }, indent=2))
           print("KNOWLEDGE_OS_ROOT_READ: PASS")
-          print("Next gate: read INDICE_MAESTRO_v010.json and prove write denial")
+          print("KNOWLEDGE_OS_INDEX_METADATA_READ: PASS")
+          print("KNOWLEDGE_OS_SCOPE_CHECK: PASS")
+          print("KNOWLEDGE_OS_WRITE_CAPABILITY_CHECK: PASS")
+          print("Next gate: read index content, verify institutional provenance, then prove write denial with a non-destructive request")
+          PY
