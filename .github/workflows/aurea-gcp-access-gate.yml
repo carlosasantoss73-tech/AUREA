@@ -9,7 +9,7 @@ permissions:
 
 env:
   AUREA_KNOWLEDGE_OS_ROOT_ID: 1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm
-  AUREA_KNOWLEDGE_OS_INDEX_ID: 19YHMHdlpD-yKA1HK-zyUszVzDhNldkHx
+  AUREA_KNOWLEDGE_OS_INDEX_ID: 1kIzswJSMKzQOpf8z6j8iDvfxhq26ZvXa
 
 jobs:
   gcp-access-gate:
