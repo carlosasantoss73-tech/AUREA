@@ -13,4 +13,27 @@ describe("AUREA canonical runtime factory", () => {
     expect(result.status).toBe("DRY_RUN");
     expect(result.context?.facts.some(f => f.includes("MoneyPrinterTurbo"))).toBe(true);
   });
+
+  it("accepts an institutional context provider", async () => {
+    const provider = {
+      async retrieve(input: { projectId: string; query: string; traceId: string }) {
+        return {
+          projectId: input.projectId,
+          query: input.query,
+          facts: ["institutional evidence"],
+          citations: [{ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11 }],
+        };
+      },
+    };
+    const runtime = createAureaRuntime(provider);
+    runtime.registerTool({ toolId: "knowledge.search", effectClass: "READ", execute: payload => payload });
+    const result = await runtime.execute({
+      actorId: "librarian", actorRole: "system", projectId: "aurea", capabilityId: "knowledge.read", toolId: "knowledge.search", action: "search", effectClass: "READ",
+      allowedProjects: ["aurea"], allowedCapabilities: ["knowledge.read"], allowedTools: ["knowledge.search"],
+      contextQuery: "¿Qué dice el Bibliotecario sobre continuidad?", payload: { query: "continuidad" }, dryRun: true,
+    });
+    expect(result.status).toBe("DRY_RUN");
+    expect(result.context?.facts).toEqual(["institutional evidence"]);
+    expect(result.context?.citations[0]).toMatchObject({ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11 });
+  });
 });
