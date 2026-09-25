@@ -8,6 +8,7 @@ export interface ContextRecord {
   sourceId: string;
   version: number;
   tags?: string[];
+  provenance?: "LOCAL_SEED" | "INSTITUTIONAL";
 }
 
 export interface ContextStore {
@@ -35,7 +36,7 @@ export function createStoreContextProvider(store: ContextStore): ContextProvider
   return {
     async retrieve(input): Promise<RetrievedContext> {
       const records = store.search(input.projectId, input.query);
-      const citations: ContextCitation[] = records.map(record => ({ sourceId: record.sourceId, documentId: record.id, version: record.version, title: record.title, excerpt: record.text.slice(0, 500) }));
+      const citations: ContextCitation[] = records.map(record => ({ sourceId: record.sourceId, documentId: record.id, version: record.version, title: record.title, excerpt: record.text.slice(0, 500), provenance: record.provenance }));
       return {
         projectId: input.projectId,
         query: input.query,
