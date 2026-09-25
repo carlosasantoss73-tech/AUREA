@@ -1,0 +1,73 @@
+name: AUREA Knowledge OS v011 Live Reader Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AUREA_KNOWLEDGE_OS_ROOT_ID: 1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm
+  AUREA_KNOWLEDGE_OS_INDEX_ID: 1kIzswJSMKzQOpf8z6j8iDvfxhq26ZvXa
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud through WIF
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Install Google API client
+        run: python -m pip install --quiet google-api-python-client google-auth
+
+      - name: Read exact institutional v011 index content
+        env:
+          INDEX_ID: ${{ env.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from googleapiclient.discovery import build
+
+          index_id = os.environ["INDEX_ID"]
+          drive = build("drive", "v3")
+
+          meta = drive.files().get(
+              fileId=index_id,
+              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy)"
+          ).execute()
+
+          print("=== V011 METADATA ===")
+          print(json.dumps(meta, indent=2))
+
+          if meta["id"] != index_id:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_ID_MISMATCH")
+          if meta.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
+
+          response = drive.files().get(fileId=index_id, alt="media").execute()
+          raw = response.decode("utf-8") if isinstance(response, bytes) else response
+
+          print("=== V011 CONTENT BEGIN ===")
+          print(raw)
+          print("=== V011 CONTENT END ===")
+
+          try:
+              parsed = json.loads(raw)
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"V011_NOT_JSON:{exc}")
+
+          print("=== V011 TOP LEVEL SHAPE ===")
+          if isinstance(parsed, dict):
+              print(json.dumps(sorted(parsed.keys()), indent=2))
+          elif isinstance(parsed, list):
+              print("LIST")
+          else:
+              print(type(parsed).__name__)
+          print("V011_CONTENT_PROBE: PASS")
+          PY
