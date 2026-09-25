@@ -6,7 +6,7 @@ export interface ContextCitation { sourceId: string; documentId?: string; versio
 export interface RetrievedContext { query: string; projectId: string; citations: ContextCitation[]; facts: string[]; }
 export interface ContextRetrievalResult { traceId: string; status: ContextRetrievalStatus; reason: string; context?: RetrievedContext; }
 export interface ContextProvider { retrieve(input: { projectId: string; query: string; traceId: string }): Promise<RetrievedContext>; }
-export interface ContextRetrievalRequest { actorId: string; actorRole: string; projectId: string; query: string; allowedProjects?: string[]; allowedCapabilities?: string[]; allowedTools?: string[]; }
+export interface ContextRetrievalRequest { actorId: string; institutionalOnly?: boolean; actorRole: string; projectId: string; query: string; allowedProjects?: string[]; allowedCapabilities?: string[]; allowedTools?: string[]; }
 
 const CONTINUITY_PATTERNS = [
   /\b(ayer|antes|anterior|previamente|semana|esta semana|estos días|últim[oa]s días)\b/i,
@@ -33,6 +33,9 @@ export class ContextRetrievalGate {
     const permission = evaluatePermission(permissionRequest, traceId);
     if (!["ALLOW", "ALLOW_WITH_LIMITS"].includes(permission.decision)) return { traceId, status: "BLOCKED", reason: permission.reason };
     const context = await this.provider.retrieve({ projectId: request.projectId, query: request.query, traceId });
+    if (request.institutionalOnly && (!context.citations.length || context.citations.some((citation) => citation.sourceId === "AUREA_LOCAL_SEED"))) {
+      return { traceId, status: "BLOCKED", reason: "INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK" };
+    }
     if (!context.citations.length && !context.facts.length) {
       return historical
         ? { traceId, status: "EMPTY", reason: "HISTORICAL_CONTEXT_NOT_FOUND" }
