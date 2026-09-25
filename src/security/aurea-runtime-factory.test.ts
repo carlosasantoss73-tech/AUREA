@@ -21,7 +21,7 @@ describe("AUREA canonical runtime factory", () => {
           projectId: input.projectId,
           query: input.query,
           facts: ["institutional evidence"],
-          citations: [{ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11, provenance: "INSTITUTIONAL" }],
+          citations: [{ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11, provenance: "INSTITUTIONAL" as const }],
         };
       },
     };
