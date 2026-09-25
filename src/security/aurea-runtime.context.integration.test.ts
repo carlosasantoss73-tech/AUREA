@@ -10,7 +10,7 @@ const request = {
 describe("AUREA Runtime + Context Retrieval Gate", () => {
   it("injects recovered historical context into the authorized tool call", async () => {
     const calls: unknown[] = [];
-    const provider: ContextProvider = { async retrieve(input) { return { projectId: input.projectId, query: input.query, facts: ["historical fact"], citations: [{ sourceId: "historical", version: 1 }] }; } };
+    const provider: ContextProvider = { async retrieve(input) { return { projectId: input.projectId, query: input.query, facts: ["historical fact"], citations: [{ sourceId: "KNOWLEDGE_OS", version: 11, provenance: "INSTITUTIONAL" }] }; } };
     const runtime = new AureaRuntime(new ContextRetrievalGate(provider));
     runtime.registerTool({ toolId: "knowledge.search", effectClass: "READ", execute: payload => { calls.push(payload); return { ok: true }; } });
     const result = await runtime.execute({ ...request, contextQuery: "¿Qué trabajamos esta semana?", payload: { query: "continuidad" } });
@@ -26,7 +26,7 @@ describe("AUREA Runtime + Context Retrieval Gate", () => {
     runtime.registerTool({ toolId: "knowledge.search", effectClass: "READ", execute: () => { executed = true; return {}; } });
     const result = await runtime.execute({ ...request, contextQuery: "continúa con lo que hicimos anteriormente", payload: {} });
     expect(result.status).toBe("BLOCKED");
-    expect(result.reason).toBe("CONTEXT_REQUIRED_BUT_NOT_FOUND");
+    expect(result.reason).toBe("CONTEXT_INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
     expect(executed).toBe(false);
   });
 });
