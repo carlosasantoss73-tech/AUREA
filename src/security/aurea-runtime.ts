@@ -34,7 +34,16 @@ export class AureaRuntime {
     let context: RetrievedContext | undefined;
     const contextQuery = inferContextQuery(request);
     if (this.contextGate && contextQuery) {
-      const retrieval = await this.contextGate.retrieve({ actorId: request.actorId, actorRole: request.actorRole, projectId: request.projectId, query: contextQuery, allowedProjects: request.allowedProjects, allowedCapabilities: request.allowedCapabilities, allowedTools: request.allowedTools });
+      const retrieval = await this.contextGate.retrieve({
+        actorId: request.actorId,
+        actorRole: request.actorRole,
+        projectId: request.projectId,
+        query: contextQuery,
+        institutionalOnly: true,
+        allowedProjects: request.allowedProjects,
+        allowedCapabilities: request.allowedCapabilities,
+        allowedTools: request.allowedTools,
+      });
       if (retrieval.status === "BLOCKED") return { traceId: envelope.traceId, status: "BLOCKED", reason: `CONTEXT_${retrieval.reason}` };
       if (retrieval.status === "EMPTY") return { traceId: envelope.traceId, status: "BLOCKED", reason: "CONTEXT_REQUIRED_BUT_NOT_FOUND" };
       context = retrieval.context;
