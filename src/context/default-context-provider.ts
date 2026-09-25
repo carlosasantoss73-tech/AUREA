@@ -12,6 +12,7 @@ export const AUREA_CONTINUITY_RECORDS: readonly ContextRecord[] = [
     text: "En el Technology Radar B11 se registraron MoneyPrinterTurbo como candidato de generación de video automatizada; Creati.ai como fuente/directorio de descubrimiento; y Created.ai / CreatAI.io como candidato de automatización de contenido/marketing. Todos quedaron en estado DISCOVERED, no INTEGRATED.",
     sourceId: "AUREA_B11_TECHNOLOGY_RADAR",
     version: 1,
+    provenance: "LOCAL_SEED",
     tags: ["B11", "video", "herramientas", "esta semana", "Technology Radar", "Creati.ai", "MoneyPrinterTurbo"],
   },
   {
@@ -21,6 +22,7 @@ export const AUREA_CONTINUITY_RECORDS: readonly ContextRecord[] = [
     text: "En el Technology Radar B11 se registró OmniVoice / OmniVoice Studio como candidato de TTS/STT y voz. Quedó en estado DISCOVERED y no INTEGRATED.",
     sourceId: "AUREA_B11_TECHNOLOGY_RADAR",
     version: 1,
+    provenance: "LOCAL_SEED",
     tags: ["B11", "voz", "TTS", "STT", "esta semana", "OmniVoice"],
   },
   {
@@ -30,6 +32,7 @@ export const AUREA_CONTINUITY_RECORDS: readonly ContextRecord[] = [
     text: "B14 existe para impedir que una solicitud histórica se responda usando memoria local como fuente suficiente. Las señales de continuidad activan Context Retrieval Gate; la recuperación se gobierna como READ; con evidencia se construye Context Pack; sin evidencia se bloquea con CONTEXT_REQUIRED_BUT_NOT_FOUND.",
     sourceId: "AUREA_B14_CONTEXT_RETRIEVAL",
     version: 1,
+    provenance: "LOCAL_SEED",
     tags: ["B14", "continuidad", "memoria", "Context Retrieval", "histórico", "antes", "anteriormente"],
   },
 ];

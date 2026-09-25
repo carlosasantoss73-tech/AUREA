@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createPersistentAureaMemory } from "../aurea-persistent-runtime-factory";
 
 describe("AUREA memory black-box", () => {
-  it("ingests real supplied evidence, recreates runtime, and retrieves it without a memory command", async () => {
+  it("fails closed when persisted memory is local rather than institutional", async () => {
     const dir = await mkdtemp(join(tmpdir(), "aurea-blackbox-"));
     const file = join(dir, "knowledge.json");
     const memory1 = await createPersistentAureaMemory(file);
@@ -19,9 +19,8 @@ describe("AUREA memory black-box", () => {
       allowedProjects: ["aurea"], allowedCapabilities: ["knowledge.read"], allowedTools: ["knowledge.search"],
       payload: { query: "¿Qué decisión tomamos sobre Krea?" },
     });
-    expect(result.status).toBe("EXECUTED");
-    expect(result.context?.facts.join(" ")).toContain("Krea queda como candidata prioritaria");
-    expect(result.context?.citations[0]).toMatchObject({ sourceId: "conversation:real-supplied", version: 1 });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("CONTEXT_INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
     await rm(dir, { recursive: true, force: true });
   });
 });
