@@ -2,7 +2,7 @@
 import { evaluatePermission, PermissionRequest } from "../security/permission-gateway";
 
 export type ContextRetrievalStatus = "NOT_NEEDED" | "READY" | "EMPTY" | "BLOCKED";
-export interface ContextCitation { sourceId: string; documentId?: string; version?: number; title?: string; excerpt?: string; }
+export interface ContextCitation { sourceId: string; documentId?: string; version?: number; title?: string; excerpt?: string; provenance?: "LOCAL_SEED" | "INSTITUTIONAL"; }
 export interface RetrievedContext { query: string; projectId: string; citations: ContextCitation[]; facts: string[]; }
 export interface ContextRetrievalResult { traceId: string; status: ContextRetrievalStatus; reason: string; context?: RetrievedContext; }
 export interface ContextProvider { retrieve(input: { projectId: string; query: string; traceId: string }): Promise<RetrievedContext>; }
@@ -33,7 +33,7 @@ export class ContextRetrievalGate {
     const permission = evaluatePermission(permissionRequest, traceId);
     if (!["ALLOW", "ALLOW_WITH_LIMITS"].includes(permission.decision)) return { traceId, status: "BLOCKED", reason: permission.reason };
     const context = await this.provider.retrieve({ projectId: request.projectId, query: request.query, traceId });
-    if (request.institutionalOnly && (!context.citations.length || context.citations.some((citation) => citation.sourceId === "AUREA_LOCAL_SEED"))) {
+    if (request.institutionalOnly && (!context.citations.length || context.citations.some((citation) => citation.sourceId === "AUREA_LOCAL_SEED" || citation.provenance === "LOCAL_SEED"))) {
       return { traceId, status: "BLOCKED", reason: "INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK" };
     }
     if (!context.citations.length && !context.facts.length) {
