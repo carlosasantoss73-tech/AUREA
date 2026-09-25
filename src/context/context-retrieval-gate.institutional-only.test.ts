@@ -32,7 +32,7 @@ describe("institutional-only retrieval", () => {
         return {
           projectId: "tcl",
           query: "continuar",
-          citations: [{ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11 }],
+          citations: [{ sourceId: "KNOWLEDGE_OS", documentId: "doc-1", version: 11, provenance: "INSTITUTIONAL" }],
           facts: ["institutional evidence"],
         };
       },
