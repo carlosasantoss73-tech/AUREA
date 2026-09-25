@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAureaRuntime } from "./aurea-runtime-factory";
 
 describe("AUREA canonical runtime continuity", () => {
-  it("retrieves historical context without explicit memory instructions", async () => {
+  it("fails closed when only local continuity seeds are available", async () => {
     const runtime = createAureaRuntime();
     runtime.registerTool({
       toolId: "knowledge.search",
@@ -23,9 +23,7 @@ describe("AUREA canonical runtime continuity", () => {
       contextQuery: "¿Qué herramientas de video trabajamos esta semana?",
       payload: { query: "herramientas de video" },
     });
-    expect(result.status).toBe("EXECUTED");
-    expect(result.context?.facts.join(" ")).toContain("MoneyPrinterTurbo");
-    expect(result.context?.facts.join(" ")).toContain("Creati.ai");
-    expect(result.context?.citations.length).toBeGreaterThan(0);
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("CONTEXT_INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
   });
 });
