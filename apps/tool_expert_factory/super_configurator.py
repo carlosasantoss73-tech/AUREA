@@ -47,6 +47,7 @@ class ToolState:
     installed: bool = False
     smoke_verified: bool = False
     credential_required: bool = False
+    credential_present: bool = False
     blockers: list[str] = field(default_factory=list)
     evidence: list[str] = field(default_factory=list)
 
@@ -115,7 +116,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         license="MIT",
         local_path=True,
         official_sources=(
-            OfficialSource("https://github.com/browserbase/stagehand", "AI web browsing framework"),
+            OfficialSource("https://github.com/browserbase/stagehand", "Stagehand is the SDK for browser agents"),
             OfficialSource("https://github.com/browserbase/stagehand/blob/main/README.md", "Local runs"),
             OfficialSource("https://github.com/browserbase/stagehand/blob/main/CONTRIBUTING.md", "MIT license"),
         ),
@@ -230,7 +231,10 @@ class SuperConfigurator:
 
         state.smoke_verified = True
         state.credential_required = bool(spec.credential_env)
-        state.status = "CONFIGURED_AWAITING_CREDENTIALS" if state.credential_required else "CONFIGURED"
+        state.credential_present = any(bool(__import__("os").environ.get(name, "").strip()) for name in spec.credential_env)
+        state.status = "CONFIGURED" if (not state.credential_required or state.credential_present) else "CONFIGURED_AWAITING_CREDENTIALS"
+        if state.credential_required:
+            state.evidence.append(f"credential_presence_verified:{state.credential_present}")
         state.evidence.append("software_configuration_verified")
         return state
 
