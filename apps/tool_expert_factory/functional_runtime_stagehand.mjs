@@ -36,9 +36,8 @@ async function main() {
       audit.steps.push({ step: "DISCOVER_INPUT", status: inputCount === 1 ? "VERIFIED" : "BLOCKED", evidence: { input_count: inputCount } });
       if (inputCount !== 1) throw new Error("ELEMENT_DISCOVERY_FAILURE");
 
-      const first = await page.act({ action: 'add a todo named "AUREA-STAGEHAND-001"' });
-      audit.steps.push({ step: "ACT_FIRST", status: first?.success === false ? "BLOCKED" : "EXECUTED", evidence: first });
-      if (first?.success === false) throw new Error("ACTION_FAILURE_FIRST");
+      const first = await stagehand.act('add a todo named "AUREA-STAGEHAND-001"');
+      audit.steps.push({ step: "ACT_FIRST", status: "EXECUTED", evidence: first });
 
       const firstCount = await page.locator(".todo-list li").count();
       const firstBody = await page.locator("body").innerText();
@@ -46,9 +45,8 @@ async function main() {
       audit.steps.push({ step: "VERIFY_FIRST", status: firstVerified ? "VERIFIED" : "BLOCKED", evidence: { todo_count: firstCount, contains_first: firstBody.includes("AUREA-STAGEHAND-001") } });
       if (!firstVerified) throw new Error("VERIFICATION_FAILURE_FIRST");
 
-      const second = await page.act({ action: 'add a todo named "AUREA-STAGEHAND-002"' });
-      audit.steps.push({ step: "ACT_SECOND", status: second?.success === false ? "BLOCKED" : "EXECUTED", evidence: second });
-      if (second?.success === false) throw new Error("ACTION_FAILURE_SECOND");
+      const second = await stagehand.act('add a todo named "AUREA-STAGEHAND-002"');
+      audit.steps.push({ step: "ACT_SECOND", status: "EXECUTED", evidence: second });
 
       const secondCount = await page.locator(".todo-list li").count();
       const secondBody = await page.locator("body").innerText();
