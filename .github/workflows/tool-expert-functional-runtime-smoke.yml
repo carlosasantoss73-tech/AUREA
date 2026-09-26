@@ -13,12 +13,27 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skyvern
+          POSTGRES_PASSWORD: skyvern
+          POSTGRES_DB: skyvern
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U skyvern -d skyvern"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ENABLE_GEMINI: "true"
       LLM_KEY: "GEMINI_3.0_FLASH"
       SECONDARY_LLM_KEY: "GEMINI_3.0_FLASH"
+      DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@127.0.0.1:5432/skyvern
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,7 +43,7 @@ jobs:
         with:
           node-version: "22"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install browser-use "skyvern[local]"
+      - run: python -m pip install browser-use "skyvern[local]" "psycopg[binary]"
       - run: python -m playwright install chromium
       - name: Execute harmless runtime task
         run: python apps/tool_expert_factory/functional_runtime_smoke.py
