@@ -69,7 +69,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
             ("python", "-m", "pip", "install", "browser-use"),
             ("uvx", "browser-use", "install"),
         ),
-        smoke_command=("python", "-c", "import browser_use; print(browser_use.__version__)"),
+        smoke_command=("python", "-c", "from browser_use import Agent; print(Agent.__name__)"),
         credential_env=("OPENAI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"),
     ),
     ToolSpec(
