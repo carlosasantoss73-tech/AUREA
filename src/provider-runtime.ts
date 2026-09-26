@@ -53,7 +53,8 @@ export class ProviderRuntime {
           : true,
       )
       .filter((provider) => provider.capabilities.includes(request.requiredCapability))
-      .filter((provider) => provider.status === "EXECUTABLE");
+      .filter((provider) => provider.status === "EXECUTABLE")
+      .filter((provider) => provider.healthEvidence.length > 0);
 
     const preferred = request.preferredProviderId
       ? candidates.find((provider) => provider.providerId === request.preferredProviderId)
