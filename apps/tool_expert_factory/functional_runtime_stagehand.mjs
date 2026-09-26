@@ -15,18 +15,25 @@ async function main() {
     try {
       const [page] = await browser.context.pages();
       await page.goto(URL);
-      const input = page.getByPlaceholder("What needs to be done?");
-      await input.fill("AUREA-STAGEHAND-1");
-      await input.press("Enter");
-      await input.fill("AUREA-STAGEHAND-2");
-      await input.press("Enter");
+
+      await stagehand.act('add a todo named "AUREA-STAGEHAND-1"');
+      await stagehand.act('add a todo named "AUREA-STAGEHAND-2"');
+
       const body = await page.locator("body").innerText();
-      const ok = body.includes("AUREA-STAGEHAND-1") && body.includes("AUREA-STAGEHAND-2");
+      const ok =
+        body.includes("AUREA-STAGEHAND-1") &&
+        body.includes("AUREA-STAGEHAND-2");
+
       console.log(JSON.stringify({
         tool: "stagehand",
         status: ok ? "EXECUTED" : "BLOCKED",
-        evidence: { url: page.url(), verified_todos: ok, stagehand_created: true, body_excerpt: body.slice(-1500) },
-        ...(ok ? {} : { blocker: "task_verification_failed" })
+        evidence: {
+          url: page.url(),
+          verified_todos: ok,
+          stagehand_ai_actions: 2,
+          body_excerpt: body.slice(-1500),
+        },
+        ...(ok ? {} : { blocker: "task_verification_failed" }),
       }));
       process.exitCode = ok ? 0 : 1;
     } finally {
