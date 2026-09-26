@@ -36,39 +36,26 @@ async function main() {
       audit.steps.push({ step: "DISCOVER_INPUT", status: inputCount === 1 ? "VERIFIED" : "BLOCKED", evidence: { input_count: inputCount } });
       if (inputCount !== 1) throw new Error("ELEMENT_DISCOVERY_FAILURE");
 
-      const first = await stagehand.act('add a todo named "AUREA-STAGEHAND-001"');
+      const first = await stagehand.act('add a todo named "AUREA-STAGEHAND-001" and press Enter to submit it');
       audit.steps.push({ step: "ACT_FIRST", status: "EXECUTED", evidence: first });
-
       const firstCount = await page.locator(".todo-list li").count();
       const firstBody = await page.locator("body").innerText();
       const firstVerified = firstCount >= 1 && firstBody.includes("AUREA-STAGEHAND-001");
       audit.steps.push({ step: "VERIFY_FIRST", status: firstVerified ? "VERIFIED" : "BLOCKED", evidence: { todo_count: firstCount, contains_first: firstBody.includes("AUREA-STAGEHAND-001") } });
       if (!firstVerified) throw new Error("VERIFICATION_FAILURE_FIRST");
 
-      const second = await stagehand.act('add a todo named "AUREA-STAGEHAND-002"');
+      const second = await stagehand.act('add a todo named "AUREA-STAGEHAND-002" and press Enter to submit it');
       audit.steps.push({ step: "ACT_SECOND", status: "EXECUTED", evidence: second });
-
       const secondCount = await page.locator(".todo-list li").count();
       const secondBody = await page.locator("body").innerText();
-      const secondVerified =
-        secondCount >= 2 &&
-        secondBody.includes("AUREA-STAGEHAND-001") &&
-        secondBody.includes("AUREA-STAGEHAND-002");
+      const secondVerified = secondCount >= 2 && secondBody.includes("AUREA-STAGEHAND-001") && secondBody.includes("AUREA-STAGEHAND-002");
       audit.steps.push({ step: "VERIFY_SECOND", status: secondVerified ? "VERIFIED" : "BLOCKED", evidence: { todo_count: secondCount, contains_first: secondBody.includes("AUREA-STAGEHAND-001"), contains_second: secondBody.includes("AUREA-STAGEHAND-002") } });
       if (!secondVerified) throw new Error("VERIFICATION_FAILURE_SECOND");
 
       const final = await page.locator(".todo-list li").count();
       const finalBody = await page.locator("body").innerText();
-      const finalVerified =
-        final >= 2 &&
-        finalBody.includes("AUREA-STAGEHAND-001") &&
-        finalBody.includes("AUREA-STAGEHAND-002");
-
-      audit.steps.push({
-        step: "FINAL_INDEPENDENT_VERIFICATION",
-        status: finalVerified ? "VERIFIED" : "BLOCKED",
-        evidence: { todo_count: final, first: finalBody.includes("AUREA-STAGEHAND-001"), second: finalBody.includes("AUREA-STAGEHAND-002") },
-      });
+      const finalVerified = final >= 2 && finalBody.includes("AUREA-STAGEHAND-001") && finalBody.includes("AUREA-STAGEHAND-002");
+      audit.steps.push({ step: "FINAL_INDEPENDENT_VERIFICATION", status: finalVerified ? "VERIFIED" : "BLOCKED", evidence: { todo_count: final, first: finalBody.includes("AUREA-STAGEHAND-001"), second: finalBody.includes("AUREA-STAGEHAND-002") } });
       if (!finalVerified) throw new Error("VERIFICATION_FAILURE");
 
       audit.status = "VERIFIED";
