@@ -1,5 +1,5 @@
-from contracts import Evidence, ExpertRequest, ExpertResult, ToolExpertProfile
-from gate import preflight
+from apps.tool_expert_factory.contracts import Evidence, ExpertRequest, ExpertResult, ToolExpertProfile
+from apps.tool_expert_factory.gate import preflight
 
 def profile():
     return ToolExpertProfile("TEST-EXPERT", "test", "docs/test.md")
