@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - "apps/gemini-expert/**"
-      - "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md"
+      - "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.yml"
       - ".github/workflows/gemini-expert.yml"
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
         run: python -m pytest -q
 
   live-probe:
-    if: ${${ github.event_name == 'push' && vars.AUREA_ENABLE_GEMINI_LIVE_PROBE == 'true' }}
+    if: ${{ github.event_name == 'push' && vars.AUREA_ENABLE_GEMINI_LIVE_PROBE == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,7 +43,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Live Gemini probe
         env:
-          GEMINI_API_KEY: ${${ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           test -n "$GEMINI_API_KEY"
           python -m cli "Run a read-only connectivity probe. State the current model identity and return a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
