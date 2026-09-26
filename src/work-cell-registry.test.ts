@@ -48,6 +48,18 @@ describe("WorkCellRegistry", () => {
     );
   });
 
+  it("fails closed when recovered history contains an impossible lifecycle transition", () => {
+    const registry = new WorkCellRegistry();
+    expect(() => registry.restore([cell], [{
+      workCellId: "WC-001",
+      from: "READY",
+      to: "CLOSED",
+      traceId: "trace-invalid",
+      evidence: ["persisted"],
+      timestamp: "2026-09-25T00:00:00.000Z",
+    }])).toThrow("INVALID_WORK_CELL_TRANSITION:READY->CLOSED");
+  });
+
   it("does not expose mutable internal state", () => {
     const registry = new WorkCellRegistry();
     registry.register(cell);

@@ -108,6 +108,9 @@ export class WorkCellRegistry {
       if (!transition.traceId || transition.evidence.length === 0) {
         throw new Error(`INVALID_WORK_CELL_TRANSITION_EVIDENCE:${transition.workCellId}`);
       }
+      if (!ALLOWED_TRANSITIONS[transition.from].includes(transition.to)) {
+        throw new Error(`INVALID_WORK_CELL_TRANSITION:${transition.from}->${transition.to}`);
+      }
     }
 
     this.cells.clear();
