@@ -45,13 +45,14 @@ jobs:
       DATABASE_STRING: ""
       BROWSER_TYPE: chromium-headless
       MAX_SCRAPING_RETRIES: "0"
+      ENABLE_LOG_ARTIFACTS: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install "skyvern[local]"
+      - run: python -m pip install "skyvern[local]>=1.0.50"
       - run: python -m playwright install chromium
       - name: Run Skyvern real example
         run: |
@@ -100,6 +101,8 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
