@@ -44,11 +44,11 @@ jobs:
       - name: Live Gemini probe
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AUREA_GEMINI_KNOWLEDGE_PATH: ../../docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md
+          AUREA_GEMINI_AUDIT_PATH: ../../runtime/gemini-expert-audit.jsonl
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "LIVE_PROBE_BLOCKED: GEMINI_API_KEY is not configured. Contract tests remain authoritative; no live execution is claimed."
             exit 0
           fi
           python -m cli "Run a read-only connectivity probe. State the current model identity and return a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
-
-# AUREA live-probe trigger marker
