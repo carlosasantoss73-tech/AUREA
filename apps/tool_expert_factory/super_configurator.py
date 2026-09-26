@@ -65,6 +65,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         ),
         prerequisites=("Python >= 3.11", "Chromium/browser runtime"),
         install_commands=(
+            ("python", "-m", "pip", "install", "uv"),
             ("python", "-m", "pip", "install", "browser-use"),
             ("uvx", "browser-use", "install"),
         ),
@@ -171,7 +172,7 @@ class SuperConfigurator:
     @staticmethod
     def _safe_command(command: tuple[str, ...]) -> bool:
         return bool(command) and command[0].lower() in {
-            "python", "python3", "py", "uvx", "npx", "npm"
+            "python", "python3", "py", "uvx", "npx", "npm", "node"
         }
 
     def run_command(self, command: tuple[str, ...]) -> tuple[int, str]:
