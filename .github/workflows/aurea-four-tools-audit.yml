@@ -50,9 +50,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install "skyvern[local]==1.0.50"
+      - run: python -m pip install "skyvern[local]==1.0.48"
       - run: python -m playwright install chromium
       - name: Run Skyvern real example
         run: |
