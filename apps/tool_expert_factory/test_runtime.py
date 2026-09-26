@@ -44,3 +44,4 @@ def test_runtime_fail_closed_on_executor_error(tmp_path: Path):
     result = runtime.execute(profile(), request, authoritative(), broken)
     assert result.status == "BLOCKED"
     assert result.blockers == ["executor_error:RuntimeError"]
+
