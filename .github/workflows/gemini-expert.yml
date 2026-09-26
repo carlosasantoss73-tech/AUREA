@@ -29,7 +29,7 @@ jobs:
         run: python -m pytest -q
 
   live-probe:
-    if: ${{ github.event_name == 'push' && vars.AUREA_ENABLE_GEMINI_LIVE_PROBE == 'true' }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,5 +45,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          test -n "$GEMINI_API_KEY"
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "LIVE_PROBE_BLOCKED: GEMINI_API_KEY is not configured. Contract tests remain authoritative; no live execution is claimed."
+            exit 0
+          fi
           python -m cli "Run a read-only connectivity probe. State the current model identity and return a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
