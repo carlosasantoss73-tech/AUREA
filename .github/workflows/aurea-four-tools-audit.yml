@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install browser-use
+      - run: python -m pip install browser-use playwright
       - run: python -m playwright install chromium
       - name: Run Browser Use real example
         run: |
@@ -89,7 +89,7 @@ jobs:
           URL="https://demo.playwright.dev/todomvc"
           TASK='Open the TodoMVC page, add one todo named "AUREA-AUDIT-SKYVERN-001" by typing it into the new todo field and pressing Enter, then verify it is present.'
           async def main():
-              browser=await Skyvern.local().launch_local_browser(headless=True)
+              browser=await Skyvern.local(settings={"use_in_memory_db": True}).launch_local_browser(headless=True)
               try:
                   page=await browser.get_working_page()
                   await page.goto(URL)
