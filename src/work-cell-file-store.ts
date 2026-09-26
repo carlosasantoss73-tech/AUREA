@@ -12,6 +12,25 @@ export interface WorkCellPersistenceState {
 
 const emptyState = (): WorkCellPersistenceState => ({ cells: {}, transitions: [] });
 
+function validatePersistenceState(value: unknown): WorkCellPersistenceState {
+  if (!value || typeof value !== "object") {
+    throw new Error("INVALID_WORK_CELL_PERSISTENCE_STATE");
+  }
+
+  const candidate = value as Partial<WorkCellPersistenceState>;
+  if (!candidate.cells || typeof candidate.cells !== "object" || Array.isArray(candidate.cells)) {
+    throw new Error("INVALID_WORK_CELL_PERSISTENCE_CELLS");
+  }
+  if (!Array.isArray(candidate.transitions)) {
+    throw new Error("INVALID_WORK_CELL_PERSISTENCE_TRANSITIONS");
+  }
+
+  return {
+    cells: candidate.cells as Record<string, WorkCell>,
+    transitions: candidate.transitions as WorkCellTransition[],
+  };
+}
+
 /** Durable storage adapter kept separate from the in-process WorkCellRegistry. */
 export class WorkCellFileStore {
   constructor(private readonly filePath: string) {}
@@ -19,11 +38,8 @@ export class WorkCellFileStore {
   async loadState(): Promise<WorkCellPersistenceState> {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<WorkCellPersistenceState>;
-      return {
-        cells: parsed.cells ?? {},
-        transitions: parsed.transitions ?? [],
-      };
+      const parsed: unknown = JSON.parse(raw);
+      return validatePersistenceState(parsed);
     } catch (error) {
       const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined;
       if (code === "ENOENT") return emptyState();
