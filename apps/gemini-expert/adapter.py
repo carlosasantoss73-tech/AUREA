@@ -13,7 +13,7 @@ class GeminiAdapter:
     def __init__(self, settings: Settings):
         self.settings = settings
         from google import genai
-        self.client = genai.Client(api_key=settings.require_api_key())
+        self.client = genai.Client(api_key=settings.require_api_key(), http_options={"api_version": settings.api_version})
 
     def execute(self, *, prompt: str, system_instruction: str) -> GeminiResult:
         interaction = self.client.interactions.create(
