@@ -7,6 +7,11 @@ on:
       - "apps/tool_expert_factory/functional_runtime_mcp.py"
       - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/aurea-four-tools-audit.yml"
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
 
 jobs:
   browser-use:
