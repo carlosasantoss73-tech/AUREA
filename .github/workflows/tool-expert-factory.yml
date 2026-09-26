@@ -25,5 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test runner
+        run: python -m pip install pytest
       - name: Run fail-closed factory contracts
-        run: python -m pytest -q
+        run: python -m pytest -q apps/tool_expert_factory/test_contracts.py
