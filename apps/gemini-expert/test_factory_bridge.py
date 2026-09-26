@@ -31,6 +31,10 @@ def test_bridge_uses_generic_runtime_for_execution(monkeypatch, tmp_path):
 
     monkeypatch.setattr(factory_bridge, "GeminiAdapter", FakeAdapter)
     monkeypatch.setenv("AUREA_GEMINI_FACTORY_AUDIT_PATH", str(tmp_path / "audit.jsonl"))
+    monkeypatch.setenv(
+        "AUREA_GEMINI_KNOWLEDGE_PATH",
+        str(ROOT / "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md"),
+    )
     result = factory_bridge.execute_and_verify("read-only test")
     assert result.status == "VERIFIED"
     assert result.trace_id.startswith("factory-")
