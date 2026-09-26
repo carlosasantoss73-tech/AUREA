@@ -50,3 +50,5 @@ jobs:
             exit 0
           fi
           python -m cli "Run a read-only connectivity probe. State the current model identity and return a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
+
+# AUREA live-probe trigger marker
