@@ -24,4 +24,4 @@ def record(path: str, result: ExpertResult) -> None:
         "blockers": result.blockers,
     }
     with target.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, ensure_ascii=False) + "\\n")
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")

@@ -46,9 +46,26 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AUREA_GEMINI_KNOWLEDGE_PATH: ../../docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md
           AUREA_GEMINI_AUDIT_PATH: ../../runtime/gemini-expert-audit.jsonl
+          AUREA_GEMINI_FACTORY_AUDIT_PATH: ../../runtime/gemini-expert-factory-audit.jsonl
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "LIVE_PROBE_BLOCKED: GEMINI_API_KEY is not configured. Contract tests remain authoritative; no live execution is claimed."
             exit 0
           fi
           python -m cli "The AUREA Python adapter has already made this live Gemini Interactions API request successfully before your response is returned. Do not claim that no network call occurred or that this is only local inference. Report the current model identity and provide a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
+      - name: Factory-bound live execution and verification
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AUREA_GEMINI_KNOWLEDGE_PATH: ../../docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md
+          AUREA_GEMINI_FACTORY_AUDIT_PATH: ../../runtime/gemini-expert-factory-audit.jsonl
+        run: |
+          python -m factory_bridge "Run a read-only factory-bound execution and verify the provider response. Return RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN. Do not mutate anything."
+      - name: Upload Gemini Expert audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurea-gemini-expert-audit
+          path: |
+            runtime/gemini-expert-audit.jsonl
+            runtime/gemini-expert-factory-audit.jsonl
+          if-no-files-found: ignore
