@@ -19,7 +19,10 @@ async function main() {
   try {
     stagehand = await Stagehand.create({
       browser,
-      model: "google/gemini-3-flash-preview",
+      model: {
+        modelName: "google/gemini-3-flash-preview",
+        apiKey: process.env.GEMINI_API_KEY,
+      },
     });
 
     try {
