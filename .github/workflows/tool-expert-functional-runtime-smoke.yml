@@ -10,12 +10,15 @@ on:
 jobs:
   runtime-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ENABLE_GEMINI: "true"
+      LLM_KEY: "GEMINI_3.0_FLASH"
+      SECONDARY_LLM_KEY: "GEMINI_3.0_FLASH"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
