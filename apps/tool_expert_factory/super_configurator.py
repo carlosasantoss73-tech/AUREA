@@ -98,8 +98,8 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         license="Apache-2.0",
         local_path=True,
         official_sources=(
-            OfficialSource("https://playwright.dev/docs/getting-started-mcp", "Playwright MCP"),
-            OfficialSource("https://github.com/microsoft/playwright-mcp", "Playwright Tools for MCP"),
+            OfficialSource("https://playwright.dev/docs/getting-started-mcp", "Standalone server"),
+            OfficialSource("https://github.com/microsoft/playwright-mcp", "Standalone MCP server"),
             OfficialSource("https://github.com/microsoft/playwright-mcp/blob/main/package.json", "@playwright/mcp"),
         ),
         prerequisites=("Node.js >= 20", "MCP-capable client"),
