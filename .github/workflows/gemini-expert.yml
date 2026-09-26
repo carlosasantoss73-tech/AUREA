@@ -51,4 +51,4 @@ jobs:
             echo "LIVE_PROBE_BLOCKED: GEMINI_API_KEY is not configured. Contract tests remain authoritative; no live execution is claimed."
             exit 0
           fi
-          python -m cli "Run a read-only connectivity probe. State the current model identity and return a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
+          python -m cli "The AUREA Python adapter has already made this live Gemini Interactions API request successfully before your response is returned. Do not claim that no network call occurred or that this is only local inference. Report the current model identity and provide a concise RESULTADO/EVIDENCIA/DECISIÓN/APRENDIZAJE/ADAPTACIÓN/SIGUIENTE ACCIÓN record. Do not mutate anything."
