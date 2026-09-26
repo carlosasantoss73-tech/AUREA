@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - "apps/gemini-expert/**"
-      - "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.yml"
+      - "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md"
       - ".github/workflows/gemini-expert.yml"
 
 jobs:
