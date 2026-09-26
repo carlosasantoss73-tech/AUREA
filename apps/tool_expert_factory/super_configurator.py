@@ -124,7 +124,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         install_commands=(
             ("npm", "install", "--no-save", "@browserbasehq/stagehand", "zod"),
         ),
-        smoke_command=("node", "-e", "require.resolve('@browserbasehq/stagehand'); console.log('stagehand_import_ok')"),
+        smoke_command=("node", "--input-type=module", "-e", "import('@browserbasehq/stagehand').then(m => { if (!m.Stagehand) process.exit(1); console.log('stagehand_import_ok') })"),
         credential_env=("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"),
     ),
 )
