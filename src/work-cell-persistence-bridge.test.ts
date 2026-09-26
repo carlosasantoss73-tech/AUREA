@@ -69,4 +69,17 @@ describe("WorkCellPersistenceBridge", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+  it("fails closed when persisted state has malformed top-level shapes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aurea-wc-"));
+    try {
+      const path = join(dir, "work-cells.json");
+      const store = new WorkCellFileStore(path);
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(path, JSON.stringify({ cells: [], transitions: {} }), "utf8");
+
+      await expect(store.loadState()).rejects.toThrow("INVALID_WORK_CELL_PERSISTENCE_CELLS");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
