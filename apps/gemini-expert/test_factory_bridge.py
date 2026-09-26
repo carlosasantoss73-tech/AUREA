@@ -35,3 +35,4 @@ def test_bridge_uses_generic_runtime_for_execution(monkeypatch, tmp_path):
     assert result.status == "VERIFIED"
     assert result.trace_id.startswith("factory-")
     assert len((tmp_path / "audit.jsonl").read_text().splitlines()) == 2
+
