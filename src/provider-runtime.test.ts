@@ -24,6 +24,21 @@ describe("ProviderRuntime", () => {
     expect(result.provider?.providerId).toBe("p-live");
   });
 
+  it("fails closed when executable status has no health evidence", () => {
+    const runtime = new ProviderRuntime();
+    runtime.register({
+      providerId: "p-unverified",
+      modelId: "m0",
+      status: "EXECUTABLE",
+      capabilities: ["text"],
+      healthEvidence: [],
+    });
+
+    const result = runtime.select({ requiredCapability: "text" });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("NO_EXECUTABLE_PROVIDER_FOR_CAPABILITY");
+  });
+
   it("fails closed when no executable provider exists", () => {
     const runtime = new ProviderRuntime();
     runtime.register({
