@@ -19,6 +19,27 @@ class ToolAutomationSuperAgent:
     def __init__(self, workspace: Path | None = None) -> None:
         self.configurator = SuperConfigurator(workspace)
 
+    def refresh_knowledge(self, sources: list[dict[str, str]]) -> dict[str, object]:
+        """Refresh candidate knowledge while preserving authority boundaries."""
+        from .knowledge_researcher import KnowledgeResearcher
+        researcher = KnowledgeResearcher()
+        findings = []
+        for item in sources:
+            source = researcher.classify_url(
+                item["url"], topic=item.get("topic", "tool"), publisher=item.get("publisher", "unknown")
+            )
+            finding = researcher.fetch(source)
+            findings.append(researcher.as_record(finding))
+        return {
+            "agent_id": self.agent_id,
+            "RESULTADO": "Knowledge refresh completed with provenance-aware evidence.",
+            "EVIDENCIA": findings,
+            "DECISION": "Official sources may enter institutional validation; non-official sources remain learning/troubleshooting evidence.",
+            "APRENDIZAJE": "Web breadth improves troubleshooting only when authority and provenance remain explicit.",
+            "ADAPTACION": "Revalidate official sources before configuration or mutation.",
+            "SIGUIENTE_ACCION": "Cross-check candidate findings against current official documentation and executable tests.",
+        }
+
     def configure_all(self, *, apply: bool = False) -> dict[str, object]:
         results = self.configurator.sequential(apply=apply)
         blocked = next((item for item in results if item.status == "BLOCKED"), None)
