@@ -79,7 +79,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         license="AGPL-3.0",
         local_path=True,
         official_sources=(
-            OfficialSource("https://github.com/Skyvern-AI/skyvern", "Self-Hosted"),
+            OfficialSource("https://github.com/Skyvern-AI/skyvern", "Automate browser based workflows with AI"),
             OfficialSource("https://github.com/Skyvern-AI/skyvern/blob/main/docs/developers/self-hosted/overview.mdx", "self-hosted"),
             OfficialSource("https://github.com/Skyvern-AI/skyvern/blob/main/docs/sdk-reference/complete-reference.mdx", "Skyvern.local"),
         ),
