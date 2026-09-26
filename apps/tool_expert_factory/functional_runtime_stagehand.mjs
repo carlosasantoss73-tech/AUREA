@@ -15,13 +15,11 @@ async function main() {
   };
 
   const browser = await localBrowser.launch({ headless: true });
+  let stagehand;
   try {
-    const stagehand = await Stagehand.create({
+    stagehand = await Stagehand.create({
       browser,
-      model: {
-        modelName: "google/gemini-3.0-flash",
-        apiKey: process.env.GEMINI_API_KEY,
-      },
+      model: "google/gemini-3-flash-preview",
     });
 
     try {
