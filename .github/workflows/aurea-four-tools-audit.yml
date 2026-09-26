@@ -1,0 +1,135 @@
+name: AUREA Four Tools Audit V1
+
+on:
+  push:
+    paths:
+      - ".github/workflows/aurea-four-tools-audit.yml"
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/aurea-four-tools-audit.yml"
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
+
+jobs:
+  browser-use:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install browser-use playwright
+      - run: python -m playwright install chromium
+      - name: Run Browser Use real example
+        run: |
+          python - <<'PY'
+          import asyncio, json
+          from browser_use import Agent, BrowserProfile, BrowserSession, ChatGoogle
+
+          TASK='Open https://demo.playwright.dev/todomvc, add one todo named "AUREA-AUDIT-BROWSER-001", then verify it is present.'
+          async def main():
+              session=BrowserSession(browser_profile=BrowserProfile(headless=True, chromium_sandbox=False))
+              history=await Agent(task=TASK,llm=ChatGoogle(model="gemini-flash-latest"),browser_session=session).run(max_steps=8)
+              evidence={
+                  "is_done": history.is_done(),
+                  "is_successful": history.is_successful(),
+                  "urls": history.urls()[-5:],
+                  "final_result": str(history.final_result())[-1000:],
+              }
+              print(json.dumps({"tool":"browser-use","evidence":evidence}, ensure_ascii=False))
+              raise SystemExit(0 if history.is_successful() is True else 1)
+          asyncio.run(main())
+          PY
+
+  skyvern:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skyvern
+          POSTGRES_PASSWORD: skyvern
+          POSTGRES_DB: skyvern
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U skyvern -d skyvern"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ENABLE_GEMINI: "true"
+      LLM_KEY: GEMINI_3.0_FLASH
+      SECONDARY_LLM_KEY: GEMINI_3.0_FLASH
+      DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@127.0.0.1:5432/skyvern
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install "skyvern[local]" "psycopg[binary]"
+      - run: python -m playwright install chromium
+      - name: Run Skyvern real example
+        run: |
+          python - <<'PY'
+          import asyncio, json
+          from skyvern import Skyvern
+
+          URL="https://demo.playwright.dev/todomvc"
+          TASK='Open the TodoMVC page, add one todo named "AUREA-AUDIT-SKYVERN-001" by typing it into the new todo field and pressing Enter, then verify it is present.'
+          async def main():
+              browser=await Skyvern.local(use_in_memory_db=True).launch_local_browser(headless=True)
+              try:
+                  page=await browser.get_working_page()
+                  await page.goto(URL)
+                  await page.agent.run_task(TASK)
+                  body=await page.locator("body").text_content() or ""
+                  ok="AUREA-AUDIT-SKYVERN-001" in body
+                  print(json.dumps({"tool":"skyvern","url":URL,"verified_todo":ok,"body_excerpt":body[-1500:]}, ensure_ascii=False))
+                  raise SystemExit(0 if ok else 1)
+              finally:
+                  await browser.close()
+          asyncio.run(main())
+          PY
+
+  playwright-mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python -m pip install "mcp>=2.1.1"
+      - name: Run Playwright MCP real example
+        run: python apps/tool_expert_factory/functional_runtime_mcp.py
+
+  stagehand:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-save @browserbasehq/stagehand zod
+      - name: Run Stagehand real example
+        run: node apps/tool_expert_factory/functional_runtime_stagehand.mjs
