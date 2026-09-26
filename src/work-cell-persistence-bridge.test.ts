@@ -22,21 +22,6 @@ const cell = (id = "wc-recovery-1"): WorkCell => ({
   evidence: ["created-for-test"],
   qaStatus: "PENDING",
   auditStatus: "PENDING",
-  it("fails closed when persisted state has malformed top-level shapes", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "aurea-wc-"));
-    try {
-      const path = join(dir, "work-cells.json");
-      const store = new WorkCellFileStore(path);
-      await store.saveState({ cells: {}, transitions: [] });
-      const { writeFile } = await import("node:fs/promises");
-      await writeFile(path, JSON.stringify({ cells: [], transitions: {} }), "utf8");
-
-      await expect(store.loadState()).rejects.toThrow("INVALID_WORK_CELL_PERSISTENCE_CELLS");
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
 });
 
 describe("WorkCellPersistenceBridge", () => {
@@ -80,6 +65,19 @@ describe("WorkCellPersistenceBridge", () => {
       await expect(new WorkCellPersistenceBridge(registry, store).recover())
         .rejects.toThrow("TRANSITION_WITHOUT_WORK_CELL:missing");
       expect(registry.list()).toHaveLength(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  it("fails closed when persisted state has malformed top-level shapes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aurea-wc-"));
+    try {
+      const path = join(dir, "work-cells.json");
+      const store = new WorkCellFileStore(path);
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(path, JSON.stringify({ cells: [], transitions: {} }), "utf8");
+
+      await expect(store.loadState()).rejects.toThrow("INVALID_WORK_CELL_PERSISTENCE_CELLS");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
