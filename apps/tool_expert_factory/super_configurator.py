@@ -63,6 +63,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
             OfficialSource("https://github.com/browser-use/browser-use", "open-source"),
             OfficialSource("https://github.com/browser-use/browser-use/blob/main/README.md", "Python Library"),
             OfficialSource("https://github.com/browser-use/browser-use/blob/main/pyproject.toml", "version"),
+            OfficialSource("https://github.com/browser-use/browser-use/blob/main/skills/cloud/SKILL.md", "BROWSER_USE_API_KEY"),
         ),
         prerequisites=("Python >= 3.11", "Chromium/browser runtime"),
         install_commands=(
@@ -71,7 +72,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
             ("uvx", "browser-use", "install"),
         ),
         smoke_command=("python", "-c", "from browser_use import Agent; print(Agent.__name__)"),
-        credential_env=("OPENAI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"),
+        credential_env=("BROWSER_USE_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"),
     ),
     ToolSpec(
         tool_id="skyvern",
