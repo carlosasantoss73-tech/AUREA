@@ -10,6 +10,7 @@ class Settings:
     knowledge_path: str = "docs/AUREA-GEMINI-EXPERT-KNOWLEDGE-PACK-V2.md"
     audit_path: str = "runtime/gemini-expert-audit.jsonl"
     max_output_chars: int = 12000
+    api_version: str = "v1"
 
     @classmethod
     def from_env(cls) -> "Settings":
