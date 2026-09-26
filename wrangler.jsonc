@@ -10,6 +10,20 @@
       "id": "REPLACE_WITH_CONCHITA_SESSIONS_NAMESPACE_ID"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONCHITA_EXECUTION_STATE",
+        "class_name": "ConchitaExecutionStateDurableObject"
+      }
+    ]
+  },
+  "exports": {
+    "ConchitaExecutionStateDurableObject": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
   "vars": {
     "CONCHITA_ANTHROPIC_MODEL": "claude-sonnet-5",
     "CONCHITA_PILOT_USER_ID": "pilot-user",
