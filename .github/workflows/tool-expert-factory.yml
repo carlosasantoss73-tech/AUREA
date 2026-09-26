@@ -1,0 +1,29 @@
+name: AUREA Tool Expert Factory Contracts
+
+on:
+  push:
+    paths:
+      - "apps/tool-expert-factory/**"
+      - "docs/AUREA-TOOL-EXPERT-FACTORY-V1.md"
+      - "docs/AUREA-15-CELL-TOOL-EXPERT-WORKPACK-V1.md"
+      - "docs/AUREA-TIKTOK-EXPERT-KNOWLEDGE-PACK-V1.md"
+  pull_request:
+    paths:
+      - "apps/tool-expert-factory/**"
+      - "docs/AUREA-TOOL-EXPERT-FACTORY-V1.md"
+      - "docs/AUREA-15-CELL-TOOL-EXPERT-WORKPACK-V1.md"
+      - "docs/AUREA-TIKTOK-EXPERT-KNOWLEDGE-PACK-V1.md"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/tool-expert-factory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run fail-closed factory contracts
+        run: python -m pytest -q
