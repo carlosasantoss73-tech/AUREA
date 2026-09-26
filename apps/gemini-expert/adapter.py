@@ -1,7 +1,6 @@
 """Real Gemini adapter using Google's current Interactions API."""
 from __future__ import annotations
 from dataclasses import dataclass
-from google import genai
 from config import Settings
 
 @dataclass(frozen=True)
@@ -13,6 +12,7 @@ class GeminiResult:
 class GeminiAdapter:
     def __init__(self, settings: Settings):
         self.settings = settings
+        from google import genai
         self.client = genai.Client(api_key=settings.require_api_key())
 
     def execute(self, *, prompt: str, system_instruction: str) -> GeminiResult:
