@@ -245,3 +245,30 @@ jobs:
                   raise SystemExit("PROVIDER_FALLBACK_DID_NOT_EXECUTE")
           PY
         
+  openai-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run OpenAI provider smoke test
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          key=os.environ.get("OPENAI_API_KEY", "")
+          if not key: raise SystemExit("OPENAI_API_KEY_MISSING")
+          payload={"model":"gpt-5.6-luna","input":"Actúa como consultor técnico de AUREA. En máximo 5 líneas indica qué debemos preservar y cuál es el siguiente paso para cerrar el Bibliotecario. No inventes integraciones.","max_output_tokens":300}
+          req=urllib.request.Request("https://api.openai.com/v1/responses",data=json.dumps(payload).encode(),headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},method="POST")
+          with urllib.request.urlopen(req,timeout=60) as resp: body=json.load(resp)
+          texts=[]
+          for item in body.get("output",[]):
+            for part in item.get("content",[]):
+              if part.get("type")=="output_text": texts.append(part.get("text", ""))
+          result="\\n".join(texts).strip()
+          if not result: raise SystemExit("OPENAI_EMPTY_RESPONSE")
+          print(json.dumps({"status":"PASS","provider":"openai","model":"gpt-5.6-luna","response":result},ensure_ascii=False))
+          PY
