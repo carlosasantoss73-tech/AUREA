@@ -11,6 +11,10 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .super_configurator import SuperConfigurator
+from .runtime import SpecialistRuntime
+from .work_cells import WorkCellRunner, WorkCellResult
+from .work_planner import WorkPlan
+from .contracts import Evidence, ToolExpertProfile
 
 
 class ToolAutomationSuperAgent:
@@ -40,6 +44,27 @@ class ToolAutomationSuperAgent:
             "SIGUIENTE_ACCION": "Cross-check candidate findings against current official documentation and executable tests.",
         }
 
+    def execute_plan(self, *, plan: WorkPlan, profiles: dict[str, ToolExpertProfile],
+                     authoritative_evidence: list[Evidence], executors: dict[str, object],
+                     audit_path: str) -> dict[str, object]:
+        """Execute a planned specialist workflow through the existing Runtime."""
+        runtime = SpecialistRuntime(audit_path)
+        results = WorkCellRunner(runtime).execute(
+            plan, profiles, authoritative_evidence, executors
+        )
+        blocked = next((item for item in results if item.result.status == "BLOCKED"), None)
+        return {
+            "agent_id": self.agent_id,
+            "RESULTADO": "Planned specialist workflow executed through Work Cells and Specialist Runtime.",
+            "EVIDENCIA": [{"cell_id": item.cell_id, "specialist_id": item.specialist_id,
+                          "status": item.result.status, "result": item.result.result,
+                          "blockers": item.result.blockers} for item in results],
+            "DECISION": "STOP_AND_PRESERVE_EVIDENCE" if blocked else "WORKFLOW_EXECUTED",
+            "APRENDIZAJE": "Execution is now delegated through the existing Specialist Runtime.",
+            "ADAPTACION": "Keep planning, cells, Runtime and provider execution as separate contracts.",
+            "SIGUIENTE_ACCION": ("Resolve blocker before resuming." if blocked else
+                                "Verify successful cells with authoritative evidence before advancing dependencies."),
+        }
     def configure_all(self, *, apply: bool = False) -> dict[str, object]:
         results = self.configurator.sequential(apply=apply)
         blocked = next((item for item in results if item.status == "BLOCKED"), None)
