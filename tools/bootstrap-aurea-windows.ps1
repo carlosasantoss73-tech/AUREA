@@ -8,7 +8,8 @@
 [CmdletBinding()]
 param(
   [string]$RepoUrl = "https://github.com/carlosasantoss73-tech/AUREA.git",
-  [string]$Target = "$env:USERPROFILE\AUREA"
+  [string]$Target = "$env:USERPROFILE\AUREA",
+  [string]$Branch = "feat/browser-use-runtime-integration-v1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +25,12 @@ function Check-Cmd($name) {
 Write-Host "=== AUREA / NODRIZA PC BOOTSTRAP ==="
 Write-Host "Target: $Target"
 
+New-Item -ItemType Directory -Force -Path (Split-Path $Target -Parent) | Out-Null
+if ((Test-Path $Target) -and -not (Test-Path (Join-Path $Target ".git"))) {
+  $entries = Get-ChildItem -Force $Target -ErrorAction SilentlyContinue
+  if ($entries.Count -gt 0) { Write-Host "[NO-GO] Target existe y no está vacío: $Target"; exit 4 }
+  Remove-Item -Force -Recurse $Target
+}
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
 " AUREA migration report $(Get-Date -Format o)" | Out-File $report
 
@@ -48,10 +55,12 @@ if ($nodeMajor -lt 20) {
 
 if (-not (Test-Path (Join-Path $Target ".git"))) {
   Write-Host "[C04] Clonando repositorio..."
-  git clone $RepoUrl $Target
+  git clone --branch $Branch $RepoUrl $Target
 } else {
   Write-Host "[C04] Repositorio existente; actualizando de forma no destructiva..."
   git -C $Target fetch --all --prune
+git -C $Target checkout $Branch
+git -C $Target pull --ff-only origin $Branch
 }
 
 Set-Location $Target
