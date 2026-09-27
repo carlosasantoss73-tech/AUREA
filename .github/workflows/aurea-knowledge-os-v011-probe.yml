@@ -44,8 +44,8 @@ jobs:
       - name: Authenticate to Google Cloud through WIF
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
 
       - name: Install Google API client
