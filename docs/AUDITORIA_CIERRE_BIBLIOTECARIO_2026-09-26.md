@@ -29,7 +29,7 @@ No se debe marcar BIBLIOTECARIO como CLOSED.
 | Reader institucional concreto | **BLOCKED** | El adapter declara que no contiene implementación externa | Falta implementación real |
 | E2E real Bibliotecario → ContextProvider → Runtime | **BLOCKED** | No existe ejecución institucional reproducible | Falta prueba de extremo a extremo |
 | Respuesta negra real sobre historial | **BLOCKED** | La prueba histórica actual debe bloquear ante seeds locales | Falta demostrar recuperación real |
-| Verificación final obligatoriamente Bibliotecario-owned | **BLOCKED** | `SpecialistRuntime.verify()` acepta evidencia autoritativa genérica | La autoridad no está acoplada obligatoriamente al Bibliotecario |
+| Verificación institucional final Bibliotecario-owned | **PASS CONTRACT / NOT LIVE** | `SpecialistRuntime.verify_with_bibliotecario()` + `require_authoritative_evidence()` + tests | La ruta institucional de cierre exige evidencia obtenida por el puerto Bibliotecario; la verificación genérica sigue existiendo para usos no institucionales |
 
 ## 2. Hallazgo crítico 1 — el lector institucional real todavía no existe
 
@@ -45,11 +45,11 @@ Por tanto:
 
 **contrato ≠ integración operacional.**
 
-## 3. Hallazgo crítico 2 — no existe evidencia de ejecución del probe BIB-08
+## 3. Hallazgo crítico 2 — el probe BIB-08 sí tiene ejecución real, pero está bloqueado antes de leer v011
 
-El workflow de BIB-08 utiliza `workflow_dispatch`.
+El workflow BIB-08 ya no depende únicamente de `workflow_dispatch`: también se ejecuta en push/PR según su configuración actual.
 
-La auditoría no encontró una ejecución real que produzca:
+Existe evidencia real de ejecución, pero la ejecución más reciente se detiene en el preflight de WIF antes de autenticarse y antes de leer Drive. Por ello todavía no existe evidencia que produzca:
 
 - metadata del índice v011;
 - bytes reales del índice;
@@ -60,21 +60,21 @@ La auditoría no encontró una ejecución real que produzca:
 
 Hasta que exista esa evidencia, el estado correcto es PENDING.
 
-## 4. Hallazgo crítico 3 — la autoridad final todavía puede ser genérica
+## 4. Hallazgo crítico 3 — separar verificación genérica de cierre institucional
 
-El contrato de `ExpertResult` considera VERIFIED válido cuando existe cualquier evidencia con:
+La auditoría de código actual confirma una corrección importante respecto de la versión inicial de este documento.
 
-`authoritative=True`
+`SpecialistRuntime.verify()` continúa siendo una ruta genérica que acepta evidencia autoritativa externa; esto es deliberado para verificaciones que no constituyen cierre institucional.
 
-y `SpecialistRuntime.verify()` recibe `verification_evidence` directamente.
+Para el cierre del Bibliotecario existe ahora una ruta explícita y separada:
 
-Eso significa que el Runtime todavía no obliga técnicamente a que la evidencia de verificación provenga del puerto:
+`SpecialistRuntime.verify_with_bibliotecario()` → `require_authoritative_evidence()` → `InstitutionalEvidenceProvider`
 
-`InstitutionalEvidenceProvider`
+Esta ruta rechaza evidencia no autoritativa y los tests cubren tanto el caso válido como el rechazo de una respuesta no autoritativa del supuesto Bibliotecario.
 
-La existencia de `require_authoritative_evidence()` protege el puerto, pero no convierte automáticamente ese puerto en requisito universal de `VERIFY`.
+Por tanto, el problema ya no es la ausencia del contrato de autoridad de verificación. El pendiente real es demostrar que el `InstitutionalEvidenceProvider` utilizado en producción está conectado al Knowledge OS/Bibliotecario real y no a un stub, seed o proveedor externo.
 
-Esto debe corregirse antes de afirmar que Bibliotecario es la única autoridad efectiva del cierre.
+La condición de cierre debe seguir siendo `PASS` únicamente después de esa demostración live.
 
 ## 5. Protecciones que sí están correctamente cerradas
 
@@ -232,9 +232,9 @@ Se ejecutó una batería paralela de validación sobre la rama auditada.
 Se mantiene la separación entre ejecución de herramientas y autoridad institucional. La ejecución real de Playwright MCP demuestra capacidad operacional de browser, pero su evidencia sigue siendo no autoritativa.
 
 ### Probe institucional
-El workflow de v011 fue actualizado en el commit dc82cd4312a7a70fd53e180f4c32514916bc2724 para permitir ejecución automática en actualizaciones de la rama, además de workflow_dispatch. La comprobación de esta auditoría no encontró todavía un run asociado que produzca V011_CONTENT_PROBE: PASS.
+El workflow de v011 fue actualizado para permitir ejecución automática en actualizaciones de la rama, además de `workflow_dispatch`. La ejecución real más reciente sí existe, pero termina en el preflight explícito porque faltan los valores de WIF.
 
-Por tanto, LIVE_READER, AUTHENTICATION y V011_PAYLOAD_VERIFIED continúan PENDING/BLOCKED por falta de evidencia de ejecución, no por fallo demostrado.
+Por tanto, `AUTHENTICATION` está **BLOCKED por configuración externa demostrada**, `LIVE_READER` está **BLOCKED por dependencia**, y `V011_PAYLOAD_VERIFIED` permanece **PENDING** porque todavía no se ha leído el payload.
 
 
 ## 13. Evidencia crítica BIB-08 — primer run real
@@ -291,3 +291,33 @@ El workflow conserva lectura de Knowledge OS estrictamente read-only y no altera
 
 ### SIGUIENTE ACCIÓN
 Configurar ambos valores en **GitHub Repository/Environment Variables** con los valores reales autorizados del proyecto GCP/WIF. Después, ejecutar nuevamente el probe. Solo entonces podrán avanzar C01→C03 y, con evidencia real del payload v011, C04→C09.
+
+
+## 15. Revisión de código y corrección del criterio de autoridad (2026-09-27)
+
+### RESULTADO
+La auditoría de código actual confirma que la ruta institucional de verificación ya está formalmente separada de la verificación genérica. No corresponde mantener el hallazgo histórico que decía que el cierre institucional carecía de una ruta Bibliotecario-owned.
+
+### EVIDENCIA
+- `SpecialistRuntime.verify_with_bibliotecario()` construye una `InstitutionalEvidenceRequest`.
+- La evidencia pasa obligatoriamente por `require_authoritative_evidence()`.
+- La función rechaza ausencia de evidencia con `BIBLIOTECARIO_AUTHORITATIVE_EVIDENCE_NOT_FOUND`.
+- También rechaza evidencia no autoritativa con `BIBLIOTECARIO_RETURNED_NON_AUTHORITATIVE_EVIDENCE`.
+- Los tests cubren el flujo Bibliotecario válido y el rechazo de una respuesta no autoritativa.
+- El lector institucional TypeScript sigue siendo un contrato source-agnostic; no existe aún una implementación live demostrada contra Knowledge OS.
+
+### DECISIÓN
+Mantener `VERIFICATION_IS_BIBLIOTECARIO_OWNED` como **PASS CONTRACT / NOT LIVE**, no como BLOCKED por diseño. El cierre global sigue bloqueado por la falta de integración live.
+
+### APRENDIZAJE
+Hemos cerrado la brecha de contrato de autoridad sin crear una segunda memoria ni acoplar proveedores externos como autoridad.
+
+### ADAPTACIÓN
+El trabajo restante se concentra en una sola cadena operacional: WIF → lectura v011 real → payload observado → reader institucional → ContextProvider → Runtime → black-box → auditoría.
+
+### SIGUIENTE ACCIÓN
+1. Obtener la configuración real autorizada de `AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT` en GitHub.
+2. Reejecutar BIB-08.
+3. Solo después de observar el payload v011, implementar el reader concreto sin inventar su shape.
+4. Ejecutar E2E y black-box.
+5. Repetir el gate de cierre.
