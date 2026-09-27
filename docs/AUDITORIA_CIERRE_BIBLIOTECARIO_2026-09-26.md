@@ -663,3 +663,42 @@ Se conserva el soporte dual Variables/Secrets para permitir configuración insti
 `INSTITUTIONAL_E2E = PENDING`
 `BLACK_BOX_INSTITUTIONAL = PENDING`
 `BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
+
+
+## 21. CHECKPOINT FINAL DE CIERRE — 2026-09-26
+
+### RESULTADO
+La auditoría técnica del cierre del Bibliotecario queda congelada sin nuevas modificaciones arquitectónicas. El frente de ejecución externa quedó validado y el único bloqueo restante es la disponibilidad de la configuración WIF de GitHub Actions para autenticar contra GCP/Knowledge OS.
+
+### EVIDENCIA
+- Four Tools Audit #117: 8/8 jobs PASS: OpenAI Provider, Browser Use, Skyvern, Playwright MCP, Super Agent E2E, Knowledge Audit, Stagehand y Provider Fallback E2E.
+- El workflow BIB-08 mantiene preflight fail-closed cuando AUREA_GCP_WIF_PROVIDER o AUREA_GCP_SERVICE_ACCOUNT no están disponibles.
+- Se corrigió la inconsistencia del workflow: el paso de autenticación ahora consume la misma resolución vars || secrets que el preflight.
+- La corrección quedó en commit db79e883354bf3c7c0fc8236d135520c7d27b487.
+- La configuración WIF real no fue inventada, inferida ni sustituida por un fixture.
+
+### DECISIÓN
+No realizar más cambios de arquitectura, proveedores ni contratos de Bibliotecario. El siguiente avance válido requiere que GitHub Actions reciba la configuración WIF real y ejecute BIB-08 hasta completar autenticación, lectura v011, Institutional Reader, E2E institucional y black-box.
+
+### ESTADO DE CIERRE
+- INTERNAL_AUREA: PASS
+- FOUR_TOOLS_AUDIT: PASS
+- PROVIDER_FALLBACK: PASS
+- BIBLIOTECARIO_VERIFICATION_CONTRACT: PASS
+- LOCAL_FALLBACK_FOR_INSTITUTIONAL_ONLY: BLOCKED (por diseño)
+- WIF_CONFIGURATION_AVAILABLE_TO_WORKFLOW: BLOCKED
+- LIVE_AUTHENTICATION: PENDING
+- V011_PAYLOAD_VERIFIED: PENDING
+- INSTITUTIONAL_READER_LIVE: PENDING
+- INSTITUTIONAL_E2E: PENDING
+- BLACK_BOX_INSTITUTIONAL: PENDING
+- FINAL_BIBLIOTECARIO_CLOSURE: PENDING_EXTERNAL_CONFIGURATION
+
+### APRENDIZAJE
+El bloqueo no es de arquitectura ni de proveedor de navegador. Es una dependencia externa de infraestructura/credenciales. GitHub documenta que las variables y secretos deben estar disponibles para la ejecución del workflow antes de poder ser consumidos.
+
+### ADAPTACIÓN
+A partir de este punto, cualquier nuevo trabajo sobre Bibliotecario debe comenzar verificando el resultado de BIB-08. No se debe crear otro lector, otro almacén local, otro mock institucional ni otra vía paralela.
+
+### SIGUIENTE ACCIÓN
+Configurar en GitHub Actions los valores reales de AUREA_GCP_WIF_PROVIDER y AUREA_GCP_SERVICE_ACCOUNT en el ámbito autorizado para el workflow y ejecutar nuevamente BIB-08. El código ya está preparado para consumirlos desde vars o secrets.
