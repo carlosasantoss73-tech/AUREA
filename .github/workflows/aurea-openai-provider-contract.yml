@@ -41,7 +41,6 @@ jobs:
 
           profile = ToolExpertProfile(
               expert_id="expert-openai-runtime",
-              name="OpenAI Provider",
               product="OpenAI Provider",
               knowledge_pack="provider-execution-contract",
               official_source_required=True,
