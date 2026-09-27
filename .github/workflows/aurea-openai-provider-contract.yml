@@ -5,6 +5,12 @@ on:
     paths:
       - "apps/tool_expert_factory/openai_adapter.py"
       - "apps/tool_expert_factory/test_openai_adapter.py"
+  push:
+    branches:
+      - "feat/browser-use-runtime-integration-v1"
+    paths:
+      - "apps/tool_expert_factory/openai_adapter.py"
+      - "apps/tool_expert_factory/test_openai_adapter.py"
   workflow_dispatch:
 
 jobs:
