@@ -5,6 +5,7 @@ from dataclasses import replace
 from .audit import record
 from .contracts import Evidence, ExpertRequest, ExpertResult, ToolExpertProfile
 from .gate import preflight
+from .institutional_authority import InstitutionalEvidenceRequest, InstitutionalEvidenceProvider, require_authoritative_evidence
 
 Executor = Callable[[ExpertRequest], ExpertResult]
 
@@ -51,6 +52,33 @@ class SpecialistRuntime:
         verified.validate()
         record(self.audit_path, verified)
         return verified
+
+    def verify_with_bibliotecario(self, profile: ToolExpertProfile, request: ExpertRequest,
+                                  result: ExpertResult, bibliotecario: InstitutionalEvidenceProvider, *,
+                                  decision: str = "VERIFY", learning: str = "", adaptation: str = "",
+                                  next_action: str = "") -> ExpertResult:
+        """Verify only with evidence obtained through the institutional authority port.
+
+        This is the closure path for institutional verification. Provider/tool evidence may
+        participate in execution, but it cannot satisfy this method unless the Bibliotecario
+        authority port returns authoritative evidence.
+        """
+        institutional_request = InstitutionalEvidenceRequest(
+            expert_id=request.expert_id,
+            trace_id=request.trace_id,
+            objective=request.objective,
+        )
+        evidence = require_authoritative_evidence(bibliotecario, institutional_request)
+        return self.verify(
+            profile,
+            request,
+            result,
+            evidence,
+            decision=decision,
+            learning=learning,
+            adaptation=adaptation,
+            next_action=next_action,
+        )
 
     @staticmethod
     def _validate_identity(profile: ToolExpertProfile, request: ExpertRequest, result: ExpertResult) -> None:
