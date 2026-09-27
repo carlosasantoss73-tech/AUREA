@@ -41,10 +41,11 @@ jobs:
           profile = ToolExpertProfile(
               expert_id="expert-openai-runtime",
               name="OpenAI Provider",
-              purpose="Provider execution contract",
+              product="OpenAI Provider",
+              knowledge_pack="provider-execution-contract",
               official_source_required=True,
-              mutation_approval_required=True,
-              secrets_output_allowed=False,
+              mutation_requires_approval=True,
+              secret_values_forbidden_in_output=True,
           )
           request = ExpertRequest(
               expert_id=profile.expert_id,
