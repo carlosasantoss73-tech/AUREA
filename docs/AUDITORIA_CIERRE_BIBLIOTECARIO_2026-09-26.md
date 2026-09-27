@@ -3,7 +3,7 @@
 Fecha de auditoría: 2026-09-26
 Repositorio: carlosasantoss73-tech/AUREA
 Rama auditada: feat/browser-use-runtime-integration-v1
-Referencia auditada: d32f93136fd682a871e3699ab2bc2f15330aba36
+Referencia auditada: ea724676149b4cf0d0b8b5fb8e2ac72075232336
 
 ## RESULTADO
 
@@ -346,3 +346,66 @@ Mantener esta barrera como requisito permanente de regresión. No relajar `insti
 
 ### SIGUIENTE ACCIÓN
 Esperar únicamente la configuración externa WIF para avanzar en C01→C04. Mientras tanto, continuar auditoría y regresión sin declarar cierre.
+
+
+## 17. AUDITORÍA INTEGRAL TRANSVERSAL — 2026-09-27
+
+### RESULTADO
+
+Se realizó una revisión integral del estado de la rama, PR, contratos, runtime, Work Planner/Work Cells, proveedores, fallback, contexto institucional, pruebas y CI. El resultado confirma que el trabajo está **técnicamente avanzado y coherente**, pero el cierre final todavía requiere resolver dos clases distintas de pendientes:
+
+1. **Bloqueo institucional externo:** WIF → Knowledge OS v011.
+2. **Regresión de typecheck detectada durante esta auditoría:** corregida en el commit `ea724676149b4cf0d0b8b5fb8e2ac72075232336`; debe quedar confirmada por CI antes del cierre.
+
+La rama está **73 commits por delante de `main` y 0 por detrás**, y el PR #147 permanece abierto y mergeable.
+
+### EVIDENCIA
+
+- PR #147: 73 commits, 30 archivos modificados; HEAD auditado inicialmente `71e345da311cb96571f274349075597a603f7cf6`.
+- La ejecución CI asociada al HEAD anterior produjo:
+  - **Four Tools Audit V1 #110:** SUCCESS.
+  - **Free Browser Runtime Smoke #27:** SUCCESS.
+  - **Tool Expert Factory Contracts #184:** SUCCESS.
+  - **Conchita Typecheck Diagnostic #179:** SUCCESS.
+  - **OpenAI Provider Contract #36:** SUCCESS.
+  - **Knowledge OS v011 Probe #22:** FAILURE controlado en preflight WIF.
+  - **AUREA P0 #543:** FAILURE en Typecheck.
+  - **A2A Live Interoperability #149:** FAILURE en Typecheck.
+- La causa concreta de los fallos P0/A2A fue identificada en logs, no inferida:
+  `src/context/context-retrieval-gate.test.ts(41,76): error TS2353 ... 'provenance' does not exist in type '{ sourceId: string; version: number; }'.`
+- Se corrigió la tipificación de la factory de pruebas para usar `ContextCitation[]` en `ea724676149b4cf0d0b8b5fb8e2ac72075232336`.
+- Los workflows de browser/runtime y contracts del HEAD anterior permanecieron verdes.
+- La prueba de fallback real conserva la separación correcta: los proveedores entregan evidencia no autoritativa y el cierre institucional queda en AUREA.
+- El PR mantiene el requisito explícito de no almacenar ni emitir secretos de Browser Use.
+- La ruta `verify_with_bibliotecario()` sigue separada de `verify()`, y el gate `institutionalOnly` bloquea LOCAL_SEED y provenance ausente.
+
+### DECISIÓN
+
+1. **No cerrar ni aprobar todavía el Bibliotecario.**
+2. Considerar corregida la regresión de typecheck a nivel de código, pero **no marcarla PASS CI hasta observar el nuevo run**.
+3. Mantener como bloqueo institucional real y único pendiente funcional la configuración autorizada de:
+   - `AUREA_GCP_WIF_PROVIDER`
+   - `AUREA_GCP_SERVICE_ACCOUNT`
+4. No implementar el reader institucional concreto hasta observar el payload real de v011.
+5. Mantener la arquitectura fail-closed y la autoridad única del Bibliotecario.
+6. Mantener separado el proveedor externo de la autoridad institucional.
+
+### APRENDIZAJE
+
+La auditoría transversal detectó una regresión real que las comprobaciones anteriores no habían dejado visible: el refuerzo de pruebas `institutionalOnly` introdujo una inferencia TypeScript demasiado estrecha. Esto demuestra que la auditoría de cierre debe considerar simultáneamente arquitectura, pruebas unitarias y CI completo; no basta con revisar contratos.
+
+### ADAPTACIÓN
+
+La suite de pruebas ahora tipa explícitamente las citas mediante `ContextCitation[]`. El próximo CI debe demostrar que:
+- Typecheck vuelve a PASS.
+- P0 y A2A avanzan a sus pruebas completas.
+- Four Tools, browser smoke y contracts permanecen PASS.
+- BIB-08 sigue siendo BLOCKED únicamente si las variables WIF siguen ausentes.
+
+### SIGUIENTE ACCIÓN
+
+1. Esperar/consultar los workflows disparados por `ea724676149b4cf0d0b8b5fb8e2ac72075232336`.
+2. Si typecheck PASS: continuar con el cierre institucional.
+3. Si WIF sigue ausente: no tocar arquitectura; solicitar únicamente la configuración autorizada de las dos variables.
+4. Si WIF pasa: leer y conservar evidencia real de v011, implementar el reader concreto sobre el shape observado, conectar E2E y black-box y repetir C01→C15.
+5. Antes de cierre definitivo, revisar el tratamiento de payload institucional en logs: el probe actual imprime el contenido completo de v011; debe minimizarse o trasladarse a un canal de evidencia controlado si ese contenido contiene información institucional sensible.
