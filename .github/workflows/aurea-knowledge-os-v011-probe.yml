@@ -27,16 +27,16 @@ jobs:
     steps:
       - name: Preflight required GCP WIF configuration
         env:
-          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
-          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
           if [ -z "$WIF_PROVIDER" ]; then
-            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER is not configured in the GitHub repository/environment variables."
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER is not available as a GitHub variable or secret."
             exit 1
           fi
           if [ -z "$SERVICE_ACCOUNT" ]; then
-            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT is not configured in the GitHub repository/environment variables."
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT is not available as a GitHub variable or secret."
             exit 1
           fi
           echo "GCP_WIF_CONFIGURATION: PRESENT"
