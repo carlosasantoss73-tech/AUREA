@@ -10,6 +10,8 @@ on:
       - "apps/tool_expert_factory/**"
       - "tools/bootstrap-aurea-windows.ps1"
       - "docs/AUDITORIA_MIGRACION_NODRIZA_PC_2026-09-26.md"
+      - "tools/audit-nodriza-pc-15-cells.ps1"
+      - ".gitignore"
       - ".github/workflows/aurea-windows-migration-audit.yml"
 
 permissions:
@@ -58,12 +60,15 @@ jobs:
       - name: Bootstrap script syntax check
         shell: pwsh
         run: |
-          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+          $tokens = $null
+          $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile(
             "$PWD/tools/bootstrap-aurea-windows.ps1",
-            [ref]$null,
-            [ref]$null
+            [ref]$tokens,
+            [ref]$errors
           )
-          if ($null) { throw "PowerShell parser returned no result" }
+          if ($errors.Count -gt 0) { throw "PowerShell syntax errors: $($errors.Count)" }
+          if ($null -eq $ast) { throw "PowerShell parser returned no AST" }
 
       - name: Migration audit summary
         shell: pwsh
