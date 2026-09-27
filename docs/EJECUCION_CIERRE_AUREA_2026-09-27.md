@@ -1,19 +1,18 @@
 # AUREA / NODRIZA — EJECUCIÓN DE CIERRE
-
 Fecha: 2026-09-27
 
 ## Objetivo
 Completar la ruta de cierre sin reconstruir AUREA:
 1. Baseline real en PC Windows.
 2. WIF + lectura institucional real del Bibliotecario.
-3. Continuidad cloud.
-4. Auditoría final y recuperación desde otro equipo.
+3. Continuidad/recovery.
+4. Auditoría final.
 
 ## Estado
 - Arquitectura interna: cerrada para esta fase.
-- Workflows internos críticos: verificados en CI en el último head auditado.
+- PR #147: MERGED.
 - Bibliotecario: contrato y gate implementados; lectura institucional real pendiente de WIF.
-- PC: automatización preparada; ejecución física pendiente en la PC del usuario.
+- PC: automatización preparada; ejecución física pendiente.
 - Cloud: workflow fail-closed preparado; activación pendiente de WIF.
 - No se deben registrar secretos en chat, código, reportes ni commits.
 
@@ -24,16 +23,9 @@ cd "$env:USERPROFILE\AUREA\tools"
 powershell -ExecutionPolicy Bypass -File .\run-nodriza-migration.ps1
 ```
 
-Si AUREA todavía no existe:
-```powershell
-git clone --branch feat/browser-use-runtime-integration-v1 https://github.com/carlosasantoss73-tech/AUREA.git "$env:USERPROFILE\AUREA"
-cd "$env:USERPROFILE\AUREA\tools"
-powershell -ExecutionPolicy Bypass -File .\run-nodriza-migration.ps1
-```
-
 Resultado requerido:
 - C01–C14 sin BLOCKED.
-- C15 puede quedar DEFERRED hasta decidir self-hosted runner.
+- C15 puede quedar DEFERRED.
 - Entregar `%USERPROFILE%\AUREA\migration-audit-15-cells.json`.
 
 ## PASO 2 — WIF / BIBLIOTECARIO
@@ -52,24 +44,18 @@ Evidencia requerida:
 
 No se acepta LOCAL_SEED como sustituto.
 
-## PASO 3 — CLOUD
+## PASO 3 — CONTINUIDAD / RECOVERY
 Con WIF validado:
 - ejecutar `AUREA Cloud Continuity`;
 - confirmar baseline Node/typecheck/tests;
-- confirmar `CLOUD_DEPLOYMENT=READY`;
-- solo después elegir y desplegar el runtime cloud mínimo.
+- confirmar `CLOUD_DEPLOYMENT=READY` cuando corresponda;
+- probar recuperación desde un segundo entorno.
 
-No desplegar un runtime cloud antes de validar WIF.
+No desplegar un runtime cloud adicional antes de validar WIF y recovery.
 
 ## PASO 4 — CIERRE
-Repetir:
-- suite completa;
-- auditoría de seguridad;
-- prueba de recuperación desde un segundo equipo;
-- verificación de GitHub PR;
-- documentación final;
-- merge únicamente cuando la evidencia cumpla la definición de cierre.
+Repetir suite completa, auditoría de seguridad y documentación final.
 
 ## Regla de cierre
-AUREA no se declara 100% cerrada mientras falte cualquiera de:
-PC baseline real, WIF autenticado, lectura institucional real, E2E institucional, continuidad cloud o recuperación desde otro equipo.
+No declarar 100% mientras falte cualquiera de:
+PC baseline real, WIF autenticado, lectura institucional real, E2E institucional, continuidad o recuperación desde otro entorno.
