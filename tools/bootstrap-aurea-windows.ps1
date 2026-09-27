@@ -59,8 +59,8 @@ if (-not (Test-Path (Join-Path $Target ".git"))) {
 } else {
   Write-Host "[C04] Repositorio existente; actualizando de forma no destructiva..."
   git -C $Target fetch --all --prune
-git -C $Target checkout $Branch
-git -C $Target pull --ff-only origin $Branch
+  git -C $Target checkout $Branch
+  git -C $Target pull --ff-only origin $Branch
 }
 
 Set-Location $Target
