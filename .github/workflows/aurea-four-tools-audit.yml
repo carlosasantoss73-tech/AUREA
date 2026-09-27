@@ -36,13 +36,27 @@ jobs:
   skyvern:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: skyvern
+          POSTGRES_PASSWORD: skyvern
+          POSTGRES_DB: skyvern
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U skyvern -d skyvern"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ENABLE_GEMINI: "true"
       LLM_KEY: GEMINI_3.0_FLASH
       SECONDARY_LLM_KEY: GEMINI_3.0_FLASH
-      DATABASE_STRING: ""
+      DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@localhost:5432/skyvern
       BROWSER_TYPE: chromium-headless
       MAX_SCRAPING_RETRIES: "0"
       ENABLE_LOG_ARTIFACTS: "false"
