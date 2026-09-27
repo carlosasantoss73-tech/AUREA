@@ -39,7 +39,131 @@ jobs:
             echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT is not available as a GitHub variable or secret."
             exit 1
           fi
-          echo "GCP_WIF_CONFIGURATION: PRESENT"
+          if ! printf '%s' "$WIF_PROVIDER" | grep -Eq '^projects/[0-9]+/locations/global/workloadIdentityPools/[^/]+/providers/[^/]+
+      - name: Authenticate to Google Cloud through WIF
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Install Google API client
+        run: python -m pip install --quiet google-api-python-client google-auth
+
+      - name: Read exact institutional v011 index content
+        env:
+          INDEX_ID: ${{ env.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from googleapiclient.discovery import build
+
+          index_id = os.environ["INDEX_ID"]
+          drive = build("drive", "v3")
+
+          meta = drive.files().get(
+              fileId=index_id,
+              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy)"
+          ).execute()
+
+          print("=== V011 METADATA ===")
+          print(json.dumps(meta, indent=2))
+
+          if meta["id"] != index_id:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_ID_MISMATCH")
+          if meta.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
+
+          response = drive.files().get(fileId=index_id, alt="media").execute()
+          raw = response.decode("utf-8") if isinstance(response, bytes) else response
+
+          digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+          print(f"V011_CONTENT_SHA256: {digest}")
+          print(f"V011_CONTENT_BYTES: {len(raw.encode('utf-8'))}")
+
+          try:
+              parsed = json.loads(raw)
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"V011_NOT_JSON:{exc}")
+
+          print("=== V011 TOP LEVEL SHAPE ===")
+          if isinstance(parsed, dict):
+              print(f"OBJECT_KEYS_COUNT: {len(parsed)}")
+              print("OBJECT_KEYS: " + ",".join(sorted(parsed.keys())))
+          elif isinstance(parsed, list):
+              print(f"LIST_LENGTH: {len(parsed)}")
+          else:
+              print(f"ROOT_TYPE: {type(parsed).__name__}")
+          print("V011_CONTENT_PROBE: PASS")
+          PY
+; then
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER has an invalid resource format."
+            exit 1
+          fi
+          if ! printf '%s' "$SERVICE_ACCOUNT" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\\.iam\\.gserviceaccount\\.com
+      - name: Authenticate to Google Cloud through WIF
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Install Google API client
+        run: python -m pip install --quiet google-api-python-client google-auth
+
+      - name: Read exact institutional v011 index content
+        env:
+          INDEX_ID: ${{ env.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from googleapiclient.discovery import build
+
+          index_id = os.environ["INDEX_ID"]
+          drive = build("drive", "v3")
+
+          meta = drive.files().get(
+              fileId=index_id,
+              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy)"
+          ).execute()
+
+          print("=== V011 METADATA ===")
+          print(json.dumps(meta, indent=2))
+
+          if meta["id"] != index_id:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_ID_MISMATCH")
+          if meta.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
+
+          response = drive.files().get(fileId=index_id, alt="media").execute()
+          raw = response.decode("utf-8") if isinstance(response, bytes) else response
+
+          digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+          print(f"V011_CONTENT_SHA256: {digest}")
+          print(f"V011_CONTENT_BYTES: {len(raw.encode('utf-8'))}")
+
+          try:
+              parsed = json.loads(raw)
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"V011_NOT_JSON:{exc}")
+
+          print("=== V011 TOP LEVEL SHAPE ===")
+          if isinstance(parsed, dict):
+              print(f"OBJECT_KEYS_COUNT: {len(parsed)}")
+              print("OBJECT_KEYS: " + ",".join(sorted(parsed.keys())))
+          elif isinstance(parsed, list):
+              print(f"LIST_LENGTH: {len(parsed)}")
+          else:
+              print(f"ROOT_TYPE: {type(parsed).__name__}")
+          print("V011_CONTENT_PROBE: PASS")
+          PY
+; then
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT has an invalid service-account email format."
+            exit 1
+          fi
+          echo "GCP_WIF_CONFIGURATION: PRESENT_AND_FORMAT_VALID"
 
       - name: Authenticate to Google Cloud through WIF
         uses: google-github-actions/auth@v3
