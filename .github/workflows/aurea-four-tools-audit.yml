@@ -53,8 +53,8 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ENABLE_GEMINI: "true"
-      LLM_KEY: GEMINI_2.5_FLASH
-      SECONDARY_LLM_KEY: GEMINI_2.5_FLASH
+      LLM_KEY: GEMINI_3.8_FLASH
+      SECONDARY_LLM_KEY: GEMINI_3.8_FLASH
       DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@localhost:5432/skyvern
       SKYVERN_API_KEY: ${{ secrets.SKYVERN_API_KEY }}
       BROWSER_TYPE: chromium-headless
