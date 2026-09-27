@@ -110,18 +110,18 @@ Entrega:
 
 ## 5. PROMPT PLUS — VERIFICACIÓN PROPIEDAD DEL BIBLIOTECARIO
 
-Audita SpecialistRuntime.verify() y todos sus consumidores.
+**Estado actual: contrato cerrado; falta únicamente evidencia live del proveedor institucional.**
 
-Problema a resolver:
-la función actualmente puede aceptar Evidence(authoritative=True) sin demostrar que la evidencia proviene de InstitutionalEvidenceProvider/Bibliotecario.
+La ruta institucional dedicada ya existe:
+`SpecialistRuntime.verify_with_bibliotecario()` → `require_authoritative_evidence()` → `InstitutionalEvidenceProvider`.
 
-Diseña el cambio mínimo que garantice:
+Debe auditarse que:
 - la ruta de cierre institucional requiere evidencia obtenida mediante el puerto institucional;
 - evidencia de OpenAI, Browser Use, Playwright, Skyvern u otro proveedor nunca puede satisfacer por sí sola el cierre institucional;
-- no se rompen los contratos legítimos de ejecución;
-- tests existentes permanecen verdes o se actualizan justificadamente.
+- la ruta genérica `verify()` permanezca disponible para verificaciones no institucionales;
+- tests existentes permanezcan verdes o se actualicen justificadamente.
 
-No hagas un refactor global.
+No hacer refactor global ni sustituir la arquitectura existente.
 
 ## 6. PROMPT PLUS — BLACK BOX / FAIL CLOSED
 
@@ -257,3 +257,10 @@ TESTS:
 BLOCKERS:
 
 Nunca responder solamente “hecho”, “funciona” o “PASS” sin evidencia.
+
+
+## 12. ESTADO DE CIERRE ACTUALIZADO — 2026-09-27
+
+La brecha de autoridad de verificación y el bypass de `institutionalOnly` están cubiertos contractualmente y mediante pruebas. El único bloqueo externo crítico permanece en C01: configuración real de GitHub WIF para acceder al Knowledge OS v011.
+
+No se debe inventar ni introducir en código ningún valor de `AUREA_GCP_WIF_PROVIDER` o `AUREA_GCP_SERVICE_ACCOUNT`. Una vez configurados con los valores autorizados, ejecutar el probe y continuar C01→C04 sin modificar el payload antes de observarlo.
