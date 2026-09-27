@@ -3,6 +3,22 @@ import { ContextRetrievalGate, ContextProvider, requiresHistoricalContext } from
 
 const provider = (facts: string[] = ["fact recovered"], citations = [{ sourceId: "historical-source", version: 1 }]): ContextProvider => ({
   async retrieve(input) { return { projectId: input.projectId, query: input.query, facts, citations }; },
+  it("blocks local seeds when institutionalOnly is required", async () => {
+    const result = await new ContextRetrievalGate(
+      provider(["seed fact"], [{ sourceId: "AUREA_LOCAL_SEED", version: 1, provenance: "LOCAL_SEED" }]),
+    ).retrieve({ ...req("¿qué hicimos esta semana?"), institutionalOnly: true });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+  });
+
+  it("blocks missing institutional provenance even when the source returns facts", async () => {
+    const result = await new ContextRetrievalGate(
+      provider(["unproven fact"], [{ sourceId: "external-source", version: 1 }]),
+    ).retrieve({ ...req("¿qué hicimos esta semana?"), institutionalOnly: true });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+  });
+
 });
 
 const req = (query: string) => ({ actorId: "aureo", actorRole: "system", projectId: "aurea", query, allowedProjects: ["aurea"], allowedCapabilities: ["knowledge.read"], allowedTools: ["knowledge.search"] });
