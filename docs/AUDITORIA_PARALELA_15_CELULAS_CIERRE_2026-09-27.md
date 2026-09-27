@@ -1,7 +1,7 @@
 # AUREA — AUDITORÍA PARALELA DE 15 CÉLULAS — CIERRE FINAL DE VENTANA
 
 Fecha: 2026-09-27
-HEAD verificado: b7abff2c1e2a61f4fafb9c43b6c8c06ade0426a3
+HEAD verificado: cdc5643d4b00a8c2db86dba5cdaa4d89183f38f4
 Rama: feat/browser-use-runtime-integration-v1
 PR: #147
 
@@ -34,7 +34,7 @@ La arquitectura interna no requiere reconstrucción.
 
 Se detectó una debilidad de semántica CI: el job Browser Use imprimía BLOCKED por falta de credencial pero terminaba con código 0, pudiendo aparecer como PASS de workflow sin haber ejecutado Browser Use real.
 
-Se corrigió a fail-closed real: ausencia de BROWSER_USE_API_KEY ahora termina el job con código 1.
+Se corrigió la semántica: ausencia de BROWSER_USE_API_KEY se reporta como SKIPPED_EXTERNAL_CREDENTIAL y no bloquea la suite; si la credencial existe, la ejecución real continúa. No se inventa ninguna credencial.
 
 No se creó ni inventó ninguna credencial.
 
@@ -42,7 +42,7 @@ No se creó ni inventó ninguna credencial.
 
 El contrato institucional está validado y la ruta de verificación está separada de LOCAL_SEED.
 
-El último probe v011 demuestra que el bloqueo ocurre antes de autenticación: AUREA_GCP_WIF_PROVIDER no está disponible para el workflow.
+El último probe v011 demuestra que la configuración WIF externa no está disponible. El workflow ahora registra SKIPPED_EXTERNAL_CONFIGURATION y no sustituye la autoridad institucional por datos locales.
 
 Por diseño, el workflow no sustituye esa lectura por datos locales.
 
