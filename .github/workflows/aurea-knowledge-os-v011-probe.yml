@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os
+          import hashlib, json, os
           from googleapiclient.discovery import build
 
           index_id = os.environ["INDEX_ID"]
@@ -79,9 +79,9 @@ jobs:
           response = drive.files().get(fileId=index_id, alt="media").execute()
           raw = response.decode("utf-8") if isinstance(response, bytes) else response
 
-          print("=== V011 CONTENT BEGIN ===")
-          print(raw)
-          print("=== V011 CONTENT END ===")
+          digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+          print(f"V011_CONTENT_SHA256: {digest}")
+          print(f"V011_CONTENT_BYTES: {len(raw.encode("utf-8"))}")
 
           try:
               parsed = json.loads(raw)
@@ -90,10 +90,11 @@ jobs:
 
           print("=== V011 TOP LEVEL SHAPE ===")
           if isinstance(parsed, dict):
-              print(json.dumps(sorted(parsed.keys()), indent=2))
+              print(f"OBJECT_KEYS_COUNT: {len(parsed)}")
+              print("OBJECT_KEYS: " + ",".join(sorted(parsed.keys())))
           elif isinstance(parsed, list):
-              print("LIST")
+              print(f"LIST_LENGTH: {len(parsed)}")
           else:
-              print(type(parsed).__name__)
+              print(f"ROOT_TYPE: {type(parsed).__name__}")
           print("V011_CONTENT_PROBE: PASS")
           PY
