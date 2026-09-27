@@ -91,7 +91,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
             ("python", "-m", "playwright", "install", "chromium"),
         ),
         smoke_command=("python", "-c", "import skyvern; print('skyvern_import_ok')"),
-        credential_env=("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"),
+        credential_env=("SKYVERN_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"),
     ),
     ToolSpec(
         tool_id="playwright-mcp",
