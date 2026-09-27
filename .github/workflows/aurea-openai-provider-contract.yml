@@ -5,12 +5,18 @@ on:
     paths:
       - "apps/tool_expert_factory/openai_adapter.py"
       - "apps/tool_expert_factory/test_openai_adapter.py"
+      - "apps/tool_expert_factory/runtime.py"
+      - "apps/tool_expert_factory/contracts.py"
+      - ".github/workflows/aurea-openai-provider-contract.yml"
   push:
     branches:
       - "feat/browser-use-runtime-integration-v1"
     paths:
       - "apps/tool_expert_factory/openai_adapter.py"
       - "apps/tool_expert_factory/test_openai_adapter.py"
+      - "apps/tool_expert_factory/runtime.py"
+      - "apps/tool_expert_factory/contracts.py"
+      - ".github/workflows/aurea-openai-provider-contract.yml"
   workflow_dispatch:
 
 jobs:
@@ -22,3 +28,49 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pytest -q apps/tool_expert_factory/test_openai_adapter.py
+      - name: Run OpenAI through Specialist Runtime
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python - <<'PY'
+          import json
+          from apps.tool_expert_factory.contracts import ExpertRequest, ToolExpertProfile
+          from apps.tool_expert_factory.openai_adapter import execute_openai
+          from apps.tool_expert_factory.runtime import SpecialistRuntime
+
+          profile = ToolExpertProfile(
+              expert_id="expert-openai-runtime",
+              name="OpenAI Provider",
+              purpose="Provider execution contract",
+              official_source_required=True,
+              mutation_approval_required=True,
+              secrets_output_allowed=False,
+          )
+          request = ExpertRequest(
+              expert_id=profile.expert_id,
+              objective="Responde en una frase: ¿qué debe preservar AUREA antes de conectar el Bibliotecario real?",
+              trace_id="trace-openai-runtime-ci",
+          )
+          runtime = SpecialistRuntime("/tmp/aurea-openai-runtime-audit.jsonl")
+          result = runtime.execute(
+              profile,
+              request,
+              [],
+              execute_openai,
+          )
+          if result.status != "EXECUTED":
+              raise SystemExit(json.dumps({
+                  "status": result.status,
+                  "blockers": result.blockers,
+              }, ensure_ascii=False))
+          if any(e.authoritative for e in result.evidence):
+              raise SystemExit("OPENAI_PROVIDER_MUST_NOT_BE_AUTHORITATIVE")
+          print(json.dumps({
+              "status": "PASS",
+              "runtime": "SpecialistRuntime",
+              "provider": "openai",
+              "result_status": result.status,
+              "institutional_authority": "Bibliotecario",
+              "response": result.result,
+          }, ensure_ascii=False))
+          PY
