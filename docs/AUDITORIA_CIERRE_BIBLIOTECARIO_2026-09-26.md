@@ -409,3 +409,96 @@ La suite de pruebas ahora tipa explícitamente las citas mediante `ContextCitati
 3. Si WIF sigue ausente: no tocar arquitectura; solicitar únicamente la configuración autorizada de las dos variables.
 4. Si WIF pasa: leer y conservar evidencia real de v011, implementar el reader concreto sobre el shape observado, conectar E2E y black-box y repetir C01→C15.
 5. Antes de cierre definitivo, revisar el tratamiento de payload institucional en logs: el probe actual imprime el contenido completo de v011; debe minimizarse o trasladarse a un canal de evidencia controlado si ese contenido contiene información institucional sensible.
+
+
+## 18. REVALIDACIÓN POST-CORRECCIÓN — HEAD 3dec9b69 (2026-09-27)
+
+### RESULTADO
+
+La regresión de TypeScript detectada en la auditoría anterior quedó **confirmada como corregida por CI**. La batería transversal volvió a verde en el HEAD actual `3dec9b69a2d4e591121efb279246839bac967ddc`.
+
+El cierre institucional del Bibliotecario, sin embargo, **continúa pendiente** porque BIB-08 sigue bloqueado en el preflight de WIF antes de autenticación y lectura de Knowledge OS v011.
+
+### EVIDENCIA
+
+PR #147:
+- Estado: OPEN
+- Mergeable: YES
+- HEAD: `3dec9b69a2d4e591121efb279246839bac967ddc`
+- Base: `8b50f1cdbdd546667a29f8dc7cb5338b09c9fc68`
+- Commits: 75
+- Archivos modificados: 30
+
+CI confirmado sobre el HEAD actual:
+- **AUREA P0 #545 — SUCCESS**: Typecheck + Tests.
+- **A2A Live Interoperability #151 — SUCCESS**: Typecheck + ejecución live.
+- **Conchita Typecheck Diagnostic #181 — SUCCESS**.
+- **AUREA Tool Expert Factory Contracts #186 — SUCCESS**.
+- **AUREA OpenAI Provider Contract #38 — SUCCESS**.
+- **AUREA Four Tools Audit V1 #112 — SUCCESS**: Playwright MCP, Browser Use, Stagehand, OpenAI provider, Super Agent E2E, Provider Fallback E2E, Skyvern y Knowledge Audit.
+- **AUREA Free Browser Runtime Smoke #31 — SUCCESS**.
+- **AUREA Knowledge OS v011 Live Reader Probe #26 — FAILURE CONTROLADO**.
+
+BIB-08 #26:
+- Run: `36293033487`
+- Job: `108546624804`
+- Paso fallido: `Preflight required GCP WIF configuration`
+- Autenticación WIF: **SKIPPED**
+- Instalación Google API: **SKIPPED**
+- Lectura v011: **SKIPPED**
+- El bloqueo continúa siendo la ausencia de:
+  - `AUREA_GCP_WIF_PROVIDER`
+  - `AUREA_GCP_SERVICE_ACCOUNT`
+
+No existe evidencia nueva de payload v011, por lo que no se debe implementar todavía el parser/reader concreto.
+
+### DECISIÓN
+
+1. La regresión de TypeScript queda **PASS CI CONFIRMADO**.
+2. P0 y A2A quedan nuevamente operativos en el HEAD actual.
+3. La batería de runtime/proveedores/fallback queda **PASS** en el HEAD actual.
+4. BIB-08 permanece **BLOCKED exclusivamente por configuración WIF externa**.
+5. No se reconstruye ni se duplica Bibliotecario.
+6. No se implementa un reader concreto con un shape inventado.
+7. El PR #147 puede permanecer abierto mientras se completa la integración institucional; no se declara cierre de Bibliotecario.
+
+### APRENDIZAJE
+
+La corrección `ea724676149b4cf0d0b8b5fb8e2ac72075232336` no solo resuelve el error de compilación detectado durante la auditoría: el CI posterior confirma que P0, A2A y la batería transversal vuelven a ejecutarse correctamente.
+
+El único bloqueo funcional institucional que permanece demostrado en esta revalidación es externo al código: configuración autorizada de GCP/WIF.
+
+### ADAPTACIÓN
+
+La fase de desarrollo interno queda estabilizada. A partir de este punto no conviene seguir modificando arquitectura para compensar el bloqueo WIF.
+
+La siguiente cadena queda congelada y lista:
+
+`WIF → lectura v011 → payload observado → InstitutionalAuthorityReader → ContextProvider → Runtime → black-box → C15`
+
+### SIGUIENTE ACCIÓN
+
+**Acción única pendiente para desbloquear la fase institucional:** configurar en GitHub los valores reales autorizados de `AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT`, y volver a ejecutar BIB-08.
+
+Una vez que BIB-08 pase:
+1. observar el payload real;
+2. definir el parser sobre ese payload, sin suposiciones;
+3. implementar el reader read-only;
+4. conectar el reader al camino institucional;
+5. ejecutar E2E + black-box;
+6. repetir C01→C15;
+7. revisar antes del cierre que el probe no deje contenido institucional completo innecesariamente expuesto en logs.
+
+### ESTADO DE CIERRE ACTUAL
+
+`TYPECHECK = PASS`  
+`P0 = PASS`  
+`A2A = PASS`  
+`RUNTIME/PROVIDERS/FALLBACK = PASS`  
+`BIBLIOTECARIO_VERIFICATION_CONTRACT = PASS CONTRACT`  
+`WIF = BLOCKED`  
+`V011_PAYLOAD = PENDING`  
+`INSTITUTIONAL_READER_LIVE = PENDING`  
+`RUNTIME_E2E_INSTITUTIONAL = PENDING`  
+`BLACK_BOX_INSTITUTIONAL = PENDING`  
+`BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
