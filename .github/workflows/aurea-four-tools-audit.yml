@@ -50,11 +50,10 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      ENABLE_GEMINI: "true"
-      LLM_KEY: GEMINI_3.0_FLASH
-      SECONDARY_LLM_KEY: GEMINI_3.0_FLASH
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ENABLE_OPENAI: "true"
+      LLM_KEY: OPENAI_GPT5_6_LUNA
+      SECONDARY_LLM_KEY: OPENAI_GPT5_6_LUNA
       DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@localhost:5432/skyvern
       SKYVERN_API_KEY: ${{ secrets.SKYVERN_API_KEY }}
       BROWSER_TYPE: chromium-headless
