@@ -57,6 +57,7 @@ jobs:
       LLM_KEY: GEMINI_3.0_FLASH
       SECONDARY_LLM_KEY: GEMINI_3.0_FLASH
       DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@localhost:5432/skyvern
+      SKYVERN_API_KEY: ${{ secrets.SKYVERN_API_KEY }}
       BROWSER_TYPE: chromium-headless
       MAX_SCRAPING_RETRIES: "0"
       ENABLE_LOG_ARTIFACTS: "false"
