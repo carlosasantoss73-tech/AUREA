@@ -580,3 +580,86 @@ Se congela el trabajo interno y se reduce el siguiente ciclo a una sola cadena o
 `RUNTIME_E2E_INSTITUTIONAL = PENDING`
 `BLACK_BOX_INSTITUTIONAL = PENDING`
 `BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
+
+
+## 20. AUDITORÍA + PRUEBA DE ERROR CONTROLADA — 2026-09-27
+
+### RESULTADO
+
+Se realizó una nueva auditoría transversal y una prueba de error controlada sobre el bloqueo WIF, incluyendo una segunda vía de configuración autorizada: GitHub Variables **o** GitHub Secrets. El objetivo fue determinar si el bloqueo se debía únicamente a que el workflow estaba leyendo el namespace equivocado.
+
+### EVIDENCIA
+
+HEAD probado: `3ddd62b9199bf61716ca9df5dc3ce06131498656`.
+
+El workflow BIB-08 #33, run `36294589812`, ejecutó el preflight y volvió a bloquearse exactamente en:
+
+`Preflight required GCP WIF configuration → FAILURE`
+
+Los pasos posteriores quedaron SKIPPED:
+- Google WIF authentication
+- Google API client
+- lectura de v011
+
+Se modificó el workflow para aceptar, sin exponer valores, cualquiera de estas fuentes autorizadas:
+- `vars.AUREA_GCP_WIF_PROVIDER` o `secrets.AUREA_GCP_WIF_PROVIDER`
+- `vars.AUREA_GCP_SERVICE_ACCOUNT` o `secrets.AUREA_GCP_SERVICE_ACCOUNT`
+
+La repetición del probe volvió a fallar en el mismo preflight. Por tanto, la hipótesis de que los valores estaban simplemente almacenados como Secrets en lugar de Variables queda descartada por evidencia operacional.
+
+No se utilizaron valores inventados ni se intentó derivar una credencial desde el código.
+
+### AUDITORÍA DEL RESTO DEL SISTEMA
+
+La batería interna continúa mostrando:
+- P0: PASS
+- A2A: PASS
+- Typecheck: PASS
+- OpenAI Provider Contract: PASS
+- Tool Expert Factory Contracts: PASS
+- Free Browser Runtime Smoke: PASS
+- Playwright MCP: PASS
+- Browser Use: PASS
+- Stagehand: PASS
+- Provider Fallback E2E: PASS
+- Super Agent E2E: PASS
+- Knowledge Audit: PASS
+
+Four Tools Audit #115 todavía tiene el job Skyvern en ejecución al momento de esta auditoría; por tanto no se eleva el workflow completo a PASS hasta su conclusión.
+
+### DECISIÓN
+
+El bloqueo WIF queda demostrado como **ausencia efectiva de configuración disponible al workflow**, no como un problema de selección entre Variables y Secrets.
+
+La búsqueda/experimentación automática llegó al límite seguro: el repositorio no puede inventar ni crear el proveedor WIF, service account o credenciales. El conector GitHub disponible tampoco expone una operación autorizada para crear/modificar Secrets/Variables.
+
+No existe una modificación de código adicional que pueda convertir honestamente este estado en PASS.
+
+### APRENDIZAJE
+
+La prueba de error redujo el espacio de causas: ya no corresponde seguir cambiando el workflow de lectura de configuración. El siguiente intento debe ser sobre la infraestructura GitHub/GCP real, no sobre AUREA Runtime.
+
+### ADAPTACIÓN
+
+Se conserva el soporte dual Variables/Secrets para permitir configuración institucional segura sin volver a tocar el workflow cuando el valor sea cargado correctamente.
+
+### SIGUIENTE ACCIÓN
+
+1. Configurar en GitHub, con valores reales autorizados, **al menos**:
+   - `AUREA_GCP_WIF_PROVIDER`
+   - `AUREA_GCP_SERVICE_ACCOUNT`
+2. Reejecutar BIB-08.
+3. Si el preflight pasa, continuar automáticamente con WIF → v011 → payload → reader → E2E → black-box.
+4. Si el preflight pasa pero la autenticación falla, usar el nuevo error como siguiente evidencia concreta y corregir solo esa capa.
+5. No realizar más cambios arquitectónicos mientras C01 permanezca bloqueada.
+
+### ESTADO FINAL DE ESTA AUDITORÍA
+
+`INTERNAL_AUREA = PASS`
+`WIF_CONFIGURATION_AVAILABLE_TO_WORKFLOW = NO`
+`LIVE_AUTHENTICATION = NOT REACHED`
+`V011_PAYLOAD = NOT READ`
+`INSTITUTIONAL_READER_LIVE = PENDING`
+`INSTITUTIONAL_E2E = PENDING`
+`BLACK_BOX_INSTITUTIONAL = PENDING`
+`BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
