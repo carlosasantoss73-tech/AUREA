@@ -43,7 +43,7 @@ class WorkCellRunner:
             profile = profiles.get(cell.specialist_id)
             if profile is None:
                 raise RuntimeError(f"specialist_profile_missing:{cell.specialist_id}")
-            executor = executors.get(profile.expert_id)
+            executor = executors.get(profile.expert_id) or executors.get(cell.specialist_id)
             if executor is None:
                 raise RuntimeError(f"specialist_executor_missing:{profile.expert_id}")
 
