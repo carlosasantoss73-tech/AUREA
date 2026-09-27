@@ -1,6 +1,9 @@
 name: AUREA Knowledge OS v011 Live Reader Probe
 
 on:
+  push:
+    branches:
+      - feat/browser-use-runtime-integration-v1
   workflow_dispatch:
 
 permissions:
