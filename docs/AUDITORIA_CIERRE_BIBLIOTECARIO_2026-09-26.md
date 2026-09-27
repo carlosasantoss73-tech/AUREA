@@ -502,3 +502,81 @@ Una vez que BIB-08 pase:
 `RUNTIME_E2E_INSTITUTIONAL = PENDING`  
 `BLACK_BOX_INSTITUTIONAL = PENDING`  
 `BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
+
+## 19. REVALIDACIÓN POST-HEAD 812cec0 — CIERRE INTERNO CONSOLIDADO (2026-09-27)
+
+### RESULTADO
+
+Se revalidó el HEAD actual del PR #147 después de la actualización de auditoría. La batería interna continúa verde y el bloqueo institucional permanece exactamente localizado en el preflight de GCP/WIF.
+
+### EVIDENCIA
+
+HEAD actual: `812cec0e71810800b5a8c62d66818b1b2f903347`.
+
+PR #147:
+- OPEN
+- MERGEABLE = YES
+- HEAD = `812cec0e71810800b5a8c62d66818b1b2f903347`
+- 76 commits
+- 30 archivos modificados
+
+CI sobre el HEAD actual:
+- **AUREA P0 #546 — SUCCESS**
+- **AUREA OpenAI Provider Contract #39 — SUCCESS**
+- **AUREA Free Browser Runtime Smoke #33 — SUCCESS**
+- **A2A Live Interoperability #152 — SUCCESS**
+- **AUREA Tool Expert Factory Contracts #187 — SUCCESS**
+- **Tool Expert Super Configurator #165 — SUCCESS**
+- **Conchita Typecheck Diagnostic #182 — SUCCESS**
+- **AUREA Four Tools Audit V1 #113 — SUCCESS**
+- **AUREA Knowledge OS v011 Live Reader Probe #28 — FAILURE CONTROLADO**
+
+BIB-08 #28:
+- Run: `36293980108`
+- Job: `108549276878`
+- Preflight WIF: **FAIL**
+- Authenticate to Google Cloud through WIF: **SKIPPED**
+- Install Google API client: **SKIPPED**
+- Read exact institutional v011 index content: **SKIPPED**
+
+El bloqueo sigue siendo la configuración externa de `AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT`. No se obtuvo todavía payload v011 y, por tanto, no se inventa parser ni reader.
+
+### DECISIÓN
+
+La fase interna queda **cerrada técnicamente para efectos de desarrollo**: contratos, gates, runtime, proveedores, fallback, P0, A2A y pruebas transversales están confirmados por CI en el HEAD actual.
+
+El **cierre institucional del Bibliotecario no se declara CLOSED** porque falta la evidencia live de WIF → Knowledge OS v011 → reader → E2E → black-box.
+
+No se realizarán cambios arquitectónicos adicionales para compensar este bloqueo.
+
+### APRENDIZAJE
+
+El bloqueo actual no está en la lógica interna de AUREA. Está localizado en una dependencia de infraestructura/autorización externa que el repositorio no puede configurar mediante el conector disponible.
+
+### ADAPTACIÓN
+
+Se congela el trabajo interno y se reduce el siguiente ciclo a una sola cadena operacional:
+
+`CONFIGURAR WIF → BIB-08 PASS → OBSERVAR v011 → READER REAL → E2E → BLACK-BOX → C15`
+
+### SIGUIENTE ACCIÓN
+
+1. Configurar los dos valores WIF autorizados en GitHub.
+2. Reejecutar BIB-08.
+3. Si pasa, continuar automáticamente con payload → reader → E2E → black-box → auditoría.
+4. Si vuelve a fallar por WIF, mantener el bloqueo sin nuevas modificaciones de arquitectura.
+
+### ESTADO CONSOLIDADO
+
+`INTERNAL_AUREA = PASS`
+`TYPECHECK = PASS`
+`P0 = PASS`
+`A2A = PASS`
+`RUNTIME/PROVIDERS/FALLBACK = PASS`
+`BIBLIOTECARIO_VERIFICATION_CONTRACT = PASS CONTRACT`
+`WIF = BLOCKED_EXTERNAL`
+`V011_PAYLOAD = PENDING`
+`INSTITUTIONAL_READER_LIVE = PENDING`
+`RUNTIME_E2E_INSTITUTIONAL = PENDING`
+`BLACK_BOX_INSTITUTIONAL = PENDING`
+`BIBLIOTECARIO = PENDING_INTEGRATION_VALIDATION`
