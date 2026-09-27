@@ -71,6 +71,7 @@ jobs:
       - run: python -m playwright install chromium
       - name: Run Skyvern real example
         run: |
+          export SKYVERN_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
           python - <<'PY'
           import asyncio, json
           from skyvern import Skyvern
