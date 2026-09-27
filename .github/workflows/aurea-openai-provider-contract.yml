@@ -1,0 +1,18 @@
+name: AUREA OpenAI Provider Contract
+
+on:
+  pull_request:
+    paths:
+      - "apps/tool_expert_factory/openai_adapter.py"
+      - "apps/tool_expert_factory/test_openai_adapter.py"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pytest -q apps/tool_expert_factory/test_openai_adapter.py
