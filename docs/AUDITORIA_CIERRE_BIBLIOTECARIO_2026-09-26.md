@@ -214,3 +214,24 @@ El workflow BIB-08 debe producir primero evidencia real. Después se implementa 
 El estado técnicamente defendible es:
 
 **PENDIENTE — INTEGRACIÓN INSTITUCIONAL REAL + E2E + AUTORIDAD DE VERIFICACIÓN.**
+
+
+## 12. Evidencia CI actualizada — ejecución paralela 2026-09-26
+
+Se ejecutó una batería paralela de validación sobre la rama auditada.
+
+### Resultados confirmados
+- AUREA P0 #532: **SUCCESS**
+- AUREA OpenAI Provider Contract #25: **SUCCESS**
+- AUREA Tool Expert Factory Contracts #173: **SUCCESS**
+- AUREA Free Browser Runtime Smoke #5: **SUCCESS**
+- AUREA Four Tools Audit V1 #99: Playwright MCP **SUCCESS**, Stagehand **SUCCESS**, Browser Use **SUCCESS**, OpenAI provider **SUCCESS**, Super Agent E2E **SUCCESS**, Knowledge audit **SUCCESS**.
+- En Four Tools Audit #99, Provider Fallback E2E y Skyvern permanecían en ejecución al momento de esta actualización; no se elevan a PASS hasta disponer de su conclusión.
+
+### Ajuste de cierre
+Se mantiene la separación entre ejecución de herramientas y autoridad institucional. La ejecución real de Playwright MCP demuestra capacidad operacional de browser, pero su evidencia sigue siendo no autoritativa.
+
+### Probe institucional
+El workflow de v011 fue actualizado en el commit dc82cd4312a7a70fd53e180f4c32514916bc2724 para permitir ejecución automática en actualizaciones de la rama, además de workflow_dispatch. La comprobación de esta auditoría no encontró todavía un run asociado que produzca V011_CONTENT_PROBE: PASS.
+
+Por tanto, LIVE_READER, AUTHENTICATION y V011_PAYLOAD_VERIFIED continúan PENDING/BLOCKED por falta de evidencia de ejecución, no por fallo demostrado.
