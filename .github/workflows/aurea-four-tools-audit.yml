@@ -193,3 +193,55 @@ jobs:
           if any(r["status"]!="FETCHED" or not r["source"]["authoritative"] for r in records):
               raise SystemExit("OFFICIAL_KNOWLEDGE_AUDIT_FAILED")
           PY
+
+
+  provider-fallback-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "mcp>=2.1.1" browser-use
+      - name: Run real provider fallback through Super Agent Work Cell
+        run: |
+          python - <<'PY'
+          import json, tempfile
+          from pathlib import Path
+          from apps.tool_expert_factory.contracts import Evidence, ToolExpertProfile
+          from apps.tool_expert_factory.provider_browser_fallback import execute_real_browser_provider_fallback
+          from apps.tool_expert_factory.super_agent import ToolAutomationSuperAgent
+          from apps.tool_expert_factory.work_planner import WorkCellSpec, WorkPlanner
+
+          plan = WorkPlanner().plan(
+              trace_id="super-agent-provider-fallback-001",
+              objective="execute real browser work with provider fallback",
+              cells=[WorkCellSpec("C07", "browser-provider-fallback", "Create and verify a TodoMVC task.")],
+          )
+          profile = ToolExpertProfile(
+              "expert-browser-provider-fallback",
+              "browser-provider-fallback",
+              "runtime-pack",
+          )
+          with tempfile.TemporaryDirectory() as td:
+              result = ToolAutomationSuperAgent().execute_plan(
+                  plan=plan,
+                  profiles={"browser-provider-fallback": profile},
+                  authoritative_evidence=[Evidence(
+                      "official", "official://browser-provider-fallback",
+                      "real browser provider adapters configured", True
+                  )],
+                  executors={"expert-browser-provider-fallback": execute_real_browser_provider_fallback},
+                  audit_path=str(Path(td) / "audit.jsonl"),
+              )
+              print(json.dumps(result, ensure_ascii=False))
+              if result["DECISION"] != "WORKFLOW_EXECUTED":
+                  raise SystemExit("PROVIDER_FALLBACK_WORKFLOW_FAILED")
+              evidence = result["EVIDENCIA"][0]
+              if evidence["status"] != "EXECUTED":
+                  raise SystemExit("PROVIDER_FALLBACK_DID_NOT_EXECUTE")
+          PY
