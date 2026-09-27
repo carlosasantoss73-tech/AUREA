@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - feat/browser-use-runtime-integration-v1
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/**"
+      - ".github/workflows/aurea-free-browser-runtime-smoke.yml"
   workflow_dispatch:
 
 permissions:
