@@ -41,11 +41,11 @@ class WorkCellRunner:
                 raise RuntimeError(f"work_cell_dependency_not_completed:{cell.cell_id}")
 
             profile = profiles.get(cell.specialist_id)
-            executor = executors.get(cell.specialist_id)
             if profile is None:
                 raise RuntimeError(f"specialist_profile_missing:{cell.specialist_id}")
+            executor = executors.get(profile.expert_id)
             if executor is None:
-                raise RuntimeError(f"specialist_executor_missing:{cell.specialist_id}")
+                raise RuntimeError(f"specialist_executor_missing:{profile.expert_id}")
 
             request = ExpertRequest(
                 expert_id=profile.expert_id,
