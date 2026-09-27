@@ -1,0 +1,12 @@
+# AUREA / NODRIZA — Git ignore
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+migration-report.txt
+migration-audit-15-cells.json
+credentials/
+secrets/
+*.pem
+*.key
