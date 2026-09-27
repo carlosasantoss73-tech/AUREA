@@ -57,6 +57,7 @@ jobs:
           workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
           service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly
 
       - name: Verify real Google authentication
         run: |
