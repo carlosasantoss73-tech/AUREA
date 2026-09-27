@@ -32,13 +32,11 @@ Bloqueadores principales:
 - INSTITUTIONAL_READER real no demostrado.
 - RUNTIME_E2E Knowledge OS → ContextProvider → Runtime no demostrado.
 - BLACK_BOX de aislamiento de fallback/local seed pendiente.
-- VERIFICATION_IS_BIBLIOTECARIO_OWNED pendiente: SpecialistRuntime.verify() permite evidencia marcada authoritative=True sin exigir que provenga del puerto/proveedor institucional.
+- VERIFICATION_IS_BIBLIOTECARIO_OWNED: la ruta institucional dedicada `verify_with_bibliotecario()` ya exige evidencia obtenida mediante `InstitutionalEvidenceProvider`; la prueba live de esta ruta aún depende de la integración real del Bibliotecario. El `verify()` genérico permanece deliberadamente disponible para verificaciones no institucionales.
 - LOCAL_FALLBACK debe permanecer BLOCKED en institutionalOnly.
 - Segundo proveedor/fallback no puede elevarse a autoridad institucional.
 
-El workflow existente:
-.github/workflows/aurea-knowledge-os-v011-probe.yml
-es workflow_dispatch, usa Google WIF, lee el ID institucional v011, comprueba canEdit=false, descarga el contenido y valida JSON. El workflow preparado NO equivale a ejecución real.
+El workflow existente `.github/workflows/aurea-knowledge-os-v011-probe.yml` se ejecuta por push, pull_request y workflow_dispatch; usa Google WIF, lee el ID institucional v011, comprueba `canEdit=false`, descarga el contenido y valida JSON. Ya existe evidencia de ejecución real, pero el run más reciente se bloqueó en el preflight porque las variables WIF requeridas están vacías. Por tanto, la lectura real v011 continúa sin demostrarse.
 
 ## 2. PROMPT MAESTRO — CHATGPT PLUS / ORQUESTADOR
 
@@ -168,8 +166,8 @@ Objetivo: conectar evidencia institucional al runtime.
 PASS: ejecución y verificación con trace/identity correctos.
 
 C08 — Bibliotecario-owned Verification
-Objetivo: cerrar la brecha de verify().
-PASS: solo evidencia proveniente del puerto institucional puede cerrar.
+Objetivo: validar la ruta institucional dedicada de cierre.
+PASS: `verify_with_bibliotecario()` obtiene evidencia exclusivamente mediante `InstitutionalEvidenceProvider`; evidencia de proveedor externo no puede cerrar esta ruta.
 
 C09 — Black Box
 Objetivo: probar aislamiento extremo.
