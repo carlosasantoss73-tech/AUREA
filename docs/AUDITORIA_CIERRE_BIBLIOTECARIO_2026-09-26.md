@@ -235,3 +235,27 @@ Se mantiene la separación entre ejecución de herramientas y autoridad instituc
 El workflow de v011 fue actualizado en el commit dc82cd4312a7a70fd53e180f4c32514916bc2724 para permitir ejecución automática en actualizaciones de la rama, además de workflow_dispatch. La comprobación de esta auditoría no encontró todavía un run asociado que produzca V011_CONTENT_PROBE: PASS.
 
 Por tanto, LIVE_READER, AUTHENTICATION y V011_PAYLOAD_VERIFIED continúan PENDING/BLOCKED por falta de evidencia de ejecución, no por fallo demostrado.
+
+
+## 13. Evidencia crítica BIB-08 — primer run real
+
+El probe institucional fue finalmente ejecutado automáticamente mediante el workflow **AUREA Knowledge OS v011 Live Reader Probe #4**, run `36291890624`.
+
+### Resultado
+**FAIL en autenticación WIF.**
+
+Job `probe`: `108543431786`.
+
+La etapa `Authenticate to Google Cloud through WIF` falló antes de instalar el cliente de Google o leer Drive. El log reporta que la acción `google-github-actions/auth@v3` no recibió exactamente uno de `workload_identity_provider` o `credentials_json`.
+
+Esto convierte el pendiente anterior en un **bloqueo operacional demostrado**, no en un simple supuesto:
+
+- `AUTHENTICATION`: **BLOCKED**
+- `LIVE_READER`: **BLOCKED por dependencia de autenticación**
+- `V011_PAYLOAD_VERIFIED`: **PENDING**, porque nunca se llegó a leer el payload
+- `INSTITUTIONAL_READER`: **PENDING**, correctamente no implementado sobre un payload no observado
+
+No se expusieron secretos en el log. Las variables institucionales `AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT` no llegaron al action como valores válidos en esta ejecución.
+
+### Siguiente acción mínima
+Configurar en el repositorio/entorno de GitHub las variables institucionales necesarias para WIF (`AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT`) con sus valores autorizados, y repetir el probe. No se deben colocar valores de credenciales en el código.
