@@ -2,7 +2,7 @@
 Fecha: 2026-09-27
 Rama: feat/browser-use-runtime-integration-v1
 PR: #147
-HEAD actual: 0479fba1411566e0a11bbd59a4b98a994077d181
+HEAD actual: cdc5643d4b00a8c2db86dba5cdaa4d89183f38f4
 
 ## RESULTADO
 AUREA queda formalmente en estado **CIERRE TÉCNICO INTERNO COMPLETADO / CIERRE OPERATIVO EXTERNO PENDIENTE**.
@@ -18,7 +18,7 @@ No se requiere reconstrucción arquitectónica.
 - La nube permanece fail-closed mientras WIF no esté disponible.
 - La migración PC permanece pendiente de ejecución física en la máquina del usuario.
 
-## BLOQUEOS EXTERNOS
+## PUERTAS EXTERNAS RESTANTES
 1. Configurar en GitHub:
    - AUREA_GCP_WIF_PROVIDER
    - AUREA_GCP_SERVICE_ACCOUNT
