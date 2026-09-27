@@ -29,7 +29,9 @@ def execute_real_browser_provider_fallback(request: ExpertRequest) -> ExpertResu
             model="bu-2-0",
             executable=True,
             health_evidence=(ProviderHealthEvidence(
-                "browser-use", "bu-2-0", "official-runtime", "Browser Use executor configured", True
+                "browser-use", "bu-2-0", "official-runtime",
+                "Browser Use executor configured; authority must be established separately.",
+                False,
             ),),
         ),
         ProviderCandidate(
@@ -37,15 +39,19 @@ def execute_real_browser_provider_fallback(request: ExpertRequest) -> ExpertResu
             model="mcp-browser",
             executable=True,
             health_evidence=(ProviderHealthEvidence(
-                "playwright-mcp", "mcp-browser", "official-runtime", "Playwright MCP executor configured", True
+                "playwright-mcp", "mcp-browser", "official-runtime",
+                "Playwright MCP executor configured; authority must be established separately.",
+                False,
             ),),
         ),
     )
     try:
         execution = execute_with_fallback(
             candidates,
-            {"browser-use": lambda _candidate: _run_browser_use(request),
-             "playwright-mcp": lambda _candidate: _run_playwright(request)},
+            {
+                "browser-use": lambda _candidate: _run_browser_use(request),
+                "playwright-mcp": lambda _candidate: _run_playwright(request),
+            },
         )
     except RuntimeError as exc:
         return ExpertResult(
