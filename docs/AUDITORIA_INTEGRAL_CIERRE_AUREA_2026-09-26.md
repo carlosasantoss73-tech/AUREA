@@ -1,35 +1,30 @@
 # AUREA — AUDITORÍA INTEGRAL DE CIERRE
-Fecha: 2026-09-26
-Rama auditada: feat/browser-use-runtime-integration-v1
-PR: #147
-HEAD auditado: bea5393fe48e1a57f522aaafe35a2ae5a24ba629
+Fecha: 2026-09-27
+Rama histórica auditada: feat/browser-use-runtime-integration-v1
+PR #147: MERGED
+HEAD integrado en main: 4a4160d906017041cfdeec0076661eafd70dde97
 
-## 1. RESULTADO EJECUTIVO
+## RESULTADO EJECUTIVO
+AUREA no requiere reconstrucción arquitectónica para esta etapa. El cierre técnico interno está completado. El cierre operativo queda limitado a evidencia externa de PC, WIF/Bibliotecario y recuperación desde un segundo entorno.
 
-AUREA está en fase de cierre técnico y preparación de migración híbrida PC+nube. No requiere reconstrucción arquitectónica.
+## EVIDENCIA CONFIRMADA
+- PR #147 integrado en main.
+- Four Tools Audit V1: PASS en la ejecución auditada.
+- Free Browser Runtime Smoke: PASS.
+- OpenAI Provider Contract: PASS.
+- Tool Expert Factory Contracts: PASS.
+- Super Configurator: PASS.
+- AUREA P0: PASS.
+- A2A Live Interoperability: PASS.
+- Conchita Typecheck Diagnostic: PASS.
+- Knowledge OS v011 Live Reader Probe: pendiente de WIF real.
 
-Estado global: CIERRE TÉCNICO INTERNO AVANZADO / CIERRE OPERATIVO PENDIENTE DE CONFIGURACIONES EXTERNAS.
-
-## 2. EVIDENCIA CONFIRMADA
-
-- PR #147 abierto, mergeable y no merged.
-- Four Tools Audit V1: PASS (run 128).
-- Free Browser Runtime Smoke: PASS (run 67).
-- OpenAI Provider Contract: PASS (run 54).
-- Tool Expert Factory Contracts: PASS (run 202).
-- Super Configurator: PASS (run 180).
-- AUREA P0: PASS (run 561).
-- A2A Live Interoperability: PASS (run 167).
-- Conchita Typecheck Diagnostic: PASS (run 197).
-- Knowledge OS v011 Live Reader Probe: FAILURE at WIF preflight (run 62).
-
-## 3. BLOQUEO INSTITUCIONAL
-
-El bloqueo real y único de cierre del Bibliotecario sigue siendo la disponibilidad del:
+## BLOQUEO INSTITUCIONAL
+El único bloqueo real para cerrar el Bibliotecario es disponer de:
 - AUREA_GCP_WIF_PROVIDER
 - AUREA_GCP_SERVICE_ACCOUNT
 
-El workflow falla cerradamente en el preflight si alguno falta. No se debe crear un lector institucional ficticio ni usar LOCAL_SEED como sustituto.
+No se debe crear un lector institucional ficticio ni usar LOCAL_SEED como sustituto.
 
 Mientras WIF no esté disponible:
 - LIVE_AUTHENTICATION = PENDING
@@ -38,8 +33,7 @@ Mientras WIF no esté disponible:
 - INSTITUTIONAL_E2E = PENDING
 - FINAL_BIBLIOTECARIO_CLOSURE = PENDING_EXTERNAL_CONFIGURATION
 
-## 4. MIGRACIÓN PC
-
+## MIGRACIÓN PC
 Preparados:
 - bootstrap Windows;
 - auditor de 15 células;
@@ -51,68 +45,34 @@ Preparados:
 Pendiente:
 - ejecutar el lanzador en la PC real;
 - resolver BLOCKED/REVIEW que aparezcan;
-- decidir self-hosted runner después del baseline.
+- decidir C15 después del baseline; puede permanecer DEFERRED.
 
-## 5. NUBE
+## NUBE / RECOVERY
+La continuidad cloud está preparada mediante workflow fail-closed. No está desplegado un runtime cloud y no se debe desplegar antes de validar WIF.
 
-Preparada conceptualmente y mediante workflow fail-closed.
+Pendiente:
+- autenticación WIF;
+- continuidad cloud;
+- recuperación desde segundo entorno.
 
-Arquitectura:
-PC → GitHub → validación → nube
-Bibliotecario/Knowledge OS permanece autoridad institucional.
-
-No está desplegada todavía porque WIF no está disponible. No se considera cloud runtime activo.
-
-## 6. SEGURIDAD
-
+## SEGURIDAD
 - No almacenar secretos en código.
 - No imprimir API keys.
-- .gitignore añadido para .env, credenciales, claves y reportes locales.
+- .gitignore cubre credenciales y reportes locales.
 - C15 no registra automáticamente un runner ni genera tokens.
 
-## 7. WORK CELLS / RUNTIME
+## DECISIÓN
+No reconstruir AUREA.
+No duplicar Bibliotecario.
+No activar infraestructura cloud antes de WIF.
+No reabrir la arquitectura para resolver pendientes que ya tienen gates preparados.
+PR #147 ya está integrado.
 
-La arquitectura mantiene:
-Super Agent → Work Planner → Work Cells → Specialist Runtime → Provider/Tool → Evidence → Verification → Audit.
-
-La evidencia de herramientas no se convierte automáticamente en autoridad institucional.
-
-## 8. PLAN FINAL DE CIERRE
-
-### Fase A — PC
-Ejecutar:
-tools/run-nodriza-migration.ps1
-
-Cerrar C01-C14 con evidencia real.
-
-### Fase B — Bibliotecario
-Configurar WIF en GitHub.
-Reejecutar Knowledge OS v011.
-Verificar lectura institucional real.
-Cerrar E2E y black-box institucional.
-
-### Fase C — Nube
-Con WIF validado:
-1. habilitar autenticación OIDC/WIF;
-2. elegir runtime cloud mínimo;
-3. desplegar Nodriza;
-4. añadir backup de estado separado del runtime;
-5. probar recuperación desde otro computador.
-
-### Fase D — Cierre
-- ejecutar suite completa;
-- revisar seguridad;
-- verificar rollback;
-- documentar estado final;
-- decidir merge de PR #147;
-- declarar cierre solamente con evidencia.
-
-## 9. DEFINICIÓN DE 100%
-
-AUREA se podrá declarar 100% cerrada para esta etapa cuando:
+## DEFINICIÓN DE CIERRE
+Para declarar 100% operacional en esta etapa se requiere:
 1. PC baseline PASS.
 2. C01-C14 sin BLOCKED.
-3. C15 resuelto o formalmente DEFERRED por decisión arquitectónica.
+3. C15 DEFERRED o resuelto.
 4. Bibliotecario live leído desde fuente institucional.
 5. WIF autenticado.
 6. V011 verificado.
@@ -120,15 +80,6 @@ AUREA se podrá declarar 100% cerrada para esta etapa cuando:
 8. Cloud continuity PASS.
 9. Recovery desde otro equipo PASS.
 10. Suite final PASS.
-11. PR integrado según política de repositorio.
-
-## DECISIÓN
-
-No reconstruir AUREA.
-No duplicar Bibliotecario.
-No activar infraestructura cloud antes de WIF.
-No cerrar como 100% hasta obtener evidencia de PC + Bibliotecario + recuperación cloud.
 
 ## SIGUIENTE ACCIÓN
-
-Mañana: ejecutar el lanzador de PC y, en paralelo, resolver la configuración WIF necesaria para cerrar el Bibliotecario.
+Ejecutar el auditor PC y configurar WIF en paralelo. No añadir arquitectura mientras esas dos evidencias no sean obtenidas.
