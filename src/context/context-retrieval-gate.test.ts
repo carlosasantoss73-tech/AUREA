@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ContextRetrievalGate, ContextProvider, requiresHistoricalContext } from "./context-retrieval-gate";
+import { ContextRetrievalGate, ContextProvider, ContextCitation, requiresHistoricalContext } from "./context-retrieval-gate";
 
-const provider = (facts: string[] = ["fact recovered"], citations = [{ sourceId: "historical-source", version: 1 }]): ContextProvider => ({
+const provider = (facts: string[] = ["fact recovered"], citations: ContextCitation[] = [{ sourceId: "historical-source", version: 1 }]): ContextProvider => ({
   async retrieve(input) { return { projectId: input.projectId, query: input.query, facts, citations }; },
 });
 
