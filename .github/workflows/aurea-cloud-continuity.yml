@@ -1,0 +1,52 @@
+name: AUREA Cloud Continuity
+
+on:
+  push:
+    branches:
+      - feat/browser-use-runtime-integration-v1
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  continuity-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repository integrity
+        shell: bash
+        run: |
+          test -f package.json
+          test -f tsconfig.json
+          test -f tools/audit-nodriza-pc-15-cells.ps1
+          echo "REPOSITORY_INTEGRITY=PASS"
+
+      - name: Node baseline
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install and verify
+        run: |
+          npm install
+          npm run typecheck
+          npm test
+
+      - name: Cloud authority gate
+        shell: bash
+        env:
+          GCP_WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$GCP_WIF_PROVIDER" ] || [ -z "$GCP_SERVICE_ACCOUNT" ]; then
+            echo "CLOUD_DEPLOYMENT=BLOCKED"
+            echo "REASON=GCP WIF configuration is not available to the workflow."
+            echo "This is intentional fail-closed behavior."
+            exit 0
+          fi
+          echo "CLOUD_DEPLOYMENT=READY"
+          echo "Next stage may authenticate through GitHub OIDC/WIF."

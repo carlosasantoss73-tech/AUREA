@@ -45,3 +45,43 @@ def test_runtime_fail_closed_on_executor_error(tmp_path: Path):
     assert result.status == "BLOCKED"
     assert result.blockers == ["executor_error:RuntimeError"]
 
+
+
+class BibliotecarioStub:
+    def get_authoritative_evidence(self, request):
+        assert request.expert_id == "TEST-EXPERT"
+        assert request.trace_id == "trace-5"
+        return [Evidence("bibliotecario", "institutional", "post-state confirmed", authoritative=True)]
+
+
+class ExternalProvider:
+    def get_authoritative_evidence(self, request):
+        return [Evidence("verification", "browser-provider", "tool output", authoritative=True)]
+
+
+def test_runtime_bibliotecario_verification_uses_institutional_port(tmp_path: Path):
+    runtime = SpecialistRuntime(str(tmp_path / "audit.jsonl"))
+    request = ExpertRequest("TEST-EXPERT", "diagnose", "trace-5")
+    executed = ExpertResult("TEST-EXPERT", "trace-5", "EXECUTED", "done",
+                            evidence=[Evidence("runtime", "adapter", "execution")])
+    verified = runtime.verify_with_bibliotecario(profile(), request, executed, BibliotecarioStub())
+    assert verified.status == "VERIFIED"
+    assert any(e.kind == "bibliotecario" and e.authoritative for e in verified.evidence)
+
+
+def test_runtime_bibliotecario_path_rejects_non_authoritative_port_output(tmp_path: Path):
+    runtime = SpecialistRuntime(str(tmp_path / "audit.jsonl"))
+    request = ExpertRequest("TEST-EXPERT", "diagnose", "trace-6")
+    executed = ExpertResult("TEST-EXPERT", "trace-6", "EXECUTED", "done",
+                            evidence=[Evidence("runtime", "adapter", "execution")])
+
+    class BadBibliotecario:
+        def get_authoritative_evidence(self, _request):
+            return [Evidence("provider", "browser", "tool output", authoritative=False)]
+
+    try:
+        runtime.verify_with_bibliotecario(profile(), request, executed, BadBibliotecario())
+    except RuntimeError as exc:
+        assert str(exc) == "BIBLIOTECARIO_RETURNED_NON_AUTHORITATIVE_EVIDENCE"
+    else:
+        raise AssertionError("non-authoritative institutional output must block")

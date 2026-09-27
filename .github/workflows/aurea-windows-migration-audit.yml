@@ -1,0 +1,78 @@
+name: AUREA Windows Migration Audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "package.json"
+      - "tsconfig.json"
+      - "src/**"
+      - "apps/tool_expert_factory/**"
+      - "tools/bootstrap-aurea-windows.ps1"
+      - "docs/AUDITORIA_MIGRACION_NODRIZA_PC_2026-09-26.md"
+      - "tools/audit-nodriza-pc-15-cells.ps1"
+      - ".gitignore"
+      - ".github/workflows/aurea-windows-migration-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-baseline:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: feat/browser-use-runtime-integration-v1
+
+      - name: Node baseline
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+          $major = [int]((node --version) -replace '^v','').Split('.')[0]
+          if ($major -lt 20) { throw "Node 20+ required" }
+
+      - name: Install Node dependencies
+        shell: pwsh
+        run: npm install
+
+      - name: Typecheck
+        shell: pwsh
+        run: npm run typecheck
+
+      - name: Test suite
+        shell: pwsh
+        run: npm test
+
+      - name: Python baseline
+        shell: pwsh
+        run: |
+          python --version
+          python -m pip install --quiet "mcp>=2.1.1"
+
+      - name: Free Playwright MCP smoke
+        shell: pwsh
+        run: python apps/tool_expert_factory/functional_runtime_mcp.py
+
+      - name: Bootstrap script syntax check
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/tools/bootstrap-aurea-windows.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) { throw "PowerShell syntax errors: $($errors.Count)" }
+          if ($null -eq $ast) { throw "PowerShell parser returned no AST" }
+
+      - name: Migration audit summary
+        shell: pwsh
+        run: |
+          Write-Host "WINDOWS_MIGRATION_AUDIT=PASS"
+          Write-Host "AUTHORITY=Bibliotecario/Knowledge OS remains external institutional authority"
+          Write-Host "SELF_HOSTED_RUNNER=NOT_ENABLED"

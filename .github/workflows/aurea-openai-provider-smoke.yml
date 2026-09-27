@@ -1,0 +1,71 @@
+name: AUREA OpenAI Provider Smoke Test
+
+on:
+  push:
+    paths:
+      - ".github/workflows/aurea-openai-provider-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  openai-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Call OpenAI Responses API
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+
+          key = os.environ.get("OPENAI_API_KEY", "")
+          if not key:
+              print(json.dumps({"status": "BLOCKED", "blocker": "missing OPENAI_API_KEY"}))
+              raise SystemExit(1)
+
+          prompt = """Actúa como consultor técnico de AUREA. Responde brevemente:
+          1) Qué arquitectura debemos preservar para AUREA.
+          2) Cuál es el siguiente paso técnico para cerrar el Bibliotecario.
+          No inventes integraciones; distingue lo demostrado de lo pendiente."""
+
+          payload = {
+              "model": "gpt-5.6-luna",
+              "input": prompt,
+              "max_output_tokens": 600,
+          }
+
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/responses",
+              data=json.dumps(payload).encode(),
+              headers={
+                  "Authorization": f"Bearer {key}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req, timeout=60) as resp:
+              body = json.load(resp)
+
+          output = body.get("output", [])
+          texts = []
+          for item in output:
+              for part in item.get("content", []):
+                  if part.get("type") == "output_text":
+                      texts.append(part.get("text", ""))
+
+          result = "\n".join(texts).strip()
+          if not result:
+              raise SystemExit("OPENAI_EMPTY_RESPONSE")
+
+          print(json.dumps({
+              "status": "PASS",
+              "provider": "openai",
+              "model": "gpt-5.6-luna",
+              "response": result
+          }, ensure_ascii=False))
+          PY

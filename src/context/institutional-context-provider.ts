@@ -41,6 +41,7 @@ export function createInstitutionalContextProvider(
         version: record.version,
         title: record.title,
         excerpt: record.excerpt ?? record.text.slice(0, 500),
+        provenance: "INSTITUTIONAL",
       }));
 
       return {

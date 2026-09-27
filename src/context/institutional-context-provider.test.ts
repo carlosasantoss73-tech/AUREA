@@ -27,6 +27,7 @@ describe("Institutional Bibliotecario adapter", () => {
       sourceId: "knowledge-os:doc-1",
       documentId: "doc-1",
       version: 7,
+      provenance: "INSTITUTIONAL",
     }]);
   });
 

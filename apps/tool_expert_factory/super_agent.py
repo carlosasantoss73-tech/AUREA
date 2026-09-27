@@ -11,6 +11,10 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .super_configurator import SuperConfigurator
+from .runtime import SpecialistRuntime
+from .work_cells import WorkCellRunner
+from .work_planner import WorkPlan
+from .contracts import Evidence, ToolExpertProfile
 
 
 class ToolAutomationSuperAgent:
@@ -26,7 +30,8 @@ class ToolAutomationSuperAgent:
         findings = []
         for item in sources:
             source = researcher.classify_url(
-                item["url"], topic=item.get("topic", "tool"), publisher=item.get("publisher", "unknown")
+                item["url"], topic=item.get("topic", "tool"),
+                publisher=item.get("publisher", "unknown"),
             )
             finding = researcher.fetch(source)
             findings.append(researcher.as_record(finding))
@@ -38,6 +43,61 @@ class ToolAutomationSuperAgent:
             "APRENDIZAJE": "Web breadth improves troubleshooting only when authority and provenance remain explicit.",
             "ADAPTACION": "Revalidate official sources before configuration or mutation.",
             "SIGUIENTE_ACCION": "Cross-check candidate findings against current official documentation and executable tests.",
+        }
+
+    def refresh_official_knowledge(self, topics: tuple[str, ...]) -> dict[str, object]:
+        """Fetch the canonical official source catalog for the requested tool topics."""
+        from .knowledge_researcher import KnowledgeResearcher
+        researcher = KnowledgeResearcher()
+        findings = []
+        for topic in topics:
+            for source in researcher.official_sources(topic):
+                findings.append(researcher.as_record(researcher.fetch(source)))
+        return {
+            "agent_id": self.agent_id,
+            "RESULTADO": "Official web knowledge refresh completed.",
+            "EVIDENCIA": findings,
+            "DECISION": "Only explicitly allowlisted official hosts are authoritative candidates.",
+            "APRENDIZAJE": "The Super Agent can use web breadth for discovery without turning arbitrary web content into institutional truth.",
+            "ADAPTACION": "Keep the Bibliotecario as the only institutional authority and revalidate before mutation.",
+            "SIGUIENTE_ACCION": "Use fresh official evidence to select or troubleshoot the next specialist executor.",
+        }
+
+    def execute_plan(
+        self,
+        *,
+        plan: WorkPlan,
+        profiles: dict[str, ToolExpertProfile],
+        authoritative_evidence: list[Evidence],
+        executors: dict[str, object],
+        audit_path: str,
+    ) -> dict[str, object]:
+        """Execute a planned specialist workflow through the existing Runtime."""
+        runtime = SpecialistRuntime(audit_path)
+        results = WorkCellRunner(runtime).execute(
+            plan, profiles, authoritative_evidence, executors
+        )
+        blocked = next((item for item in results if item.result.status == "BLOCKED"), None)
+        return {
+            "agent_id": self.agent_id,
+            "RESULTADO": "Planned specialist workflow executed through Work Cells and Specialist Runtime.",
+            "EVIDENCIA": [
+                {
+                    "cell_id": item.cell_id,
+                    "specialist_id": item.specialist_id,
+                    "status": item.result.status,
+                    "result": item.result.result,
+                    "blockers": item.result.blockers,
+                }
+                for item in results
+            ],
+            "DECISION": "STOP_AND_PRESERVE_EVIDENCE" if blocked else "WORKFLOW_EXECUTED",
+            "APRENDIZAJE": "Execution is now delegated through the existing Specialist Runtime.",
+            "ADAPTACION": "Keep planning, cells, Runtime and provider execution as separate contracts.",
+            "SIGUIENTE_ACCION": (
+                "Resolve blocker before resuming." if blocked
+                else "Verify successful cells with authoritative evidence before advancing dependencies."
+            ),
         }
 
     def configure_all(self, *, apply: bool = False) -> dict[str, object]:

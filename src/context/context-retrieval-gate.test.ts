@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ContextRetrievalGate, ContextProvider, requiresHistoricalContext } from "./context-retrieval-gate";
+import { ContextRetrievalGate, ContextProvider, ContextCitation, requiresHistoricalContext } from "./context-retrieval-gate";
 
-const provider = (facts: string[] = ["fact recovered"], citations = [{ sourceId: "historical-source", version: 1 }]): ContextProvider => ({
+const provider = (facts: string[] = ["fact recovered"], citations: ContextCitation[] = [{ sourceId: "historical-source", version: 1 }]): ContextProvider => ({
   async retrieve(input) { return { projectId: input.projectId, query: input.query, facts, citations }; },
 });
 
@@ -35,5 +35,19 @@ describe("AUREA B14 Context Retrieval Gate", () => {
   it("returns EMPTY instead of inventing historical context", async () => {
     const result = await new ContextRetrievalGate(provider([], [])).retrieve(req("¿qué hicimos anteriormente?"));
     expect(result.status).toBe("EMPTY");
+  });
+  it("blocks local seeds when institutionalOnly is required", async () => {
+    const result = await new ContextRetrievalGate(
+      provider(["seed fact"], [{ sourceId: "AUREA_LOCAL_SEED", version: 1, provenance: "LOCAL_SEED" }]),
+    ).retrieve({ ...req("¿qué hicimos esta semana?"), institutionalOnly: true });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+  });
+  it("blocks missing institutional provenance even when the source returns facts", async () => {
+    const result = await new ContextRetrievalGate(
+      provider(["unproven fact"], [{ sourceId: "external-source", version: 1 }]),
+    ).retrieve({ ...req("¿qué hicimos esta semana?"), institutionalOnly: true });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
   });
 });
