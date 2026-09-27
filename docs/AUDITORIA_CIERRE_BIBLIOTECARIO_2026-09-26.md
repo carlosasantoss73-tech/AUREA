@@ -259,3 +259,35 @@ No se expusieron secretos en el log. Las variables institucionales `AUREA_GCP_WI
 
 ### Siguiente acción mínima
 Configurar en el repositorio/entorno de GitHub las variables institucionales necesarias para WIF (`AUREA_GCP_WIF_PROVIDER` y `AUREA_GCP_SERVICE_ACCOUNT`) con sus valores autorizados, y repetir el probe. No se deben colocar valores de credenciales en el código.
+
+
+## 14. Revalidación C01 — preflight explícito de configuración WIF (2026-09-27)
+
+### RESULTADO
+La comprobación C01 fue repetida en el workflow **AUREA Knowledge OS v011 Live Reader Probe #7** sobre commit `0a0dfffe3fbba6e73678ecedbb6003e381435b5c`. El workflow falla de forma controlada antes de autenticación porque las variables requeridas de GitHub están vacías.
+
+### EVIDENCIA
+- Run: `36292120957`
+- Job: `108544090544`
+- Paso: `Preflight required GCP WIF configuration`
+- `WIF_PROVIDER:` vacío
+- `SERVICE_ACCOUNT:` vacío
+- Mensaje emitido: `BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER is not configured in the GitHub repository/environment variables.`
+- El paso de autenticación WIF quedó correctamente **SKIPPED**.
+- No se expusieron secretos ni credenciales.
+
+### DECISIÓN
+C01 permanece **BLOCKED** exclusivamente por configuración externa requerida para el acceso GCP/WIF. No se debe sustituir esta dependencia por valores inventados, credenciales en código ni seeds locales.
+
+### APRENDIZAJE
+El gate ahora identifica el bloqueo de configuración antes de invocar el action de Google. Esto convierte un error genérico de autenticación en un bloqueo institucional explícito y auditable.
+
+### ADAPTACIÓN
+Se agregó un preflight fail-closed al workflow para exigir:
+- `AUREA_GCP_WIF_PROVIDER`
+- `AUREA_GCP_SERVICE_ACCOUNT`
+
+El workflow conserva lectura de Knowledge OS estrictamente read-only y no altera la autoridad del Bibliotecario.
+
+### SIGUIENTE ACCIÓN
+Configurar ambos valores en **GitHub Repository/Environment Variables** con los valores reales autorizados del proyecto GCP/WIF. Después, ejecutar nuevamente el probe. Solo entonces podrán avanzar C01→C03 y, con evidencia real del payload v011, C04→C09.
