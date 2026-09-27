@@ -321,3 +321,28 @@ El trabajo restante se concentra en una sola cadena operacional: WIF → lectura
 3. Solo después de observar el payload v011, implementar el reader concreto sin inventar su shape.
 4. Ejecutar E2E y black-box.
 5. Repetir el gate de cierre.
+
+
+## 16. Refuerzo C06/C09 — pruebas institucionalOnly (2026-09-27)
+
+### RESULTADO
+Se reforzó la suite del Context Retrieval Gate para cubrir explícitamente dos bypass críticos del cierre institucional.
+
+### EVIDENCIA
+Commit: `b1aff76934e949037a130d3756e862e31eb1da9a`
+
+Nuevas pruebas en `src/context/context-retrieval-gate.test.ts`:
+- `LOCAL_SEED` con `institutionalOnly=true` → **BLOCKED** con `INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK`.
+- Fuente sin `provenance=INSTITUTIONAL` con `institutionalOnly=true` → **BLOCKED** con el mismo código.
+
+### DECISIÓN
+C06/C09 quedan reforzadas a nivel de contrato y prueba. Esto no convierte el reader en live ni sustituye la evidencia del Knowledge OS.
+
+### APRENDIZAJE
+El gate impide que una fuente local o una fuente sin provenance institucional atraviese la frontera de cierre aunque entregue facts aparentemente válidos.
+
+### ADAPTACIÓN
+Mantener esta barrera como requisito permanente de regresión. No relajar `institutionalOnly` para resolver el bloqueo WIF.
+
+### SIGUIENTE ACCIÓN
+Esperar únicamente la configuración externa WIF para avanzar en C01→C04. Mientras tanto, continuar auditoría y regresión sin declarar cierre.
