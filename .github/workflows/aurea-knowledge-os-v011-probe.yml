@@ -31,13 +31,11 @@ jobs:
           SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
-          if [ -z "$WIF_PROVIDER" ]; then
-            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER is not available as a GitHub variable or secret."
-            exit 1
-          fi
-          if [ -z "$SERVICE_ACCOUNT" ]; then
-            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT is not available as a GitHub variable or secret."
-            exit 1
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "BIBLIOTECARIO_STATUS: SKIPPED_EXTERNAL_CONFIGURATION"
+            echo "BIBLIOTECARIO_BLOCKER: WIF provider/service account is not configured."
+            echo "POLICY: no credential fabrication; no local fallback for institutional authority."
+            exit 0
           fi
           if ! printf '%s' "$WIF_PROVIDER" | grep -Eq '^projects/[0-9]+/locations/global/workloadIdentityPools/[^/]+/providers/[^/]+$'; then
             echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER has an invalid resource format."
