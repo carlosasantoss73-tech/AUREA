@@ -81,7 +81,7 @@ jobs:
 
           digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
           print(f"V011_CONTENT_SHA256: {digest}")
-          print(f"V011_CONTENT_BYTES: {len(raw.encode("utf-8"))}")
+          print(f"V011_CONTENT_BYTES: {len(raw.encode('utf-8'))}")
 
           try:
               parsed = json.loads(raw)
