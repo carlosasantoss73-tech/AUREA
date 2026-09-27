@@ -25,6 +25,22 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - name: Preflight required GCP WIF configuration
+        env:
+          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WIF_PROVIDER" ]; then
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_WIF_PROVIDER is not configured in the GitHub repository/environment variables."
+            exit 1
+          fi
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "BIBLIOTECARIO_BLOCKER: AUREA_GCP_SERVICE_ACCOUNT is not configured in the GitHub repository/environment variables."
+            exit 1
+          fi
+          echo "GCP_WIF_CONFIGURATION: PRESENT"
+
       - name: Authenticate to Google Cloud through WIF
         uses: google-github-actions/auth@v3
         with:
