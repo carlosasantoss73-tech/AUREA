@@ -247,17 +247,7 @@ jobs:
           token="$DRIVE_ACCESS_TOKEN"
           test -n "$token"
           raw="$(curl -fsS -H "Authorization: Bearer $token" "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media")"
-          python - <<'PY' <<< "$raw"
-          import json, sys
-          p=json.load(sys.stdin)
-          records=p.get("registros_nuevos_v011") or []
-          print("=== LIVE V011 RECORD VERSION SHAPES ===")
-          for i, item in enumerate(records):
-              if isinstance(item, dict):
-                  value=item.get("version")
-                  print(f"record[{i}].version type={type(value).__name__} value={json.dumps(value, ensure_ascii=False)}")
-          print("=== END LIVE V011 RECORD VERSION SHAPES ===")
-          PY
+          printf '%s' "$raw" | python -c 'import json,sys; p=json.load(sys.stdin); records=p.get("registros_nuevos_v011") or []; print("=== LIVE V011 RECORD VERSION SHAPES ==="); [print(f"record[{i}].version type={type(item.get("version")).__name__} value={json.dumps(item.get("version"), ensure_ascii=False)}") for i,item in enumerate(records) if isinstance(item,dict)]; print("=== END LIVE V011 RECORD VERSION SHAPES ===")'
 
 
       - name: Prepare live institutional reader test scope
