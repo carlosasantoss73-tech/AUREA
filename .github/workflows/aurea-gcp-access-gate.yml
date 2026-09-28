@@ -2,6 +2,10 @@ name: AUREA GCP Access Gate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
 
 permissions:
   contents: read
@@ -13,6 +17,7 @@ env:
 
 jobs:
   gcp-access-gate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'chore: execute aurea gcp access gate' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -130,4 +135,52 @@ jobs:
           print("KNOWLEDGE_OS_SCOPE_CHECK: PASS")
           print("KNOWLEDGE_OS_WRITE_CAPABILITY_CHECK: PASS")
           print("Next gate: read index content, verify institutional provenance, then prove write denial with a non-destructive request")
+          PY
+
+      - name: Read real Knowledge OS v011 index content
+        env:
+          DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, urllib.error, urllib.request
+
+          token = os.environ.get("DRIVE_ACCESS_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("NO_DRIVE_ACCESS_TOKEN_FROM_AUTH_ACTION")
+
+          index_id = os.environ["AUREA_KNOWLEDGE_OS_INDEX_ID"]
+          url = f"https://www.googleapis.com/drive/v3/files/{index_id}?alt=media"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+
+          try:
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  raw = response.read()
+                  content_type = response.headers.get("Content-Type", "")
+          except urllib.error.HTTPError as exc:
+              body = exc.read().decode("utf-8", errors="replace")
+              print(f"KNOWLEDGE_OS_CONTENT_READ_FAILED_HTTP_{exc.code}")
+              print(body)
+              raise
+
+          if not raw:
+              raise SystemExit("KNOWLEDGE_OS_INDEX_CONTENT_EMPTY")
+
+          digest = hashlib.sha256(raw).hexdigest()
+          try:
+              payload = json.loads(raw.decode("utf-8"))
+          except Exception as exc:
+              raise SystemExit(f"KNOWLEDGE_OS_INDEX_NOT_VALID_JSON: {exc}") from exc
+
+          if not isinstance(payload, dict):
+              raise SystemExit("KNOWLEDGE_OS_INDEX_TOP_LEVEL_NOT_OBJECT")
+
+          keys = sorted(payload.keys())
+          print(f"KNOWLEDGE_OS_INDEX_CONTENT_BYTES: {len(raw)}")
+          print(f"KNOWLEDGE_OS_INDEX_CONTENT_TYPE: {content_type}")
+          print(f"KNOWLEDGE_OS_INDEX_SHA256: {digest}")
+          print(f"KNOWLEDGE_OS_INDEX_TOP_LEVEL_KEYS: {json.dumps(keys, ensure_ascii=False)}")
+          print("KNOWLEDGE_OS_V011_CONTENT_READ: PASS")
+          print("V011_CONTENT_PROBE: PASS")
+          print("Institutional provenance remains a separate verification gate until the observed payload fields are reviewed.")
           PY
