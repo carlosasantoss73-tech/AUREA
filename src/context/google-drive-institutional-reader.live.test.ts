@@ -25,7 +25,7 @@ describe("LIVE Bibliotecario / Knowledge OS reader", () => {
 
     const current = await reader.readCurrentIndex("live-bib-08");
     expect(current.state).toBe("VIGENTE");
-    expect(current.fileId).toBe(indexFileId);
+    expect(current.fileId).toBe(liveConfig.indexFileId);
 
     const records = await reader.readRecords(liveConfig.indexFileId, {
       projectId: liveConfig.projectId,
