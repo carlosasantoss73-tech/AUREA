@@ -19,7 +19,7 @@ export type InstitutionalRecordState =
 
 export interface InstitutionalIndexRef {
   fileId: string;
-  version: number;
+  version: string;
   state: "VIGENTE" | "REEMPLAZADO";
   previousIndexFileId?: string;
 }
