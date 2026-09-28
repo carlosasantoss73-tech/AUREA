@@ -56,6 +56,60 @@ describe("Google Drive institutional reader", () => {
     expect(records[0].sourceId).toBe("source-current");
   });
 
+
+
+  it("supports the observed legacy records collection and ignores non-retrievable proposal states", async () => {
+    const current = {
+      estado_indice: "VIGENTE",
+      version_indice: "11",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v10" },
+      registros_nuevos_v011: [{
+        id: "proposal",
+        proyecto: "XOLAR",
+        nombre: "Propuesta",
+        descripcion: "Propuesta no recuperable.",
+        fuente: "KNOWLEDGE_OS",
+        estado: "PROPUESTA",
+        version: "v1",
+        ubicacion: { fileId: "proposal-source" },
+      }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO",
+      version_indice: "v10",
+      registros: [{
+        id: "legacy-1",
+        proyecto: "XOLAR",
+        nombre: "Registro histórico vigente",
+        descripcion: "Evidencia histórica vigente.",
+        fuente: "KNOWLEDGE_OS",
+        estado: "VIGENTE",
+        version: "v1 (copia)",
+        ubicacion: { fileId: "legacy-source" },
+      }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({ current, previous }),
+    });
+
+    const records = await reader.readRecords("current", {
+      projectId: "XOLAR",
+      query: "histórico",
+      traceId: "trace-3",
+    });
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      id: "legacy-1",
+      projectId: "XOLAR",
+      version: 1,
+      state: "VIGENTE",
+      sourceId: "legacy-source",
+    });
+  });
+
   it("fails closed when the index is writable", async () => {
     const reader = new GoogleDriveInstitutionalReader({
       indexFileId: "current",
