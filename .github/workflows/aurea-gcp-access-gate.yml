@@ -238,3 +238,35 @@ jobs:
           print("V011_CONTENT_PROBE: PASS")
           print("Next gate: execute the concrete InstitutionalAuthorityReader against the same live source.")
           PY
+
+      - name: Prepare live institutional reader test scope
+        env:
+          DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          token="$DRIVE_ACCESS_TOKEN"
+          test -n "$token"
+          echo "::add-mask::$token"
+          raw="$(curl -fsS -H "Authorization: Bearer $token" "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media")"
+          project_id="$(python -c 'import json,sys; p=json.load(sys.stdin); r=p.get("registros_nuevos_v011") or []; print((r[0].get("proyecto") if r and isinstance(r[0],dict) else "") or "")' <<< "$raw")"
+          test -n "$project_id"
+          echo "AUREA_LIVE_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
+          echo "LIVE_READER_PROJECT_SCOPE: PRESENT"
+
+      - name: Setup Node for live institutional reader
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install AUREA runtime dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Execute concrete live InstitutionalAuthorityReader
+        env:
+          AUREA_LIVE_DRIVE_TOKEN: ${{ steps.auth.outputs.access_token }}
+          AUREA_KNOWLEDGE_OS_INDEX_ID: ${{ env.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$AUREA_LIVE_DRIVE_TOKEN"
+          npx vitest run src/context/google-drive-institutional-reader.live.test.ts
+          echo "BIBLIOTECARIO_LIVE_READER: PASS"
