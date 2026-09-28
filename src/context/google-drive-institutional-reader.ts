@@ -90,7 +90,7 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       if (visited.has(cursor)) throw new Error("BIBLIOTECARIO_INDEX_CHAIN_CYCLE");
       visited.add(cursor);
       const document = await this.loadIndexDocument(cursor, input.traceId);
-      records.push(...this.extractRecords(document.payload, cursor, input));
+      records.push(...this.extractRecords(document.payload, cursor, input, depth === 0));
       cursor = this.previousIndexFileId(document.payload);
     }
 
@@ -146,13 +146,16 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return asOptionalString((previous as JsonObject).fileId);
   }
 
-  private extractRecords(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }): InstitutionalRecord[] {
+  private extractRecords(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }, required: boolean): InstitutionalRecord[] {
     const rawRecords = Array.isArray(payload.registros_nuevos_v011)
       ? payload.registros_nuevos_v011
       : Array.isArray(payload.registros)
         ? payload.registros
         : undefined;
-    if (!rawRecords) throw new Error(`BIBLIOTECARIO_RECORDS_COLLECTION_MISSING:${indexFileId}`);
+    if (!rawRecords) {
+      if (!required) return [];
+      throw new Error(`BIBLIOTECARIO_RECORDS_COLLECTION_MISSING:${indexFileId}`);
+    }
 
     return rawRecords.flatMap((raw, position) => {
       const item = asObject(raw, `records[${position}]`);
