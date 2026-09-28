@@ -104,7 +104,7 @@ describe("Google Drive institutional reader", () => {
     expect(records[0]).toMatchObject({
       id: "legacy-1",
       projectId: "XOLAR",
-      version: "v1",
+      version: "v1 (copia)",
       state: "VIGENTE",
       sourceId: "legacy-source",
     });
