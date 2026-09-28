@@ -6,10 +6,9 @@ const indexFileId = process.env.AUREA_KNOWLEDGE_OS_INDEX_ID;
 const projectId = process.env.AUREA_LIVE_PROJECT_ID;
 
 describe("LIVE Bibliotecario / Knowledge OS reader", () => {
-  it("reads the real current V011 through the concrete institutional reader", async () => {
-    if (!token || !indexFileId || !projectId) {
-      throw new Error("LIVE_INSTITUTIONAL_TEST_CONFIGURATION_MISSING");
-    }
+  it.skipIf(!token || !indexFileId || !projectId)(
+    "reads the real current V011 through the concrete institutional reader",
+    async () => {
 
     const reader = new GoogleDriveInstitutionalReader({
       indexFileId,
