@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GoogleDriveInstitutionalReader } from "./google-drive-institutional-reader";
+import { createGoogleDriveInstitutionalContextProvider } from "./google-drive-institutional-context-provider";
+import { ContextRetrievalGate } from "./context-retrieval-gate";
 
 const token = process.env.AUREA_LIVE_DRIVE_TOKEN;
 const indexFileId = process.env.AUREA_KNOWLEDGE_OS_INDEX_ID;
@@ -46,4 +48,34 @@ describe("LIVE Bibliotecario / Knowledge OS reader", () => {
       PROVENANCE_BOUNDARY: "INSTITUTIONAL_CONTEXT_PROVIDER_REQUIRED",
     }));
   }, 30_000);
+
+  it.skipIf(!token || !indexFileId || !projectId)(
+    "passes real institutional evidence through the existing ContextRetrievalGate",
+    async () => {
+      const liveConfig = requireLiveConfig();
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: liveConfig.indexFileId,
+        accessToken: liveConfig.token,
+      });
+      const provider = createGoogleDriveInstitutionalContextProvider(reader);
+      const gate = new ContextRetrievalGate(provider);
+      const result = await gate.retrieve({
+        actorId: "live-bib-08",
+        actorRole: "system",
+        projectId: liveConfig.projectId,
+        query: "continuar",
+        institutionalOnly: true,
+      });
+      expect(result.status).toBe("READY");
+      expect(result.context?.citations.length).toBeGreaterThan(0);
+      expect(result.context?.citations.every((citation) => citation.provenance === "INSTITUTIONAL")).toBe(true);
+      console.log(JSON.stringify({
+        LIVE_CONTEXT_GATE: "PASS",
+        STATUS: result.status,
+        CITATIONS_RETRIEVED: result.context?.citations.length ?? 0,
+        PROVENANCE_BOUNDARY: "INSTITUTIONAL",
+      }));
+    },
+    30_000,
+  );
 });
