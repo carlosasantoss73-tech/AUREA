@@ -2,10 +2,6 @@ name: AUREA GCP Access Gate
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-
 
 permissions:
   contents: read
@@ -17,7 +13,6 @@ env:
 
 jobs:
   gcp-access-gate:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'chore: execute aurea gcp access gate' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
