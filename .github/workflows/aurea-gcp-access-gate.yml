@@ -190,7 +190,25 @@ jobs:
           print(f"KNOWLEDGE_OS_INDEX_CONTENT_TYPE: {content_type}")
           print(f"KNOWLEDGE_OS_INDEX_SHA256: {digest}")
           print(f"KNOWLEDGE_OS_INDEX_TOP_LEVEL_KEYS: {json.dumps(keys, ensure_ascii=False)}")
+
+          def shape(value, path="$", depth=0, max_depth=4):
+              if depth > max_depth:
+                  return
+              if isinstance(value, dict):
+                  print(f"V011_SHAPE {path}: object keys={json.dumps(sorted(value.keys()), ensure_ascii=False)}")
+                  for key in sorted(value.keys()):
+                      shape(value[key], f"{path}.{key}", depth + 1, max_depth)
+              elif isinstance(value, list):
+                  print(f"V011_SHAPE {path}: array length={len(value)}")
+                  if value:
+                      shape(value[0], f"{path}[0]", depth + 1, max_depth)
+              else:
+                  print(f"V011_SHAPE {path}: {type(value).__name__}")
+
+          print("=== V011 STRUCTURAL SHAPE (NO VALUES) ===")
+          shape(payload)
+          print("=== END V011 STRUCTURAL SHAPE ===")
           print("KNOWLEDGE_OS_V011_CONTENT_READ: PASS")
           print("V011_CONTENT_PROBE: PASS")
-          print("Institutional provenance remains a separate verification gate until the observed payload fields are reviewed.")
+          print("Next gate: implement the institutional reader only from this observed payload shape; no inferred fields.")
           PY
