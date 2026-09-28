@@ -239,16 +239,50 @@ jobs:
           print("Next gate: execute the concrete InstitutionalAuthorityReader against the same live source.")
           PY
 
-      - name: Diagnose live V011 record version shapes
+      - name: Diagnose live index-chain record version shapes
         env:
           DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           set -euo pipefail
           token="$DRIVE_ACCESS_TOKEN"
           test -n "$token"
-          raw="$(curl -fsS -H "Authorization: Bearer $token" "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media")"
-          printf '%s' "$raw" | python -c 'import json,sys; p=json.load(sys.stdin); records=p.get("registros_nuevos_v011") or []; print("=== LIVE V011 RECORD VERSION SHAPES ==="); [print(f"record[{i}].version type={type(item.get("version")).__name__} value={json.dumps(item.get("version"), ensure_ascii=False)}") for i,item in enumerate(records) if isinstance(item,dict)]; print("=== END LIVE V011 RECORD VERSION SHAPES ===")'
-
+          raw="$(
+            curl -fsS -H "Authorization: Bearer $token"               "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media"
+          )"
+          printf '%s' "$raw" | python -c '
+import json,sys,urllib.request,urllib.parse
+token=sys.argv[1]
+p=json.load(sys.stdin)
+seen=set()
+file_id=sys.argv[2]
+depth=0
+print("=== LIVE INDEX-CHAIN RECORD VERSION SHAPES ===")
+while file_id and file_id not in seen and depth < 32:
+    seen.add(file_id)
+    if depth == 0:
+        payload=p
+    else:
+        req=urllib.request.Request(
+            "https://www.googleapis.com/drive/v3/files/"+urllib.parse.quote(file_id)+"?alt=media",
+            headers={"Authorization":"Bearer "+token})
+        with urllib.request.urlopen(req,timeout=30) as r:
+            payload=json.load(r)
+    records=payload.get("registros_nuevos_v011")
+    if not isinstance(records,list):
+        records=payload.get("registros")
+    if isinstance(records,list):
+        print(f"index_depth={depth} file_id={file_id} records={len(records)}")
+        for i,item in enumerate(records):
+            if isinstance(item,dict):
+                v=item.get("version")
+                print(f"index_depth={depth} record[{i}].version type={type(v).__name__} value={json.dumps(v,ensure_ascii=False)}")
+    else:
+        print(f"index_depth={depth} file_id={file_id} records=NONE")
+    prev=payload.get("indice_anterior") or {}
+    file_id=prev.get("fileId") if isinstance(prev,dict) else None
+    depth+=1
+print("=== END LIVE INDEX-CHAIN RECORD VERSION SHAPES ===")
+' "$token" "$AUREA_KNOWLEDGE_OS_INDEX_ID"
 
       - name: Prepare live institutional reader test scope
         env:
