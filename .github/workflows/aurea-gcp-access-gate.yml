@@ -2,6 +2,9 @@ name: AUREA GCP Access Gate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -91,7 +94,11 @@ jobs:
                   with urllib.request.urlopen(req, timeout=30) as response:
                       return json.load(response)
               except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
                   print(f"DRIVE_READ_FAILED_HTTP_{exc.code}: {file_id}")
+                  print("DRIVE_ERROR_BODY_BEGIN")
+                  print(body)
+                  print("DRIVE_ERROR_BODY_END")
                   raise
 
           root = get_file(
