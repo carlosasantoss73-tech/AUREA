@@ -44,7 +44,7 @@ function asNumber(value: unknown, label: string): number {
   if (typeof value === "string") {
     const normalized = value.trim();
     if (/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
-    if (/^v\d+$/i.test(normalized)) return Number(normalized.slice(1));
+    const versionMatch = normalized.match(/^v(\d+)/i);\n    if (versionMatch) return Number(versionMatch[1]);
   }
   throw new Error(`BIBLIOTECARIO_V011_INVALID_NUMBER:${label}`);
 }
@@ -146,14 +146,22 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
   }
 
   private extractRecords(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }): InstitutionalRecord[] {
-    const rawRecords = payload.registros_nuevos_v011;
-    if (!Array.isArray(rawRecords)) throw new Error("BIBLIOTECARIO_V011_RECORDS_COLLECTION_MISSING");
+    const rawRecords = Array.isArray(payload.registros_nuevos_v011)
+      ? payload.registros_nuevos_v011
+      : Array.isArray(payload.registros)
+        ? payload.registros
+        : undefined;
+    if (!rawRecords) throw new Error(`BIBLIOTECARIO_RECORDS_COLLECTION_MISSING:${indexFileId}`);
 
-    return rawRecords.map((raw, position) => {
-      const item = asObject(raw, `registros_nuevos_v011[${position}]`);
-      const state = asString(item.estado, `record[${position}].estado`) as InstitutionalRecord["state"];
+    return rawRecords.flatMap((raw, position) => {
+      const item = asObject(raw, `records[${position}]`);
+      const rawState = asString(item.estado, `record[${position}].estado`);
+      // PROPUESTA is a real source state in V011, but it is not part of the
+      // InstitutionalRecord contract and must never be promoted to retrieval.
+      if (rawState === "PROPUESTA") return [];
+      const state = rawState as InstitutionalRecord["state"];
       const allowedStates: InstitutionalRecord["state"][] = ["VIGENTE", "APROBADO", "REEMPLAZADO", "HISTORICO", "INFERENCIA", "PENDIENTE", "NO_VERIFICADO"];
-      if (!allowedStates.includes(state)) throw new Error(`BIBLIOTECARIO_UNKNOWN_RECORD_STATE:${state}`);
+      if (!allowedStates.includes(state)) throw new Error(`BIBLIOTECARIO_UNKNOWN_RECORD_STATE:${rawState}`);
 
       const projectId = asString(item.proyecto, `record[${position}].proyecto`);
       const title = asString(item.nombre, `record[${position}].nombre`);
@@ -171,5 +179,6 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
         version, state, excerpt: text.slice(0, 500),
       };
     }).filter((record) => record.projectId === input.projectId && (record.state === "VIGENTE" || record.state === "APROBADO"));
+  }
   }
 }
