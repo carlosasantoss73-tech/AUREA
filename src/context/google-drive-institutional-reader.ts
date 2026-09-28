@@ -41,7 +41,11 @@ function asOptionalString(value: unknown): string | undefined {
 
 function asNumber(value: unknown, label: string): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value.trim())) return Number(value);
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
+    if (/^v\d+$/i.test(normalized)) return Number(normalized.slice(1));
+  }
   throw new Error(`BIBLIOTECARIO_V011_INVALID_NUMBER:${label}`);
 }
 
