@@ -60,6 +60,7 @@ jobs:
           workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
           service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
+          token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly
 
       - name: Verify real Google authentication
@@ -72,16 +73,16 @@ jobs:
           echo "Credential exchange: PASS"
 
       - name: Verify Drive access, exact root, read-only capability, and index scope
+        env:
+          DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, subprocess, urllib.error, urllib.request
+          import json, os, urllib.error, urllib.request
 
-          token = subprocess.check_output(
-              ["gcloud", "auth", "application-default", "print-access-token"], text=True
-          ).strip()
+          token = os.environ.get("DRIVE_ACCESS_TOKEN", "").strip()
           if not token:
-              raise SystemExit("NO_ACCESS_TOKEN")
+              raise SystemExit("NO_DRIVE_ACCESS_TOKEN_FROM_AUTH_ACTION")
 
           root_id = os.environ["AUREA_KNOWLEDGE_OS_ROOT_ID"]
           index_id = os.environ["AUREA_KNOWLEDGE_OS_INDEX_ID"]
