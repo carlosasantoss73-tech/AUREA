@@ -103,6 +103,28 @@ jobs:
               root_id,
               "id,name,mimeType,parents,capabilities(canEdit,canDownload,canCopy)"
           )
+
+          def get_permissions(file_id):
+              url = f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions?fields=permissions(id,type,role,permissionDetails)&pageSize=100"
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
+                  print(f"DRIVE_PERMISSIONS_READ_FAILED_HTTP_{exc.code}: {file_id}")
+                  print(body)
+                  raise
+
+          root_permissions = get_permissions(root_id)
+          print("KNOWLEDGE_OS_ROOT_PERMISSION_DIAGNOSTIC_BEGIN")
+          for permission in root_permissions.get("permissions", []):
+              print(json.dumps({
+                  "type": permission.get("type"),
+                  "role": permission.get("role"),
+                  "permissionDetails": permission.get("permissionDetails", []),
+              }, ensure_ascii=False))
+          print("KNOWLEDGE_OS_ROOT_PERMISSION_DIAGNOSTIC_END")
           if root.get("id") != root_id:
               raise SystemExit("KNOWLEDGE_OS_ROOT_ID_MISMATCH")
           if root.get("mimeType") != "application/vnd.google-apps.folder":
