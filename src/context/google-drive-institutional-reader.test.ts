@@ -3,7 +3,7 @@ import { GoogleDriveInstitutionalReader } from "./google-drive-institutional-rea
 
 const index = (fileId: string, previous?: string) => ({
   estado_indice: "VIGENTE",
-  version_indice: previous ? "10" : "11",
+  version_indice: "11",
   indice_anterior: previous
     ? { estado: "REEMPLAZADO", fileId: previous, version: "10" }
     : undefined,
