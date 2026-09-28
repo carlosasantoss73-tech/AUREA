@@ -19,7 +19,7 @@ export interface InstitutionalContextRecord {
   title: string;
   text: string;
   sourceId: string;
-  version: string;
+  version: string | number;
   excerpt?: string;
 }
 
