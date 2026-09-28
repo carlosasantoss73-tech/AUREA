@@ -172,7 +172,7 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       const text = asString(item.descripcion, `record[${position}].descripcion`);
       const sourceId = asString(item.fuente, `record[${position}].fuente`);
       const id = asString(item.id, `record[${position}].id`);
-      const version = asNumber(item.version, `record[${position}].version`);
+      const version = asString(item.version, `record[${position}].version`);
       const location = item.ubicacion;
       const locationObject = location && typeof location === "object" && !Array.isArray(location) ? location as JsonObject : undefined;
       const sourceDocumentId = asOptionalString(locationObject?.fileId);
