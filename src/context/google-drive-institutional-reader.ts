@@ -160,12 +160,11 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return rawRecords.flatMap((raw, position) => {
       const item = asObject(raw, `records[${position}]`);
       const rawState = asString(item.estado, `record[${position}].estado`);
-      // PROPUESTA is a real source state in V011, but it is not part of the
-      // InstitutionalRecord contract and must never be promoted to retrieval.
-      if (rawState === "PROPUESTA") return [];
+      // The institutional source contains additional operational states (for
+      // example PROPUESTA and EN PRUEBA). They are real source values, but they
+      // are outside the retrieval contract and must never be promoted.
+      if (rawState !== "VIGENTE" && rawState !== "APROBADO") return [];
       const state = rawState as InstitutionalRecord["state"];
-      const allowedStates: InstitutionalRecord["state"][] = ["VIGENTE", "APROBADO", "REEMPLAZADO", "HISTORICO", "INFERENCIA", "PENDIENTE", "NO_VERIFICADO"];
-      if (!allowedStates.includes(state)) throw new Error(`BIBLIOTECARIO_UNKNOWN_RECORD_STATE:${rawState}`);
 
       const projectId = asString(item.proyecto, `record[${position}].proyecto`);
       const title = asString(item.nombre, `record[${position}].nombre`);
