@@ -120,6 +120,7 @@ jobs:
           print("KNOWLEDGE_OS_ROOT_PERMISSION_DIAGNOSTIC_BEGIN")
           for permission in root_permissions.get("permissions", []):
               print(json.dumps({
+                  "id": permission.get("id"),
                   "type": permission.get("type"),
                   "role": permission.get("role"),
                   "emailAddress": permission.get("emailAddress"),
