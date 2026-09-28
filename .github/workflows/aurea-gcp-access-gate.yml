@@ -239,6 +239,27 @@ jobs:
           print("Next gate: execute the concrete InstitutionalAuthorityReader against the same live source.")
           PY
 
+      - name: Diagnose live V011 record version shapes
+        env:
+          DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          token="$DRIVE_ACCESS_TOKEN"
+          test -n "$token"
+          raw="$(curl -fsS -H "Authorization: Bearer $token" "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media")"
+          python - <<'PY' <<< "$raw"
+          import json, sys
+          p=json.load(sys.stdin)
+          records=p.get("registros_nuevos_v011") or []
+          print("=== LIVE V011 RECORD VERSION SHAPES ===")
+          for i, item in enumerate(records):
+              if isinstance(item, dict):
+                  value=item.get("version")
+                  print(f"record[{i}].version type={type(value).__name__} value={json.dumps(value, ensure_ascii=False)}")
+          print("=== END LIVE V011 RECORD VERSION SHAPES ===")
+          PY
+
+
       - name: Prepare live institutional reader test scope
         env:
           DRIVE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
