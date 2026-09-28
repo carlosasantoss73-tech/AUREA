@@ -208,7 +208,33 @@ jobs:
           print("=== V011 STRUCTURAL SHAPE (NO VALUES) ===")
           shape(payload)
           print("=== END V011 STRUCTURAL SHAPE ===")
+
+          # Safe authority metadata needed to bind the concrete reader.
+          # Do not print descriptions, titles, document contents, or arbitrary payload values.
+          previous = payload.get("indice_anterior") or {}
+          records = payload.get("registros_nuevos_v011") or []
+          projects = sorted({
+              str(item.get("proyecto"))
+              for item in records
+              if isinstance(item, dict) and item.get("proyecto")
+          })
+          states = sorted({
+              str(item.get("estado"))
+              for item in records
+              if isinstance(item, dict) and item.get("estado")
+          })
+          print("=== V011 AUTHORITY METADATA ===")
+          print(f"V011_VERSION: {payload.get('version_indice')}")
+          print(f"V011_STATE: {payload.get('estado_indice')}")
+          print(f"V011_PREVIOUS_INDEX_ID_PRESENT: {bool(previous.get('fileId'))}")
+          print(f"V011_PREVIOUS_INDEX_ID: {previous.get('fileId') if previous.get('fileId') else 'NONE'}")
+          print(f"V011_TOTAL_RECORDS_DECLARED: {payload.get('total_registros')}")
+          print(f"V011_NEW_RECORDS_COUNT: {len(records)}")
+          print(f"V011_RECORD_PROJECT_IDS: {json.dumps(projects, ensure_ascii=False)}")
+          print(f"V011_RECORD_STATES: {json.dumps(states, ensure_ascii=False)}")
+          print("=== END V011 AUTHORITY METADATA ===")
+
           print("KNOWLEDGE_OS_V011_CONTENT_READ: PASS")
           print("V011_CONTENT_PROBE: PASS")
-          print("Next gate: implement the institutional reader only from this observed payload shape; no inferred fields.")
+          print("Next gate: execute the concrete InstitutionalAuthorityReader against the same live source.")
           PY
