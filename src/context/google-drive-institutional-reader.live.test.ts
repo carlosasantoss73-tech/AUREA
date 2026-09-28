@@ -45,5 +45,5 @@ describe("LIVE Bibliotecario / Knowledge OS reader", () => {
       PROJECT_SCOPE: liveConfig.projectId,
       PROVENANCE_BOUNDARY: "INSTITUTIONAL_CONTEXT_PROVIDER_REQUIRED",
     }));
-  });
+  }, 30_000);
 });
