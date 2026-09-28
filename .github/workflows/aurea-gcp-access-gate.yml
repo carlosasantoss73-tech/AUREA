@@ -119,14 +119,32 @@ jobs:
           root_permissions = get_permissions(root_id)
           print("KNOWLEDGE_OS_ROOT_PERMISSION_DIAGNOSTIC_BEGIN")
           for permission in root_permissions.get("permissions", []):
-              print(json.dumps({
+              item = {
                   "id": permission.get("id"),
                   "type": permission.get("type"),
                   "role": permission.get("role"),
                   "emailAddress": permission.get("emailAddress"),
                   "displayName": permission.get("displayName"),
                   "permissionDetails": permission.get("permissionDetails", []),
-              }, ensure_ascii=False))
+              }
+              permission_id = permission.get("id")
+              if permission_id:
+                  detail_url = f"https://www.googleapis.com/drive/v3/files/{root_id}/permissions/{permission_id}?fields=id,type,role,emailAddress,displayName,permissionDetails"
+                  detail_req = urllib.request.Request(detail_url, headers=headers)
+                  try:
+                      with urllib.request.urlopen(detail_req, timeout=30) as response:
+                          detail = json.load(response)
+                      item["detail"] = {
+                          "id": detail.get("id"),
+                          "type": detail.get("type"),
+                          "role": detail.get("role"),
+                          "emailAddress": detail.get("emailAddress"),
+                          "displayName": detail.get("displayName"),
+                          "permissionDetails": detail.get("permissionDetails", []),
+                      }
+                  except urllib.error.HTTPError as exc:
+                      item["detail_error"] = exc.code
+              print(json.dumps(item, ensure_ascii=False))
           print("KNOWLEDGE_OS_ROOT_PERMISSION_DIAGNOSTIC_END")
           if root.get("id") != root_id:
               raise SystemExit("KNOWLEDGE_OS_ROOT_ID_MISMATCH")
