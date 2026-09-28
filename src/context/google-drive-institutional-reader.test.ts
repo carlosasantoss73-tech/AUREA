@@ -110,6 +110,44 @@ describe("Google Drive institutional reader", () => {
     });
   });
 
+
+
+  it("does not require the V011 record collection on a historical index", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        current: {
+          estado_indice: "VIGENTE",
+          version_indice: "v011",
+          indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v010" },
+          registros_nuevos_v011: [{
+            id: "proposal",
+            proyecto: "XOLAR",
+            nombre: "Propuesta",
+            descripcion: "Propuesta no recuperable.",
+            fuente: "KNOWLEDGE_OS",
+            estado: "PROPUESTA",
+            version: "v1",
+          }],
+        },
+        previous: {
+          estado_indice: "REEMPLAZADO",
+          version_indice: "v010",
+          indice_anterior: undefined,
+        },
+      }),
+    });
+
+    const records = await reader.readRecords("current", {
+      projectId: "XOLAR",
+      query: "",
+      traceId: "trace-4",
+    });
+
+    expect(records).toHaveLength(0);
+  });
+
   it("fails closed when the index is writable", async () => {
     const reader = new GoogleDriveInstitutionalReader({
       indexFileId: "current",
