@@ -2,9 +2,6 @@ name: AUREA GCP Access Gate
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -13,7 +10,6 @@ permissions:
 env:
   AUREA_KNOWLEDGE_OS_ROOT_ID: 1LII_NQoow-zcR_iGECRiA6cVS4VOBXLm
   AUREA_KNOWLEDGE_OS_INDEX_ID: 1kIzswJSMKzQOpf8z6j8iDvfxhq26ZvXa
-  AUREA_GCP_PROJECT_ID: aurea-509918
 
 jobs:
   gcp-access-gate:
@@ -72,13 +68,6 @@ jobs:
           token="$(gcloud auth application-default print-access-token)"
           test -n "$token"
           echo "Credential exchange: PASS"
-
-      - name: Enable required Google Drive API
-        run: |
-          set -euo pipefail
-          echo "Checking/enabling drive.googleapis.com in project $AUREA_GCP_PROJECT_ID"
-          gcloud services enable drive.googleapis.com --project="$AUREA_GCP_PROJECT_ID"
-          echo "DRIVE_API_ENABLEMENT: PASS"
 
       - name: Verify Drive access, exact root, read-only capability, and index scope
         env:
