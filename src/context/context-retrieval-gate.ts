@@ -2,7 +2,7 @@
 import { evaluatePermission, PermissionRequest } from "../security/permission-gateway";
 
 export type ContextRetrievalStatus = "NOT_NEEDED" | "READY" | "EMPTY" | "BLOCKED";
-export interface ContextCitation { sourceId: string; documentId?: string; version?: number; title?: string; excerpt?: string; provenance?: "LOCAL_SEED" | "INSTITUTIONAL"; }
+export interface ContextCitation { sourceId: string; documentId?: string; version?: string; title?: string; excerpt?: string; provenance?: "LOCAL_SEED" | "INSTITUTIONAL"; }
 export interface RetrievedContext { query: string; projectId: string; citations: ContextCitation[]; facts: string[]; }
 export interface ContextRetrievalResult { traceId: string; status: ContextRetrievalStatus; reason: string; context?: RetrievedContext; }
 export interface ContextProvider { retrieve(input: { projectId: string; query: string; traceId: string }): Promise<RetrievedContext>; }
