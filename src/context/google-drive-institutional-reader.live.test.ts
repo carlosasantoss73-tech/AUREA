@@ -63,7 +63,7 @@ describe("LIVE Bibliotecario / Knowledge OS reader", () => {
         actorId: "live-bib-08",
         actorRole: "system",
         projectId: liveConfig.projectId,
-        query: "continuar",
+        query: "",
         institutionalOnly: true,
       });
       expect(result.status).toBe("READY");
