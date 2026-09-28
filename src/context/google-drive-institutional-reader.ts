@@ -181,5 +181,4 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       };
     }).filter((record) => record.projectId === input.projectId && (record.state === "VIGENTE" || record.state === "APROBADO"));
   }
-  }
 }
