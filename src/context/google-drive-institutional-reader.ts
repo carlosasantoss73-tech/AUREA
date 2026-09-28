@@ -44,7 +44,7 @@ function asNumber(value: unknown, label: string): number {
   if (typeof value === "string") {
     const normalized = value.trim();
     if (/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
-    const versionMatch = normalized.match(/^v(\d+)/i);
+    const versionMatch = normalized.match(/^(?:v)?(\d+)(?:\.\d+)*(?:\s*\([^)]*\))?$/i);
     if (versionMatch) return Number(versionMatch[1]);
   }
   throw new Error(`BIBLIOTECARIO_V011_INVALID_NUMBER:${label}`);
