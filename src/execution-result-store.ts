@@ -1,7 +1,7 @@
 /** Durable store contract for execution idempotency and recovery. */
 import type { ExecutionRuntimeResult } from "./execution-runtime.js";
 
-export type ExecutionReservationStatus = "RESERVED" | "COMPLETED";
+export type ExecutionReservationStatus = "RESERVED" | "COMPLETED" | "BLOCKED";
 
 export interface ExecutionResultStoreState {
   completed: ExecutionRuntimeResult[];
@@ -29,7 +29,7 @@ export class InMemoryExecutionResultStore implements ExecutionResultStore {
 
   async reserve(traceId: string): Promise<ExecutionReservationStatus> {
     if (this.results.has(traceId)) return "COMPLETED";
-    if (this.reservations.has(traceId)) return "RESERVED";
+    if (this.reservations.has(traceId)) return "BLOCKED";
     this.reservations.add(traceId);
     return "RESERVED";
   }
