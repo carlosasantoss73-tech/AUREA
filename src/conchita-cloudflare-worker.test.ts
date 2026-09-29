@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import worker from './conchita-cloudflare-worker.js';
+import worker, { ConchitaExecutionStateDurableObject } from './conchita-cloudflare-worker.js';
 
-type Stored = Record<string, unknown>;
 class FakeKv {
   private readonly data = new Map<string, string>();
   async get<T>(key: string, type: 'json'): Promise<T | null> {
@@ -14,9 +13,34 @@ class FakeKv {
   dump(): Record<string, string> { return Object.fromEntries(this.data.entries()); }
 }
 
-function env(kv: FakeKv) {
+function fakeSql() {
+  const results = new Map<string, string>();
+  const reservations = new Set<string>();
+  return {
+    exec(sql: string, ...bindings: unknown[]) {
+      const traceId = String(bindings[0] ?? '');
+      if (sql.startsWith('CREATE TABLE')) return { toArray: <T>() => [] as T[] };
+      if (sql.includes('SELECT result_json')) return { toArray: <T>() => [...results.values()].map(result_json => ({ result_json }) as T) };
+      if (sql.includes('SELECT trace_id FROM execution_results')) return { toArray: <T>() => results.has(traceId) ? [{ trace_id: traceId } as T] : [] };
+      if (sql.includes('SELECT trace_id FROM execution_reservations')) return { toArray: <T>() => reservations.has(traceId) ? [{ trace_id: traceId } as T] : [] };
+      if (sql.startsWith('INSERT INTO execution_reservations')) { reservations.add(traceId); return { toArray: <T>() => [] as T[] }; }
+      if (sql.startsWith('INSERT OR REPLACE INTO execution_results')) { results.set(traceId, String(bindings[1])); return { toArray: <T>() => [] as T[] }; }
+      if (sql.startsWith('DELETE FROM execution_reservations')) { reservations.delete(traceId); return { toArray: <T>() => [] as T[] }; }
+      throw new Error(`unexpected SQL: ${sql}`);
+    },
+  };
+}
+
+function fakeExecutionState() {
+  const object = new ConchitaExecutionStateDurableObject({ storage: { sql: fakeSql() } });
+  const stub = { fetch: (input: RequestInfo | URL, init?: RequestInit) => object.fetch(new Request(String(input), init)) };
+  return { idFromName: (_name: string) => 'execution-state', get: (_id: unknown) => stub };
+}
+
+function env(kv: FakeKv, executionState = fakeExecutionState()) {
   return {
     CONCHITA_SESSIONS: kv,
+    CONCHITA_EXECUTION_STATE: executionState,
     CONCHITA_ANTHROPIC_MODEL: 'claude-sonnet-5',
     ANTHROPIC_API_KEY: 'test-secret',
     CONCHITA_PILOT_USER_ID: 'pilot-user',
@@ -49,9 +73,10 @@ describe('Conchita Cloudflare pilot worker', () => {
 
   it('runs phone-shaped message through gate, admission, provider and execution', async () => {
     const kv = new FakeKv();
+    const runtimeEnv = env(kv);
     const sessionResponse = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
       method: 'POST', headers: { Origin: 'https://pilot.example', Authorization: 'Bearer pilot-token' },
-    }), env(kv));
+    }), runtimeEnv);
     const session = await sessionResponse.json() as { sessionId: string };
 
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hola desde Claude' }] }), { status: 200, headers: { 'Content-Type': 'application/json', 'request-id': 'req_test_123' } })));
@@ -59,7 +84,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
       method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), env(kv));
+    }), runtimeEnv);
 
     expect(response.status).toBe(200);
     const body = await response.json() as { status: string; response: string; evidence: string[]; traceId: string };
@@ -71,7 +96,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     const second = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
       method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), env(kv));
+    }), runtimeEnv);
     const replay = await second.json() as { status: string; traceId: string; response: string; evidence: string[] };
     expect(second.status).toBe(200);
     expect(replay.status).toBe('COMPLETED');
