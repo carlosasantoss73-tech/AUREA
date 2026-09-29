@@ -1,7 +1,7 @@
 /** Durable store contract for execution idempotency and recovery. */
 import type { ExecutionRuntimeResult } from "./execution-runtime.js";
 
-export type ExecutionReservationStatus = "RESERVED" | "COMPLETED";
+export type ExecutionReservationStatus = "RESERVED" | "COMPLETED" | "BLOCKED";
 
 export interface ExecutionResultStoreState {
   completed: ExecutionRuntimeResult[];
