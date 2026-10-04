@@ -13,6 +13,8 @@ jobs:
   live-a2a:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      AUREA_LIVE_A2A: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
