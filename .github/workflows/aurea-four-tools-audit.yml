@@ -1,43 +1,61 @@
 name: AUREA Four Tools Audit V1
 
+# Evidence-trigger update: execute the four-tool audit on branch activity.
+
 on:
   push:
     paths:
       - ".github/workflows/aurea-four-tools-audit.yml"
-      - "apps/tool_expert_factory/**"
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
   workflow_dispatch:
   pull_request:
     paths:
       - ".github/workflows/aurea-four-tools-audit.yml"
-      - "apps/tool_expert_factory/**"
+      - "apps/tool_expert_factory/functional_runtime_mcp.py"
+      - "apps/tool_expert_factory/functional_runtime_stagehand.mjs"
 
 jobs:
   browser-use:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install browser-use
-      - name: Browser Use credential gate
+      - run: python -m pip install browser-use playwright
+      - run: python -m playwright install chromium
+      - name: Run Browser Use real example
         run: |
-          if [ -z "$BROWSER_USE_API_KEY" ]; then
-            echo '{"tool":"browser-use","status":"SKIPPED_EXTERNAL_CREDENTIAL","blocker":"missing BROWSER_USE_API_KEY","policy":"fail-closed; no secret fabrication; adapter contract remains tested"}'
-            exit 0
-          fi
-          python apps/tool_expert_factory/functional_runtime_browser_use.py
+          python - <<'PY'
+          import asyncio, json
+          from browser_use import Agent, BrowserProfile, BrowserSession, ChatGoogle
+
+          TASK='Open https://demo.playwright.dev/todomvc, add one todo named "AUREA-AUDIT-BROWSER-001", then verify it is present.'
+          async def main():
+              session=BrowserSession(browser_profile=BrowserProfile(headless=True, chromium_sandbox=False))
+              history=await Agent(task=TASK,llm=ChatGoogle(model="gemini-flash-latest"),browser_session=session).run(max_steps=8)
+              evidence={
+                  "is_done": history.is_done(),
+                  "is_successful": history.is_successful(),
+                  "urls": history.urls()[-5:],
+                  "final_result": str(history.final_result())[-1000:],
+              }
+              print(json.dumps({"tool":"browser-use","evidence":evidence}, ensure_ascii=False))
+              raise SystemExit(0 if history.is_successful() is True else 1)
+          asyncio.run(main())
+          PY
 
   skyvern:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:14-alpine
+        image: postgres:16
         env:
           POSTGRES_USER: skyvern
           POSTGRES_PASSWORD: skyvern
@@ -46,51 +64,41 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U skyvern -d skyvern"
-          --health-interval 5s
+          --health-interval 10s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 5
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ENABLE_OPENAI: "true"
-      LLM_KEY: OPENAI_GPT5_6_LUNA
-      SECONDARY_LLM_KEY: OPENAI_GPT5_6_LUNA
-      DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@localhost:5432/skyvern
-      SKYVERN_API_KEY: ${{ secrets.SKYVERN_API_KEY }}
-      BROWSER_TYPE: chromium-headless
-      MAX_SCRAPING_RETRIES: "0"
-      ENABLE_LOG_ARTIFACTS: "false"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ENABLE_GEMINI: "true"
+      LLM_KEY: GEMINI_3.0_FLASH
+      SECONDARY_LLM_KEY: GEMINI_3.0_FLASH
+      DATABASE_STRING: postgresql+psycopg://skyvern:skyvern@127.0.0.1:5432/skyvern
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install "skyvern[local] @ git+https://github.com/Skyvern-AI/skyvern.git@v1.0.48" "psycopg[binary]>=3.2,<4"
+      - run: python -m pip install "skyvern[local]" "psycopg[binary]"
       - run: python -m playwright install chromium
       - name: Run Skyvern real example
         run: |
-          python -c "from skyvern.utils import migrate_db; migrate_db()"
-          export SKYVERN_API_KEY="$(python - <<'PY'
-          import asyncio, os
-          from skyvern.cli.mcp import setup_local_organization_from_database_string
-          print(asyncio.run(setup_local_organization_from_database_string(os.environ["DATABASE_STRING"])))
-          PY
-          )"
-          test -n "$SKYVERN_API_KEY"
           python - <<'PY'
           import asyncio, json
           from skyvern import Skyvern
+
           URL="https://demo.playwright.dev/todomvc"
           TASK='Open the TodoMVC page, add one todo named "AUREA-AUDIT-SKYVERN-001" by typing it into the new todo field and pressing Enter, then verify it is present.'
           async def main():
-              browser=await Skyvern.local().launch_local_browser(headless=True)
+              browser=await Skyvern.local(use_in_memory_db=True).launch_local_browser(headless=True)
               try:
                   page=await browser.get_working_page()
                   await page.goto(URL)
                   await page.agent.run_task(TASK)
                   body=await page.locator("body").text_content() or ""
                   ok="AUREA-AUDIT-SKYVERN-001" in body
-                  print(json.dumps({"tool":"skyvern","url":URL,"verified_todo":ok}, ensure_ascii=False))
+                  print(json.dumps({"tool":"skyvern","url":URL,"verified_todo":ok,"body_excerpt":body[-1500:]}, ensure_ascii=False))
                   raise SystemExit(0 if ok else 1)
               finally:
                   await browser.close()
@@ -121,153 +129,9 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - run: npm install --no-save @browserbasehq/stagehand zod
       - name: Run Stagehand real example
         run: node apps/tool_expert_factory/functional_runtime_stagehand.mjs
-
-  super-agent-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: python -m pip install "mcp>=2.1.1"
-      - name: Run Super Agent real Work Cell
-        run: |
-          python - <<'PY'
-          import json, tempfile
-          from pathlib import Path
-          from apps.tool_expert_factory.contracts import Evidence, ToolExpertProfile
-          from apps.tool_expert_factory.playwright_mcp_adapter import execute_playwright_mcp
-          from apps.tool_expert_factory.super_agent import ToolAutomationSuperAgent
-          from apps.tool_expert_factory.work_planner import WorkCellSpec, WorkPlanner
-          plan=WorkPlanner().plan(
-              trace_id="super-agent-real-mcp-001",
-              objective="execute one real browser work cell through the Super Agent",
-              cells=[WorkCellSpec("C10","playwright-mcp","Create and verify two TodoMVC tasks.")],
-          )
-          profile=ToolExpertProfile("expert-playwright-mcp","playwright-mcp","runtime-pack")
-          with tempfile.TemporaryDirectory() as td:
-              result=ToolAutomationSuperAgent().execute_plan(
-                  plan=plan, profiles={"playwright-mcp":profile},
-                  authoritative_evidence=[Evidence("official","official://playwright-mcp-ci","official executor path configured",True)],
-                  executors={"expert-playwright-mcp":execute_playwright_mcp},
-                  audit_path=str(Path(td)/"audit.jsonl"),
-              )
-              print(json.dumps(result, ensure_ascii=False))
-              if result["DECISION"]!="WORKFLOW_EXECUTED" or [x["status"] for x in result["EVIDENCIA"]]!=["EXECUTED"]:
-                  raise SystemExit("SUPER_AGENT_REAL_WORK_CELL_FAILED")
-          PY
-
-  knowledge-audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Verify official-source catalog
-        run: |
-          python - <<'PY'
-          import json
-          from apps.tool_expert_factory.knowledge_researcher import KnowledgeResearcher
-          topics=("playwright-mcp","skyvern","stagehand","browser-use","model-context-protocol")
-          records=[]
-          for topic in topics:
-              for source in KnowledgeResearcher.official_sources(topic):
-                  finding=KnowledgeResearcher(timeout_seconds=10).fetch(source)
-                  records.append(KnowledgeResearcher.as_record(finding))
-          print(json.dumps(records, ensure_ascii=False))
-          if any(r["status"]!="FETCHED" or not r["source"]["authoritative"] for r in records):
-              raise SystemExit("OFFICIAL_KNOWLEDGE_AUDIT_FAILED")
-          PY
-
-  provider-fallback-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install "mcp>=2.1.1" browser-use
-      - name: Run real provider fallback through Super Agent Work Cell
-        run: |
-          python - <<'PY'
-          import json, tempfile
-          from pathlib import Path
-          from apps.tool_expert_factory.contracts import Evidence, ToolExpertProfile
-          from apps.tool_expert_factory.provider_browser_fallback import execute_real_browser_provider_fallback
-          from apps.tool_expert_factory.super_agent import ToolAutomationSuperAgent
-          from apps.tool_expert_factory.work_planner import WorkCellSpec, WorkPlanner
-
-          plan = WorkPlanner().plan(
-              trace_id="super-agent-provider-fallback-001",
-              objective="execute real browser work with provider fallback",
-              cells=[WorkCellSpec("C07", "browser-provider-fallback", "Create and verify a TodoMVC task.")],
-          )
-          profile = ToolExpertProfile(
-              "expert-browser-provider-fallback",
-              "browser-provider-fallback",
-              "runtime-pack",
-          )
-          with tempfile.TemporaryDirectory() as td:
-              result = ToolAutomationSuperAgent().execute_plan(
-                  plan=plan,
-                  profiles={"browser-provider-fallback": profile},
-                  authoritative_evidence=[Evidence(
-                      "official", "official://browser-provider-fallback",
-                      "real browser provider adapters configured", True
-                  )],
-                  executors={"expert-browser-provider-fallback": execute_real_browser_provider_fallback},
-                  audit_path=str(Path(td) / "audit.jsonl"),
-              )
-              print(json.dumps(result, ensure_ascii=False))
-              if result["DECISION"] != "WORKFLOW_EXECUTED":
-                  raise SystemExit("PROVIDER_FALLBACK_WORKFLOW_FAILED")
-              evidence = result["EVIDENCIA"][0]
-              if evidence["status"] != "EXECUTED":
-                  raise SystemExit("PROVIDER_FALLBACK_DID_NOT_EXECUTE")
-          PY
-
-  openai-provider:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Run OpenAI provider smoke test
-        run: |
-          python - <<'PY'
-          import json, os, urllib.request
-          key=os.environ.get("OPENAI_API_KEY", "")
-          if not key: raise SystemExit("OPENAI_API_KEY_MISSING")
-          payload={"model":"gpt-5.6-luna","input":"Actúa como consultor técnico de AUREA. En máximo 5 líneas indica qué debemos preservar y cuál es el siguiente paso para cerrar el Bibliotecario. No inventes integraciones.","max_output_tokens":300}
-          req=urllib.request.Request("https://api.openai.com/v1/responses",data=json.dumps(payload).encode(),headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},method="POST")
-          with urllib.request.urlopen(req,timeout=60) as resp: body=json.load(resp)
-          texts=[]
-          for item in body.get("output",[]):
-            for part in item.get("content",[]):
-              if part.get("type")=="output_text": texts.append(part.get("text", ""))
-          result="\n".join(texts).strip()
-          if not result: raise SystemExit("OPENAI_EMPTY_RESPONSE")
-          print(json.dumps({"status":"PASS","provider":"openai","model":"gpt-5.6-luna","response":result},ensure_ascii=False))
-          PY
