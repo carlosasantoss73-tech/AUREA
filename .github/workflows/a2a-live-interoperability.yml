@@ -25,4 +25,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Execute live A2A interoperability test
+        env:
+          AUREA_LIVE_A2A: "1"
         run: npm test -- --run tests/aurea-a2a-live.interop.test.ts
