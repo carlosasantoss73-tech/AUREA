@@ -91,7 +91,12 @@ jobs:
               raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
 
           response = drive.files().get(fileId=index_id, alt="media").execute()
-          raw = response.decode("utf-8") if isinstance(response, bytes) else response
+          if isinstance(response, bytes):
+              raw = response.decode("utf-8")
+          elif isinstance(response, str):
+              raw = response
+          else:
+              raw = json.dumps(response, ensure_ascii=False, sort_keys=True)
 
           digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
           print(f"V011_CONTENT_SHA256: {digest}")
