@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - "test/live-provider-fallback-smoke"
+  pull_request:
+    branches:
+      - "main"
 
 jobs:
   live-provider-fallback:
