@@ -46,6 +46,9 @@ describe("A2A live interoperability", () => {
       ],
     });
 
+    if (result.status !== "COMPLETED") {
+      throw new Error(`A2A_LIVE_BLOCKED ${JSON.stringify(result.evidence)}`);
+    }
     expect(result.status).toBe("COMPLETED");
     expect(result.result).toBeTruthy();
     expect(result.evidence).toContain("A2A_VERSION:1.0");
