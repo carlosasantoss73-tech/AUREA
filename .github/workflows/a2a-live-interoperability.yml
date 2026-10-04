@@ -3,7 +3,7 @@ name: A2A Live Interoperability
 on:
   push:
     branches:
-      - feat/a2a-live-interoperability
+      - main
   pull_request:
     branches:
       - main
