@@ -46,6 +46,7 @@ describe("A2A live interoperability", () => {
       ],
     });
 
+    console.log("A2A_LIVE_DIAGNOSTIC", JSON.stringify({ status: result.status, blockers: result.blockers, evidence: result.evidence }));
     expect(result.status).toBe("COMPLETED");
     expect(result.result).toBeTruthy();
     expect(result.evidence).toContain("A2A_VERSION:1.0");
