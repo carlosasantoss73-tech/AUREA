@@ -2,6 +2,9 @@ name: AUREA Controlled Live Provider Fallback Smoke
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "test/live-provider-fallback-smoke"
 
 jobs:
   live-provider-fallback:
