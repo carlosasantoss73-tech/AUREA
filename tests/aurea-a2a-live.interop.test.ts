@@ -19,7 +19,6 @@ describe("A2A live interoperability", () => {
       cellId: "aurea-live-a2a-interop",
       providerId: discovered.agentName ?? "public-a2a-agent",
       endpoint: discovered.endpoint,
-      tenant: discovered.tenant,
     });
 
     const runtime = new ExternalCodeCellRuntime();
