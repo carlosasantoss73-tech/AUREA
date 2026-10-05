@@ -6,8 +6,7 @@
   "workers_dev": true,
   "kv_namespaces": [
     {
-      "binding": "CONCHITA_SESSIONS",
-      "id": "REPLACE_WITH_CONCHITA_SESSIONS_NAMESPACE_ID"
+      "binding": "CONCHITA_SESSIONS"
     }
   ],
   "durable_objects": {
