@@ -96,7 +96,7 @@ async function executeA2AMission(
 
   const sendEndpoint = new URL(
     "message:send",
-    endpoint.toString().replace(/\\/$/, "") + "/",
+    endpoint.toString().replace(/\/$/, "") + "/",
   );
   const response = await fetchImpl(sendEndpoint, {
     method: "POST",
