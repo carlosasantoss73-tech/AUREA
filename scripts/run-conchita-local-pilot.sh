@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="\${AUREA_PILOT_URL:-http://localhost:8787}"
-TIMEOUT_SECONDS="\${CONCHITA_HEALTH_TIMEOUT_SECONDS:-60}"
-ROOT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
+BASE_URL="${AUREA_PILOT_URL:-http://localhost:8787}"
+TIMEOUT_SECONDS="${CONCHITA_HEALTH_TIMEOUT_SECONDS:-60}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 command -v node >/dev/null 2>&1 || { echo "BLOCKED: node is required." >&2; exit 2; }
@@ -46,7 +46,7 @@ while (( SECONDS < deadline )); do
 done
 
 if [[ "$healthy" != "true" ]]; then
-  echo "BLOCKED: Conchita pilot did not become HEALTHY within \${TIMEOUT_SECONDS}s." >&2
+  echo "BLOCKED: Conchita pilot did not become HEALTHY within ${TIMEOUT_SECONDS}s." >&2
   [[ -f "$LOG_FILE" ]] && tail -n 80 "$LOG_FILE"
   exit 3
 fi
