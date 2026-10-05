@@ -94,7 +94,11 @@ async function executeA2AMission(
     },
   };
 
-  const response = await fetchImpl(endpoint, {
+  const sendEndpoint = new URL(
+    "message:send",
+    endpoint.toString().replace(/\\/$/, "") + "/",
+  );
+  const response = await fetchImpl(sendEndpoint, {
     method: "POST",
     headers: {
       "content-type": "application/a2a+json",
