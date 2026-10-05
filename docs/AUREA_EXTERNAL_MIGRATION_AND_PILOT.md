@@ -28,7 +28,17 @@ Variables: CONCHITA_ANTHROPIC_MODEL, CONCHITA_PILOT_USER_ID, CONCHITA_ALLOWED_OR
 Secrets: ANTHROPIC_API_KEY, CONCHITA_PILOT_BOOTSTRAP_TOKEN.
 
 ## Ejecución local
-Desde la raíz:
+Ruta recomendada de mínima fricción en Windows:
+
+1. Copiar .dev.vars.example a .dev.vars.
+2. Completar localmente ANTHROPIC_API_KEY y CONCHITA_PILOT_BOOTSTRAP_TOKEN.
+3. Ejecutar desde la raíz:
+
+powershell -ExecutionPolicy Bypass -File .\scripts\run-conchita-local-pilot.ps1
+
+El runner instala dependencias, inicia Wrangler localmente, espera HEALTHY, ejecuta el piloto existente y detiene Wrangler al finalizar. No sustituye la evidencia real: el resultado debe conservarse fuera del chat.
+
+Ruta manual, si se necesita diagnóstico:
 npm install
 npx wrangler --version
 npx wrangler dev
