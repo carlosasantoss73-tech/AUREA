@@ -21,6 +21,15 @@ if (-not (Test-Path ".dev.vars")) {
   throw "BLOCKED: .dev.vars is missing. Copy .dev.vars.example to .dev.vars and add the local secrets."
 }
 
+$bootstrapTokenLine = Get-Content ".dev.vars" | Where-Object { $_ -match '^\s*CONCHITA_PILOT_BOOTSTRAP_TOKEN\s*=' } | Select-Object -First 1
+if (-not $bootstrapTokenLine) {
+  throw "BLOCKED: CONCHITA_PILOT_BOOTSTRAP_TOKEN is missing from .dev.vars."
+}
+$env:CONCHITA_PILOT_BOOTSTRAP_TOKEN = ($bootstrapTokenLine -replace '^\s*CONCHITA_PILOT_BOOTSTRAP_TOKEN\s*=\s*', '').Trim().Trim('"').Trim("'")
+if ([string]::IsNullOrWhiteSpace($env:CONCHITA_PILOT_BOOTSTRAP_TOKEN)) {
+  throw "BLOCKED: CONCHITA_PILOT_BOOTSTRAP_TOKEN is empty in .dev.vars."
+}
+
 Write-Host "== 1. INSTALL =="
 npm install
 
