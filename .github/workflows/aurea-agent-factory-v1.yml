@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - "feat/aurea-agent-factory-v1"
+      - "feat/aurea-procurement-v1"
+  pull_request:
+    branches:
+      - "feat/aurea-agent-factory-v1"
 
 permissions:
   contents: read
