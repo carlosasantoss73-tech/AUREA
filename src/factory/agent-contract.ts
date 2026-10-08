@@ -1,20 +1,9 @@
 export type AgentLifecycleState =
-  | "DRAFT"
-  | "DEVELOPMENT"
-  | "TESTING"
-  | "VALIDATED"
-  | "STAGED"
-  | "PRODUCTION"
-  | "DEPRECATED"
-  | "RETIRED";
+  | "DRAFT" | "DEVELOPMENT" | "TESTING" | "VALIDATED"
+  | "STAGED" | "PRODUCTION" | "DEPRECATED" | "RETIRED";
 
 export type EvidenceKind =
-  | "SOURCE"
-  | "RULE"
-  | "CALCULATION"
-  | "VALIDATION"
-  | "RESULT"
-  | "DECISION";
+  | "SOURCE" | "RULE" | "CALCULATION" | "VALIDATION" | "RESULT" | "DECISION";
 
 export interface AgentManifest {
   agentId: string;
@@ -71,7 +60,7 @@ export function validateAgentManifest(manifest: AgentManifest): string[] {
       blockers.push(`MANIFEST_MISSING:${key}`);
     }
   }
-  if (!/^\\d+\\.\\d+\\.\\d+$/.test(manifest.version)) {
+  if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) {
     blockers.push("MANIFEST_INVALID_VERSION");
   }
   return blockers;
