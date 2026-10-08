@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { buildRadarOpportunity } from "./aurea-radar";
+describe("AUREA Radar",()=>{ it("requires evidence",()=>{expect(()=>buildRadarOpportunity({id:"x",title:"Reusable",category:"SKILL",evidence:[{sourceId:"s",sourceType:"VIDEO",capturedAt:"2026-08-29T17:50:00-05:00",claims:["claim"],verified:true}],reuseTargets:["skill-registry"],disposition:"INTEGRATE",rationale:"Evidence-backed",confidence:"HIGH"})).not.toThrow();}); it("rejects no evidence",()=>{expect(()=>buildRadarOpportunity({id:"x",title:"Unverified",category:"OTHER",evidence:[],reuseTargets:[],disposition:"WATCH",rationale:"Needs verification",confidence:"LOW"})).toThrow("RADAR_EVIDENCE_REQUIRED");});});
