@@ -1,5 +1,3 @@
-import type { } from "./agent-contract.js";
-
 export type EvaluationState =
   | "COMPLIANT"
   | "NON_COMPLIANT"
