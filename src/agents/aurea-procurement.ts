@@ -117,6 +117,7 @@ export interface ProcurementEvidence {
   documentId: string;
   location: string;
   excerpt: string;
+  preExisting: boolean;
 }
 
 export interface ProcurementFinding {
@@ -204,7 +205,7 @@ export function evaluateProcurementRequirements(
         id.startsWith(item.documentId + ":" + item.location + ":"),
       ),
     ),
-    reasoning: comparison.rationale,
+    reasoning: comparison.rationale + (result.blockers.some(blocker => blocker.startsWith("POST_OFFER_EVIDENCE:" + comparison.requirementId + ":")) ? " Post-offer evidence was excluded by the Factory engine." : ""),
     correction: comparison.correction,
   }));
 }
