@@ -7,7 +7,8 @@
 | Provider-neutral routing | src/factory/provider-router.ts | Reasoning/provider selection | REUSE |
 | White Label | src/factory/white-label.ts | Client-specific branding | REUSE |
 | Tool contract | src/factory/tool-contract.ts | Document/SOCE/normative tools | REUSE |
-| Deterministic engine | src/factory/deterministic-engine.ts | Extend only for procurement comparisons | EXTEND |
+| Deterministic survey engine | src/factory/deterministic-engine.ts | Survey-specific calculation | NOT USED |
+| Deterministic evaluation engine | src/factory/evaluation-engine.ts | Requirement/evidence comparison | REUSE |
 | Factory validation | src/factory/agent-factory.ts | Package readiness | REUSE |
 | Tenant configuration | Agent Contract TenantConfig | Client isolation | REUSE |
 | Domain rules | AUREA Procurement | Ecuadorian procurement | CREATE |
