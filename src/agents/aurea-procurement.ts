@@ -136,3 +136,75 @@ export const PROCUREMENT_EVALUATION_SEQUENCE = [
   "CONVALIDABILIDAD",
   "CONCLUSION",
 ] as const;
+
+
+import {
+  DeterministicEvaluationEngine,
+  type EvaluationComparison,
+  type EvaluationEvidence,
+  type EvaluationRequirement,
+  type EvaluationState,
+} from "../factory/evaluation-engine.js";
+
+const PROCUREMENT_STATE_MAP: Record<EvaluationState, ProcurementFindingState> = {
+  COMPLIANT: "CUMPLE",
+  NON_COMPLIANT: "NO_CUMPLE",
+  CONVALIDABLE: "CONVALIDABLE",
+  NOT_APPLICABLE: "NO_APLICA",
+  HUMAN_REVIEW: "REVISION_HUMANA",
+};
+
+export function evaluateProcurementRequirements(
+  requirements: ProcurementRequirement[],
+  evidence: ProcurementEvidence[],
+  compare: (
+    requirement: ProcurementRequirement,
+    evidence: ProcurementEvidence[],
+  ) => EvaluationComparison,
+): ProcurementFinding[] {
+  const engine = new DeterministicEvaluationEngine();
+
+  const evaluationRequirements: EvaluationRequirement[] = requirements.map(requirement => ({
+    id: requirement.id,
+    description: requirement.description,
+    mandatory: requirement.mandatory,
+  }));
+
+  const evaluationEvidence: EvaluationEvidence[] = evidence.map((item, index) => ({
+    id: item.documentId + ":" + item.location + ":" + index,
+    requirementId: item.requirementId,
+    source: item.documentId,
+    documentId: item.documentId,
+    location: item.location,
+    value: item.excerpt,
+    preExisting: item.preExisting,
+  }));
+
+  const result = engine.evaluate(
+    { requirements: evaluationRequirements, evidence: evaluationEvidence },
+    (requirement, usableEvidence) => {
+      const procurementRequirement = requirements.find(item => item.id === requirement.id)!;
+      const procurementEvidence = usableEvidence.map(item =>
+        evidence.find(source =>
+          source.requirementId === item.requirementId &&
+          source.documentId === item.documentId &&
+          source.location === item.location &&
+          source.excerpt === item.value,
+        )!,
+      );
+      return compare(procurementRequirement, procurementEvidence);
+    },
+  );
+
+  return result.comparisons.map(comparison => ({
+    requirementId: comparison.requirementId,
+    state: PROCUREMENT_STATE_MAP[comparison.state],
+    evidence: evidence.filter(item =>
+      comparison.evidenceIds.some(id =>
+        id.startsWith(item.documentId + ":" + item.location + ":"),
+      ),
+    ),
+    reasoning: comparison.rationale,
+    correction: comparison.correction,
+  }));
+}
