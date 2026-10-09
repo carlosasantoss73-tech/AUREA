@@ -52,6 +52,7 @@ describe("chunkExtractedEvidence", () => {
   });
 
   it("rejects invalid limits", () => {
+    expect(() => chunkExtractedEvidence(base, { maxCharsPerChunk: 10 })).toThrowError(EvidenceChunkingError);
     try { chunkExtractedEvidence(base, { maxCharsPerChunk: 10 }); } catch (error) { expect((error as EvidenceChunkingError).code).toBe("ECP_INVALID_CHUNK_LIMIT"); }
   });
 });
