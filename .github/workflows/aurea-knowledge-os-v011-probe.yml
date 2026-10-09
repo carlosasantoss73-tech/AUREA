@@ -54,6 +54,7 @@ jobs:
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to Google Cloud through WIF
+        id: auth
         if: steps.wif_gate.outputs.configured == 'true'
         uses: google-github-actions/auth@v3
         with:
@@ -280,6 +281,14 @@ jobs:
           AUREA_LIVE_PROJECT_ID: ecp
         run: |
           set -euo pipefail
+          if [ -z "${AUREA_LIVE_DRIVE_TOKEN:-}" ]; then
+            echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: BLOCKED_NO_ACCESS_TOKEN"
+            exit 1
+          fi
           echo "::add-mask::$AUREA_LIVE_DRIVE_TOKEN"
           npx vitest run src/context/google-drive-institutional-reader.live.test.ts
+          if grep -q "skipped" <<< "$(npx vitest run src/context/google-drive-institutional-reader.live.test.ts 2>&1)"; then
+            echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: BLOCKED_TESTS_SKIPPED"
+            exit 1
+          fi
           echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: PASS"
