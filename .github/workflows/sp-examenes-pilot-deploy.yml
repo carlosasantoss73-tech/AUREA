@@ -42,6 +42,26 @@ jobs:
             echo "::error::Missing one of CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID or GEMINI_API_KEY in GitHub Actions secrets."
             exit 1
           fi
+      - name: Verify Cloudflare account scope
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          response="$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts)"
+          success="$(printf '%s' "$response" | jq -r '.success // false')"
+          if [ "$success" != "true" ]; then
+            echo "::error::Cloudflare token cannot list accessible accounts; inspect token scopes and account configuration."
+            printf '%s' "$response" | jq -r '.errors[]? | "Cloudflare API error code=\(.code) message=\(.message)"'
+            exit 1
+          fi
+          match_count="$(printf '%s' "$response" | jq --arg id "$CLOUDFLARE_ACCOUNT_ID" '[.result[]? | select(.id == $id)] | length')"
+          if [ "$match_count" = "0" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID does not match an account accessible to this token. Available account IDs and names:"
+            printf '%s' "$response" | jq -r '.result[]? | "\(.id)  \(.name)"'
+            exit 1
+          fi
+          matched_name="$(printf '%s' "$response" | jq -r --arg id "$CLOUDFLARE_ACCOUNT_ID" '.result[]? | select(.id == $id) | .name' | head -n 1)"
+          echo "Cloudflare account identifier validated; matched account name: $matched_name"
       - name: Deploy Worker and static UI
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
