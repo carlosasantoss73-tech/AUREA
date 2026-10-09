@@ -35,7 +35,7 @@ describe("chunkExtractedEvidence", () => {
     }, { maxCharsPerChunk: 256, maxCharsPerBlock: 256 });
     const joined = chunks.map((chunk) => chunk.text).join("\n");
     for (let i = 0; i < 160; i += 1) expect(joined).toContain(`word${i}`);
-    expect(chunks.every((chunk) => chunk.textLength <= 400)).toBe(true);
+    expect(chunks.every((chunk) => chunk.textLength <= 256)).toBe(true);
   });
 
   it("rejects a token larger than the configured block limit instead of truncating it", () => {
