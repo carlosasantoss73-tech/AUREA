@@ -1,0 +1,42 @@
+name: SP Examenes Pilot Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/sp-examenes/**'
+      - '.github/workflows/sp-examenes-pilot-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sp-examenes-pilot-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check app files
+        run: |
+          test -s apps/sp-examenes/worker.ts
+          test -s apps/sp-examenes/public/index.html
+          test -s apps/sp-examenes/wrangler.jsonc
+      - name: Deploy Worker and static UI
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/sp-examenes
+          command: deploy
+          secrets: |
+            ANTHROPIC_API_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
