@@ -13,11 +13,11 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 | Pruebas del gate | VALIDADO | 11 pruebas ECP; suite previa y typecheck aprobados |
 | Pack de contexto con citas | IMPLEMENTADO / VALIDADO POR CI | PR #169 fusionado; constructor bloquea citas incompletas y fuentes locales |
 | Adaptador de autoridad al límite de búsqueda institucional | IMPLEMENTADO / VALIDADO POR CI | PR #169 fusionado; todavía depende de un lector concreto |
-| Composición Gate compartido → pack ECP | IMPLEMENTADO / CI PENDIENTE | `src/ecp/context-pipeline.ts` en rama de trabajo |
+| Composición Gate compartido → pack ECP | IMPLEMENTADO / VALIDADO POR CI | `src/ecp/context-pipeline.ts` en rama de trabajo |
 | Alcance del conocimiento ECP en Bibliotecario Universal | DOCUMENTADO | `docs/ecp/BIBLIOTECARIO_SCOPE.md`; no se creó segundo índice |
-| Acceso live a Google Drive | PARCIALMENTE VALIDADO | Workflows #99 y #100 autentican por WIF y leen el descriptor configurado |
-| Lectura del índice real de registros y búsqueda por proyecto | NO DEMOSTRADA / BLOQUEO P0 | El archivo `INDICE_MAESTRO_v011.json` leído contiene 133 bytes y solo claves id, kind, mimeType, name; no es el contenido del índice consultable |
-| Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No modificar el índice de Drive desde este cambio; falta identificar el flujo autorizado |
+| Acceso live a Google Drive | VALIDADO EN LECTURA | Workflow #106 autenticó por WIF, descubrió 15 candidatos y descargó los bytes reales del índice vigente |
+| Lectura del índice real de registros | VALIDADA EN MODO LECTURA | `INDICE_MAESTRO_v011.json` se descargó con `MediaIoBaseDownload`: 6.016 bytes, versión v011, estado VIGENTE, total declarado 45, 1 registro nuevo y cadena hasta v001; 45 IDs únicos recuperados al recorrer la cadena. La búsqueda en la cadena no encontró un registro de proyecto ECP |
+| Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No se halló registro ECP. Preparar propuesta de incorporación y usar el flujo autorizado; no editar Drive directamente |
 | Conector live Bibliotecario → runtime | NO IMPLEMENTADO | `InstitutionalAuthorityReader` sigue siendo una interfaz; no existe implementación externa concreta conectada al runtime |
 | Contexto recuperado entregado al modelo | BLOQUEADO | `src/conchita-runtime-bridge.ts` pasa solo message/mode; el worker mantiene provider vacío |
 | Ingestión de PDF/Excel/OCR y archivos grandes | NO VALIDADA | Endpoint HTTP revisado es JSON y tiene límite de cuerpo de 16.384 bytes |
@@ -27,11 +27,11 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 ## RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION
 
 - **RESULT:** el gate ECP y el pack con citas están en main; se añadió un adaptador reutilizable al contrato de autoridad y ahora se compone el Gate compartido con el pack ECP en una rama posterior.
-- **EVIDENCE:** PR #169 fusionado tras CI exitoso; workflows de Knowledge OS #99 y #100 completaron la lectura del descriptor por WIF. El resultado observado es un descriptor JSON de 133 bytes, no registros consultables.
+- ****EVIDENCE:** PR #169 fusionado tras CI exitoso; PR #170 tiene typecheck y suite P0 aprobados en run #731. Workflow Knowledge OS #106 autenticó por WIF y descargó el contenido real del índice: v011, VIGENTE, 45 registros declarados, cadena de 11 índices desde v011 hasta v001 y 45 IDs únicos recolectados.
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
 - **ADAPTATION:** el pipeline ECP falla de forma cerrada ante recuperación vacía, proyecto incorrecto, citas locales o metadatos incompletos. Mantener separación entre evidencia primaria, continuidad heredada y aprendizaje documentado.
-- **NEXT ACTION:** (1) validar CI del pipeline; (2) localizar en Drive el descriptor y el índice de registros correctos mediante la identidad de lectura ya configurada; (3) implementar el lector real sin modificar Knowledge OS; (4) conectar recuperación y citas al runtime ECP; (5) resolver ingesta por lotes; (6) ejecutar caso original y Red Team.
+- **NEXT ACTION:** (1) registrar ECP mediante el flujo autorizado del Bibliotecario; (2) resolver discrepancia del índice: AKL-002 aparece como PROPUESTA en v011 pese a que existe una referencia documental a DEC-001 aprobada; (3) implementar búsqueda real por registros y recuperar archivos fuente por fileId; (4) conectar recuperación y citas al runtime ECP; (5) resolver ingesta por lotes; (6) ejecutar caso original y Red Team.
 
 ## Condiciones para declarar OPERATIVO
 
