@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler",
+  "name": "sp-examenes-pilot",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "SP_EXAMENES_MODEL": "claude-sonnet-4-5"
+  }
+}
