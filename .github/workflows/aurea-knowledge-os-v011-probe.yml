@@ -25,6 +25,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Preflight required GCP WIF configuration
         id: wif_gate
         env:
