@@ -286,8 +286,12 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$AUREA_LIVE_DRIVE_TOKEN"
-          npx vitest run src/context/google-drive-institutional-reader.live.test.ts
-          if grep -q "skipped" <<< "$(npx vitest run src/context/google-drive-institutional-reader.live.test.ts 2>&1)"; then
+          output="$(npx vitest run src/context/google-drive-institutional-reader.live.test.ts 2>&1)" || {
+            printf '%s\n' "$output"
+            exit 1
+          }
+          printf '%s\n' "$output"
+          if grep -Eq '[0-9]+ skipped' <<< "$output"; then
             echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: BLOCKED_TESTS_SKIPPED"
             exit 1
           fi
