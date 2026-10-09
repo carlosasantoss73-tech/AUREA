@@ -50,7 +50,14 @@ describe("ECP evidence gate", () => {
     }).status).toBe("CONVALIDABLE");
   });
 
-  it("does not allow convalidation to create capacity or materially change the offer", () => {
+  it("does not call a material change NO CUMPLE without evidence of baseline failure", () => {
+    expect(assessEcpFinding({
+      ...base, defectKind: "FORMAL_OMISSION", convalidationAllowedByApplicableRule: true,
+      createsNewCapacityOrMaterialChange: true,
+    }).status).toBe("NO_CONCLUYENTE");
+  });
+
+  it("does not allow convalidation to create capacity when baseline failure is evidenced", () => {
     expect(assessEcpFinding({
       ...base, defectKind: "FORMAL_OMISSION", convalidationAllowedByApplicableRule: true,
       createsNewCapacityOrMaterialChange: true, evidenceShowsRequirementFailed: true,
@@ -64,9 +71,9 @@ describe("ECP evidence gate", () => {
     }).status).toBe("NO_CONCLUYENTE");
   });
 
-  it("requires page/section or an excerpt to trace evidence", () => {
+  it("requires a page or section locator to trace evidence", () => {
     expect(assessEcpFinding({
-      ...base, offerEvidence: [{ ...offer, pageOrSection: undefined, excerpt: undefined }],
+      ...base, offerEvidence: [{ ...offer, pageOrSection: undefined, excerpt: "Texto citado" }],
       evidenceShowsRequirementMet: true,
     }).status).toBe("NO_CONCLUYENTE");
   });
