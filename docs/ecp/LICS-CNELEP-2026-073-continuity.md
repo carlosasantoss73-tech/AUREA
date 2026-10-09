@@ -36,5 +36,14 @@ Estos son estados reportados por la transferencia y no se elevan a hechos defini
 5. Completar los 54 perfiles individualmente solo desde documentos originales; no extrapolar una conclusión a otros perfiles.
 6. Ejecutar Red Team y registrar RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION.
 
+## P0 — verificación web efectuada el 08-oct-2026
+
+- **Fuente oficial SERCOP:** la página de resoluciones vigentes lista la R.E-SERCOP-2026-0006 como vigente, emitida el 27-ago-2026, con disposiciones transitorias para el Portal y el RUP: https://portal.compraspublicas.gob.ec/sercop/normativa/nor_res_ext/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-08-resolucion-nro-r-e-sercop-2026-0006-pdf
+- **Fuente oficial SERCOP:** comunicado del 31-jul-2026 explica que el Decreto Ejecutivo 461 reformó el Reglamento y que los procedimientos deben continuar bajo la normativa aplicable al momento de su inicio conforme al régimen transitorio: https://portal.compraspublicas.gob.ec/sercop/comunicado-oficial-reformas-al-reglamento-de-contratacion-publica-mantienen-una-transicion-ordenada-para-garantizar-la-continuidad-de-los-procedimientos/
+- **Fuente oficial Registro Oficial:** el Decreto Ejecutivo 193 expide el Reglamento General y aparece publicado el 28-oct-2025: https://www.registroficial.gob.ec/noveno-suplemento-no-153/
+- **Fuente secundaria (no suficiente para cerrar requisitos):** Licita.ec identifica el proceso como LICS-CNELEP-2026-073, licitación, presupuesto USD 762.086,83 y límite de propuestas 05-oct-2026: https://licita.ec/buscar/procesos/LICS-CNELEP-2026-073-2022661
+- **Portal oficial SOCE:** el enlace «Ver en SERCOP» de esa ficha condujo a la página de información del procedimiento, pero la consulta expiró por timeout en esta ejecución. No se pudieron verificar desde el portal los archivos originales del pliego/ofertas. La ficha secundaria no reemplaza esa comprobación.
+- **Consecuencia:** P0 normativo iniciado, pero el régimen concreto del expediente sigue sin cierre hasta verificar la fecha oficial de inicio/publicación, la resolución de inicio, el pliego y las aclaraciones. No aplicar una norma por la sola fecha de consulta.
+
 ## Bloqueo de evidencia
 Hasta recuperar fuentes primarias, el registro sirve para continuidad y priorización, no para declarar cumplimiento definitivo, recomendar adjudicación o cerrar el procedimiento.
