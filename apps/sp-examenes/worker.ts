@@ -9,6 +9,7 @@ const SOURCES = [
   { title: "SERCOP — Reglamento", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/reglamento" },
   { title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" },
   { title: "SERCOP — Circulares 2026", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" },
+  { title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" },
   { title: "Registro Oficial del Ecuador", url: "https://www.registroficial.gob.ec/" }
 ] as const;
 
@@ -94,6 +95,20 @@ export default {
     const official = await readOfficialSources();
     const goodSources = official.results.filter(s => s.ok);
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
+    const qLower = question.toLowerCase();
+    const regulationQuestion = /reglamento|fase|procedimiento|plazo|convalid|subasta|menor cuant[ií]a|cat[aá]logo|[ií]nfima|requisito|oferta|adjudicaci[oó]n|garant[ií]a|presupuesto referencial|contrato/i.test(qLower);
+    const selectedDocs: Array<{ title: string; url: string }> = [];
+    if (regulationQuestion) {
+      selectedDocs.push({ title: "Reglamento General de la LOSNCP (Decreto Ejecutivo 193; versión oficial alojada por SERCOP, 30-oct-2025; comprobar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/Reglamento-LOSNCP-20251030.pdf" });
+    } else {
+      selectedDocs.push({ title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; última reforma visible en el PDF: 7-oct-2025)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" });
+    }
+    if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(qLower)) {
+      selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0005-C (25-sep-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/09/SERCOP-SERCOP-2026-0005-C.pdf" });
+    }
+    if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0006 (27-ago-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/RESOLUCIO%CC%81N-Nro.-R.E-SERCOP-2026-0006.pdf" });
+    }
     const sourceContext = official.results.map(s =>
       "FUENTE: " + s.title + "\nURL: " + s.url + "\nCONSULTADA: " + s.checkedAt +
       "\nESTADO: " + (s.ok ? "consultada" : "no disponible") + "\nCONTENIDO EXTRAÍDO:\n" +
@@ -106,14 +121,17 @@ export default {
       "2. Responde a preguntas de práctica y estudio. Si el usuario dice que está haciendo un examen oficial activo, no selecciones por él la respuesta; ofrece explicación conceptual para estudiar.\n" +
       "3. Selecciona una opción solo si el texto oficial recuperado respalda razonablemente la respuesta. Si no hay evidencia suficiente, escribe: NO CONCLUYENTE — no pude verificar la disposición exacta en el contenido oficial consultado.\n" +
       "4. Nunca inventes artículos, numerales, fechas, resoluciones, reformas ni texto literal. No conviertas el título de una página en prueba del contenido de un PDF.\n" +
-      "5. Distingue el contenido visible de páginas índice del texto íntegro de la norma. Si no se recuperó el texto de la norma concreta, dilo expresamente.\n" +
+      "5. Los PDF normativos adjuntos son versiones oficiales alojadas por SERCOP, pero algunos pueden estar desactualizados respecto de reformas posteriores; contrasta con las resoluciones/circulares y la fecha de la pregunta. No declares vigente una disposición solo porque aparezca en un PDF antiguo.\n" +
       "6. Cita título y URL oficial exactos; no fabriques enlaces. Incluye fecha/hora de consulta " + official.checkedAt + ".\n" +
       "7. Devuelve: Respuesta propuesta; Fundamento verificable; Fuentes oficiales; Qué no se pudo verificar; Confianza (alta/media/baja).\n" +
       "8. Si la imagen está borrosa o la pregunta/opciones están incompletas, pide una foto más clara o el texto.\n\n" +
       "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext;
 
     const userContent: Array<Record<string, unknown>> = [];
-    if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question });
+    for (const doc of selectedDocs) {
+      userContent.push({ type: "document", title: doc.title, context: "Documento normativo oficial alojado en el dominio de SERCOP. Verifica la vigencia y las reformas posteriores antes de usarlo.", source: { type: "url", url: doc.url } });
+    }
+    if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question }); 
     if (image) userContent.push({ type: "image", source: { type: "base64", media_type: mimeType, data: image } });
     userContent.push({ type: "text", text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
 
@@ -134,7 +152,7 @@ export default {
       if (!answer) return Response.json({ error: "El proveedor no devolvió texto verificable." }, { status: 502 });
       return Response.json({
         answer: answer,
-        sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
+        sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })).concat(selectedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt }))),
         sourceStatus: sourceStatus
       }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
     } catch {
