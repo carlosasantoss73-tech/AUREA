@@ -10,6 +10,6 @@
     "not_found_handling": "single-page-application"
   },
   "vars": {
-    "SP_EXAMENES_MODEL": "claude-sonnet-4-5"
+    "SP_EXAMENES_MODEL": "claude-sonnet-5"
   }
 }
