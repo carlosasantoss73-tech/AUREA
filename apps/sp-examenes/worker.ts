@@ -1,7 +1,8 @@
+import PAGE from "./public/index.html";
+
 interface Env {
   GEMINI_API_KEY: string;
   SP_EXAMENES_MODEL?: string;
-  ASSETS: { fetch(request: Request): Promise<Response> };
 }
 
 const SOURCES = [
@@ -70,8 +71,11 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({ status: "ok", app: "SP-EXAMENES", version: "0.1-pilot" });
     }
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+      return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
+    }
     if (request.method !== "POST" || url.pathname !== "/api/answer") {
-      return env.ASSETS.fetch(request);
+      return new Response("Not found", { status: 404 });
     }
     const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
     if (!allowPilotRequest(clientIp)) return Response.json({ error: "Límite temporal del piloto alcanzado. Espera unos minutos antes de intentar de nuevo." }, { status: 429 });
