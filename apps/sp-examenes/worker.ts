@@ -122,7 +122,7 @@ export default {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: env.SP_EXAMENES_MODEL || "claude-sonnet-4-5",
+          model: env.SP_EXAMENES_MODEL || "claude-sonnet-5",
           max_tokens: 1400,
           system: system,
           messages: [{ role: "user", content: userContent }]
