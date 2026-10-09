@@ -18,20 +18,22 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 | Acceso live a Google Drive | VALIDADO EN LECTURA | Workflow #106 autenticó por WIF, descubrió 15 candidatos y descargó los bytes reales del índice vigente |
 | Lectura del índice real de registros | VALIDADA EN MODO LECTURA | `INDICE_MAESTRO_v011.json` se descargó con `MediaIoBaseDownload`: 6.016 bytes, versión v011, estado VIGENTE, total declarado 45, 1 registro nuevo y cadena hasta v001; 45 IDs únicos recuperados al recorrer la cadena. La búsqueda en la cadena no encontró un registro de proyecto ECP |
 | Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No se halló registro ECP. Preparar propuesta de incorporación y usar el flujo autorizado; no editar Drive directamente |
+| Adaptador de ejecución ECP con inyección de contexto institucional | IMPLEMENTADO + PRUEBAS CI APROBADAS | `src/ecp/institutional-execution-adapter.ts`; PR #171 fusionada. En ruta ECP dedicada, exige pack institucional READY antes de llamar al proveedor; aún no está registrada en un deployment ECP. |
+| Sonda live de Bibliotecario enfocada en ECP | EN CORRECCIÓN / VALIDACIÓN | `.github/workflows/aurea-knowledge-os-v011-probe.yml` y `src/context/google-drive-institutional-reader.live.test.ts`; el workflow anterior verificaba índice/cadena pero no ejecutaba la prueba live del lector. La corrección apunta explícitamente a `projectId: "ecp"` y debe distinguir registro ausente de lectura fallida. |
 | Conector live Bibliotecario → runtime | NO IMPLEMENTADO | `InstitutionalAuthorityReader` sigue siendo una interfaz; no existe implementación externa concreta conectada al runtime |
-| Contexto recuperado entregado al modelo | BLOQUEADO | `src/conchita-runtime-bridge.ts` pasa solo message/mode; el worker mantiene provider vacío |
+| Contexto recuperado entregado al modelo | ADAPTADOR IMPLEMENTADO; DEPLOYMENT NO INTEGRADO | `EcpInstitutionalExecutionAdapter` inyecta pack/citas cuando se registra en una ruta ECP dedicada; el worker actual sigue con provider vacío y no registra la ruta ECP |
 | Ingestión de PDF/Excel/OCR y archivos grandes | NO VALIDADA | Endpoint HTTP revisado es JSON y tiene límite de cuerpo de 16.384 bytes |
 | Auditoría real de ofertas originales | NO VALIDADA | La biblioteca no devolvió los originales de las tres ofertas en las búsquedas efectuadas |
 | Piloto ECP completo | **NO OPERATIVO** | Faltan recuperación live de registros, conexión al runtime, ingesta y caso real con evidencia primaria |
 
 ## RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION
 
-- **RESULT:** el gate ECP y el pack con citas están en main; se añadió un adaptador reutilizable al contrato de autoridad y ahora se compone el Gate compartido con el pack ECP en una rama posterior.
+- **RESULT:** el gate ECP, el pack con citas, el pipeline de composición y el adaptador de inyección de contexto institucional ECP están en main; la inyección solo se activa al registrar el adaptador en una ruta ECP dedicada.
 - ****EVIDENCE:** PR #169 fusionado tras CI exitoso; PR #170 tiene typecheck y suite P0 aprobados en run #731. Workflow Knowledge OS #106 autenticó por WIF y descargó el contenido real del índice: v011, VIGENTE, 45 registros declarados, cadena de 11 índices desde v011 hasta v001 y 45 IDs únicos recolectados.
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
 - **ADAPTATION:** el pipeline ECP falla de forma cerrada ante recuperación vacía, proyecto incorrecto, citas locales o metadatos incompletos. Mantener separación entre evidencia primaria, continuidad heredada y aprendizaje documentado.
-- **NEXT ACTION:** (1) registrar ECP mediante el flujo autorizado del Bibliotecario; (2) resolver discrepancia del índice: AKL-002 aparece como PROPUESTA en v011 pese a que existe una referencia documental a DEC-001 aprobada; (3) implementar búsqueda real por registros y recuperar archivos fuente por fileId; (4) conectar recuperación y citas al runtime ECP; (5) resolver ingesta por lotes; (6) ejecutar caso original y Red Team.
+- **NEXT ACTION:** (1) correr la sonda live explícitamente con projectId=ecp y registrar si falta el registro autorizado; (2) registrar ECP mediante el flujo autorizado del Bibliotecario, sin editar el índice manualmente; (3) implementar una ruta de ejecución ECP que instancie el adaptador nuevo con el lector live; (4) resolver ingesta por lotes de PDF/Excel y referencias a páginas; (5) evaluar originales del expediente y ejecutar Red Team.
 
 ## Condiciones para declarar OPERATIVO
 
