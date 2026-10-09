@@ -109,15 +109,21 @@ export function chunkExtractedEvidence(
   const normalized = input.blocks.flatMap((block) => {
     if (!block.text.trim()) return [];
     required(block.locator, "block.locator");
-    return splitOversizedBlock(block, Math.min(maxBlock, maxChars));
+    const prefixLength = `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\\n`.length;
+    const contentLimit = Math.min(maxBlock, maxChars) - prefixLength;
+    if (contentLimit < 1) throw new EvidenceChunkingError("ECP_LOCATOR_EXCEEDS_LIMIT", block.locator);
+    return splitOversizedBlock(block, contentLimit);
   });
   if (!normalized.length) throw new EvidenceChunkingError("ECP_DOCUMENT_TEXT_EMPTY", metadata.documentId);
 
+  const renderBlock = (block: ExtractedEvidenceBlock) =>
+    `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\\n${block.text}`;
   const groups: ExtractedEvidenceBlock[][] = [];
   let current: ExtractedEvidenceBlock[] = [];
   let length = 0;
   for (const block of normalized) {
-    const added = block.text.length + (current.length ? 2 : 0);
+    const renderedLength = renderBlock(block).length;
+    const added = renderedLength + (current.length ? 2 : 0);
     if (current.length && length + added > maxChars) {
       groups.push(current);
       const overlapBlocks: ExtractedEvidenceBlock[] = [];
@@ -125,7 +131,7 @@ export function chunkExtractedEvidence(
       if (overlap > 0) {
         for (let i = current.length - 1; i >= 0; i -= 1) {
           const candidate = current[i];
-          const candidateLength = candidate.text.length + (overlapBlocks.length ? 2 : 0);
+          const candidateLength = renderBlock(candidate).length + (overlapBlocks.length ? 2 : 0);
           if (overlapLength + candidateLength > overlap) break;
           overlapBlocks.unshift(candidate);
           overlapLength += candidateLength;
@@ -134,14 +140,14 @@ export function chunkExtractedEvidence(
       current = [...overlapBlocks];
       length = overlapLength;
     }
-    const nextLength = block.text.length + (current.length ? 2 : 0);
+    const nextLength = renderedLength + (current.length ? 2 : 0);
     if (current.length && length + nextLength > maxChars) {
       groups.push(current);
       current = [];
       length = 0;
     }
     current.push(block);
-    length += block.text.length + (current.length > 1 ? 2 : 0);
+    length += renderedLength + (current.length > 1 ? 2 : 0);
   }
   if (current.length) groups.push(current);
 
