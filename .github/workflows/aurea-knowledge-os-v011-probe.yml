@@ -192,5 +192,60 @@ jobs:
                   for item in new_records if isinstance(item, dict)
               ], indent=2, ensure_ascii=False))
 
+
+          print("=== V011 VERSION-CHAIN SUMMARY ===")
+          cursor_id = index_id
+          seen_index_ids = set()
+          indexed_records = {}
+          chain_summary = []
+          while cursor_id and cursor_id not in seen_index_ids:
+              seen_index_ids.add(cursor_id)
+              version_meta = drive.files().get(
+                  fileId=cursor_id,
+                  fields="id,name,modifiedTime,capabilities(canEdit)"
+              ).execute()
+              version_raw = download_text(drive, cursor_id)
+              try:
+                  version_data = json.loads(version_raw)
+              except json.JSONDecodeError:
+                  print(f"INDEX_CHAIN_INVALID_JSON: {cursor_id}")
+                  break
+              record_lists = []
+              if isinstance(version_data, dict):
+                  if isinstance(version_data.get("registros"), list):
+                      record_lists.append(version_data["registros"])
+                  for key, value in version_data.items():
+                      if key.startswith("registros_nuevos") and isinstance(value, list):
+                          record_lists.append(value)
+                  local_count = sum(len(items) for items in record_lists)
+                  chain_summary.append({
+                      "fileId": cursor_id,
+                      "name": version_meta.get("name"),
+                      "version": version_data.get("version_indice"),
+                      "state": version_data.get("estado_indice"),
+                      "declaredTotal": version_data.get("total_registros"),
+                      "recordsInLists": local_count,
+                  })
+                  for items in record_lists:
+                      for item in items:
+                          if isinstance(item, dict) and item.get("id"):
+                              indexed_records[item["id"]] = item
+                  previous = version_data.get("indice_anterior")
+                  cursor_id = previous.get("fileId") if isinstance(previous, dict) else None
+              else:
+                  break
+          print("INDEX_CHAIN: " + json.dumps(chain_summary, ensure_ascii=False))
+          print(f"INDEX_CHAIN_UNIQUE_RECORD_IDS: {len(indexed_records)}")
+          print("=== ECP / REUSABLE AGENT RECORD MATCHES ===")
+          matches = [
+              {k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "componente_reutilizable", "ubicacion")}
+              for item in indexed_records.values()
+              if "ECP" in str(item).upper()
+              or "CONTRATACION PUBLICA" in str(item).upper()
+              or item.get("id") in {"AKL-002", "AKL-031", "AKL-034", "AKL-035"}
+          ]
+          print(json.dumps(matches, indent=2, ensure_ascii=False))
+          print("VERSION_CHAIN_READ_ONLY: PASS")
+
           print("V011_CONTENT_PROBE: PASS")
           PY
