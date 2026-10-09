@@ -42,7 +42,7 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - La arquitectura y la app del piloto se añaden en una rama separada; no se modifica el main de AUREA.
 - ECP tiene componentes de contexto/evidencia reutilizables, pero su propio estado documental indica que la conexión real del Bibliotecario a runtime ECP y el registro institucional de ECP siguen sin demostrarse. SP EXÁMENES no debe declararse integrado al Bibliotecario hasta resolverlo.
 - La consulta de páginas oficiales en vivo no equivale a una ingesta completa de PDF ni a una base legal consolidada. El piloto es una prueba funcional inicial, no certificación de exactitud jurídica.
-- Para una sesión de prueba limitada puede usarse el secreto de proveedor existente en el pipeline de despliegue, si está disponible. No reutilizar bases de datos de XOLAR ni exponer claves en el cliente.
+- El despliegue requiere el secreto `GEMINI_API_KEY` en GitHub Actions; la clave nunca se entrega al navegador ni se pega en el chat. No reutilizar bases de datos de XOLAR ni exponer claves en el cliente.
 
 ## Siguiente paso tras la prueba
 - Incorporar preguntas reales de prueba, comparar la respuesta con la fuente oficial exacta y registrar falsos positivos/negativos.
