@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827"><title>SP EXÁMENES · SERCOP</title>
+<style>
+:root{color-scheme:light;--ink:#182230;--muted:#5b6675;--line:#d8dee8;--paper:#f4f6f9;--navy:#17263d}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--navy);color:white;padding:24px 18px}header .wrap,main{max-width:860px;margin:auto}header h1{margin:0;font-size:1.65rem;letter-spacing:.02em}header p{margin:5px 0 0;color:#d8e1ef}
+main{padding:22px 16px 48px}.panel{background:white;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 18px #16253b0b}
+label{display:block;font-weight:650;margin-bottom:8px}textarea{width:100%;min-height:130px;resize:vertical;border:1px solid #b8c3d2;border-radius:10px;padding:12px;font:inherit}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}button,.filebutton{border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:650;cursor:pointer;background:var(--navy);color:white}button:disabled{opacity:.55;cursor:wait}.filebutton{background:#e9edf4;color:var(--ink);border:1px solid var(--line)}input[type=file]{max-width:100%}.small{color:var(--muted);font-size:.9rem}.status{margin-top:12px;color:var(--muted);overflow-wrap:anywhere}#answer{white-space:pre-wrap;overflow-wrap:anywhere}.sources a{display:block;margin:8px 0;overflow-wrap:anywhere;color:#174d86}.notice{font-size:.88rem;color:var(--muted)}.preview{display:none;max-width:100%;max-height:260px;margin-top:10px;border-radius:10px}
+</style></head>
+<body><header><div class="wrap"><h1>SP EXÁMENES</h1><p>Práctica guiada · Contratación pública del Ecuador</p></div></header>
+<main>
+<section class="panel"><label for="question">Escribe la pregunta del examen</label><textarea id="question" maxlength="6000" placeholder="Pega aquí la pregunta y sus opciones. También puedes adjuntar una fotografía."></textarea>
+<div class="actions"><label class="filebutton" for="photo">Adjuntar foto</label><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" hidden><button id="send">Analizar pregunta</button></div>
+<img id="preview" class="preview" alt="Vista previa de la pregunta adjunta"><div class="small">Imagen JPG, PNG o WebP; máximo 4 MB. No adjuntes cédulas ni datos personales.</div><div id="status" class="status" role="status"></div></section>
+<section class="panel" id="result-panel" hidden><h2>Respuesta</h2><div id="answer"></div><div class="sources" id="sources"></div></section>
+<section class="panel"><h3>Cómo responde</h3><p class="notice">Consulta fuentes oficiales disponibles en ese momento. Si no puede verificar el fundamento, debe indicarlo y no inventar artículos. Esta herramienta es para práctica y estudio; no sustituye la revisión de la norma ni está diseñada para responder por ti una evaluación oficial activa.</p><p class="notice">Piloto de prueba. La consulta de páginas oficiales no garantiza que todos los PDF o reformas hayan podido leerse en cada pregunta.</p></section>
+</main>
+<script>
+const question=document.querySelector('#question'),photo=document.querySelector('#photo'),preview=document.querySelector('#preview'),send=document.querySelector('#send'),status=document.querySelector('#status'),panel=document.querySelector('#result-panel'),answer=document.querySelector('#answer'),sources=document.querySelector('#sources');
+let imageData=null,imageMime=null;
+photo.addEventListener('change',()=>{const f=photo.files&&photo.files[0];imageData=null;imageMime=null;preview.style.display='none';if(!f)return;if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>4*1024*1024){status.textContent='La imagen debe ser JPG, PNG o WebP y pesar como máximo 4 MB.';photo.value='';return;}imageMime=f.type;const reader=new FileReader();reader.onload=()=>{imageData=String(reader.result).split(',')[1]||null;preview.src=String(reader.result);preview.style.display='block';};reader.readAsDataURL(f);});
+send.addEventListener('click',async()=>{const q=question.value.trim();if(!q&&!imageData){status.textContent='Escribe una pregunta o adjunta una fotografía.';return;}send.disabled=true;status.textContent='Consultando fuentes oficiales y analizando la pregunta…';panel.hidden=true;try{const res=await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q,image:imageData,mimeType:imageMime})});const data=await res.json();if(!res.ok)throw new Error(data.error||'No fue posible procesar la pregunta.');answer.textContent=data.answer||'No se recibió una respuesta verificable.';sources.replaceChildren();for(const s of (data.sources||[])){const a=document.createElement('a');a.href=s.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=s.title+' · consultada '+s.checkedAt;sources.appendChild(a);}panel.hidden=false;status.textContent=data.sourceStatus==='partial'?'Atención: algunas fuentes oficiales no estuvieron disponibles. Revisa la respuesta y los enlaces.':'Consulta terminada. Verifica siempre la fuente oficial citada.';}catch(e){status.textContent='No se pudo completar: '+(e instanceof Error?e.message:'error desconocido');}finally{send.disabled=false;}});
+</script></body></html>

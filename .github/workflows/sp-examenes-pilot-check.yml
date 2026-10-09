@@ -1,0 +1,28 @@
+name: SP Examenes Pilot Check
+
+on:
+  pull_request:
+    paths:
+      - 'apps/sp-examenes/**'
+      - '.github/workflows/sp-examenes-pilot-check.yml'
+      - '.github/workflows/sp-examenes-pilot-deploy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  worker-dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate required pilot files
+        run: |
+          test -s apps/sp-examenes/worker.ts
+          test -s apps/sp-examenes/public/index.html
+          test -s apps/sp-examenes/wrangler.jsonc
+      - name: Bundle Worker without deployment
+        run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
