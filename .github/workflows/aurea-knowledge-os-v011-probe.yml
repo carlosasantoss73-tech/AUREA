@@ -177,5 +177,20 @@ jobs:
               print(f"V007_NOT_JSON: {exc}")
           print("V007_CANDIDATE_CHECK: COMPLETE")
 
+
+          if isinstance(parsed, dict):
+              print(f"V011_VERSION: {parsed.get('version_indice', 'NOT_EXPLICIT')}")
+              print(f"V011_STATE: {parsed.get('estado_indice', 'NOT_EXPLICIT')}")
+              print(f"V011_TOTAL_REGISTROS: {parsed.get('total_registros', 'NOT_EXPLICIT')}")
+              print(f"V011_NEW_RECORDS_COUNT: {len(parsed.get('registros_nuevos_v011', []))}")
+              print(f"V011_PREVIOUS_INDEX_REF: {parsed.get('indice_anterior', 'NOT_EXPLICIT')}")
+              print(f"V011_INDEX_FIELD_TYPE: {type(parsed.get('indice')).__name__}")
+              new_records = parsed.get("registros_nuevos_v011", [])
+              print("=== V011 NEW RECORD METADATA ===")
+              print(json.dumps([
+                  {k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version")}
+                  for item in new_records if isinstance(item, dict)
+              ], indent=2, ensure_ascii=False))
+
           print("V011_CONTENT_PROBE: PASS")
           PY
