@@ -46,11 +46,12 @@ describe("chunkExtractedEvidence", () => {
   });
 
   it("rejects missing source metadata and empty extracted documents", () => {
-    expect(() => chunkExtractedEvidence({ ...base, documentId: " " })).toThrow("ECP_SOURCE_METADATA_REQUIRED");
+    expect(() => chunkExtractedEvidence({ ...base, documentId: " " })).toThrowError(EvidenceChunkingError);
+    try { chunkExtractedEvidence({ ...base, documentId: " " }); } catch (error) { expect((error as EvidenceChunkingError).code).toBe("ECP_SOURCE_METADATA_REQUIRED"); }
     expect(() => chunkExtractedEvidence({ ...base, blocks: [] })).toThrow("ECP_DOCUMENT_TEXT_EMPTY");
   });
 
   it("rejects invalid limits", () => {
-    expect(() => chunkExtractedEvidence(base, { maxCharsPerChunk: 10 })).toThrow("ECP_INVALID_CHUNK_LIMIT");
+    try { chunkExtractedEvidence(base, { maxCharsPerChunk: 10 }); } catch (error) { expect((error as EvidenceChunkingError).code).toBe("ECP_INVALID_CHUNK_LIMIT"); }
   });
 });
