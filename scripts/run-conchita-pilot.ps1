@@ -34,11 +34,21 @@ $body = @{
   message = "Responde únicamente: PILOT_OK"
   clientRequestId = [guid]::NewGuid().ToString()
   mode = "PERSONAL"
-} | ConvertTo-Json
+} | ConvertTo-Json -Compress
 
 $response = Invoke-RestMethod -Method Post -Uri "$BaseUrl/conchita/v1/message" -Headers @{
-  Authorization = "Bearer $Token"
+  "Content-Type" = "application/json"
 } -ContentType "application/json" -Body $body
 
 $response | ConvertTo-Json -Depth 20
-Write-Host "PILOT REQUEST COMPLETED"
+
+if ($response.status -ne "COMPLETED") {
+  Write-Error "BLOCKED: message execution did not complete."
+  exit 5
+}
+if ([string]::IsNullOrWhiteSpace($response.response) -or $response.response.Trim() -ne "PILOT_OK") {
+  Write-Error "BLOCKED: expected exact PILOT_OK response; received a different or empty response."
+  exit 6
+}
+
+Write-Host "PILOT SMOKE TEST PASSED"
