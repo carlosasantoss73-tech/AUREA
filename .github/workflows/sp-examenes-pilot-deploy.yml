@@ -29,6 +29,14 @@ jobs:
           test -s apps/sp-examenes/worker.ts
           test -s apps/sp-examenes/public/index.html
           test -s apps/sp-examenes/wrangler.jsonc
+      - name: Verify Gemini API key is configured
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing GEMINI_API_KEY repository secret. Add it under Settings > Secrets and variables > Actions; never commit or paste the key into source code."
+            exit 1
+          fi
       - name: Deploy Worker and static UI
         uses: cloudflare/wrangler-action@v3
         with:
