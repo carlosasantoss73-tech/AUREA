@@ -107,9 +107,20 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import hashlib
+          import io
           import json
           import os
           from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+
+          def download_text(drive, file_id):
+              request = drive.files().get_media(fileId=file_id)
+              buffer = io.BytesIO()
+              downloader = MediaIoBaseDownload(buffer, request)
+              done = False
+              while not done:
+                  _, done = downloader.next_chunk()
+              return buffer.getvalue().decode("utf-8")
 
           index_id = os.environ["INDEX_ID"]
           drive = build("drive", "v3")
@@ -127,13 +138,7 @@ jobs:
           if meta.get("capabilities", {}).get("canEdit") is not False:
               raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
 
-          response = drive.files().get(fileId=index_id, alt="media").execute()
-          if isinstance(response, bytes):
-              raw = response.decode("utf-8")
-          elif isinstance(response, str):
-              raw = response
-          else:
-              raw = json.dumps(response, ensure_ascii=False, sort_keys=True)
+          raw = download_text(drive, index_id)
 
           digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
           print(f"V011_CONTENT_SHA256: {digest}")
@@ -160,13 +165,7 @@ jobs:
               fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy),shortcutDetails(targetId,targetMimeType)"
           ).execute()
           print(json.dumps(v007_meta, indent=2))
-          v007_response = drive.files().get(fileId=v007_id, alt="media").execute()
-          if isinstance(v007_response, bytes):
-              v007_raw = v007_response.decode("utf-8")
-          elif isinstance(v007_response, str):
-              v007_raw = v007_response
-          else:
-              v007_raw = json.dumps(v007_response, ensure_ascii=False, sort_keys=True)
+          v007_raw = download_text(drive, v007_id)
           print(f"V007_CONTENT_BYTES: {len(v007_raw.encode('utf-8'))}")
           try:
               v007 = json.loads(v007_raw)
