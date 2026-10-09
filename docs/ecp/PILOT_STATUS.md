@@ -2,6 +2,8 @@
 
 Corte: 09-oct-2026. Estado documental separado de operación real.
 
+Última actualización de continuidad: PR #175 fusionada en `main` (commit `bee1133f70c10f3f4ba5d8d611b0c919024eaa62`; workflow AUREA Cloud Continuity run `37879263548` terminó `success`). El paquete AKL-046 existe en el repositorio como propuesta y borrador de acta; esto NO demuestra que se haya escrito en Drive ni cambia el índice institucional vigente.
+
 ## Semáforo por dimensión
 
 | Dimensión | Estado | Evidencia |
@@ -17,7 +19,8 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 | Alcance del conocimiento ECP en Bibliotecario Universal | DOCUMENTADO | `docs/ecp/BIBLIOTECARIO_SCOPE.md`; no se creó segundo índice |
 | Acceso live a Google Drive | VALIDADO EN LECTURA | Workflow #106 autenticó por WIF, descubrió 15 candidatos y descargó los bytes reales del índice vigente |
 | Lectura del índice real de registros | VALIDADA EN MODO LECTURA | `INDICE_MAESTRO_v011.json` se descargó con `MediaIoBaseDownload`: 6.016 bytes, versión v011, estado VIGENTE, total declarado 45, 1 registro nuevo y cadena hasta v001; 45 IDs únicos recuperados al recorrer la cadena. La búsqueda en la cadena no encontró un registro de proyecto ECP |
-| Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No se halló registro ECP. Preparar propuesta de incorporación y usar el flujo autorizado; no editar Drive directamente |
+| Paquete de propuesta AKL-046 en repositorio | DOCUMENTADO / PROPUESTA | PR #175 fusionada; `docs/ecp/ECP_AGENTE_CONTRATACION_PUBLICA_ECUADOR_v1.md` y `docs/ecp/BORRADOR_ACTA_INCORPORACION_AKL-046.md`. No equivalen a archivos institucionales en Drive. |
+| Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No se halló registro ECP. La propuesta está preparada; falta escritura institucional con permisos autorizados y verificación de lectura posterior. No editar Drive directamente fuera del procedimiento. |
 | Adaptador de ejecución ECP con inyección de contexto institucional | IMPLEMENTADO + PRUEBAS CI APROBADAS | `src/ecp/institutional-execution-adapter.ts`; PR #171 fusionada. En ruta ECP dedicada, exige pack institucional READY antes de llamar al proveedor; aún no está registrada en un deployment ECP. |
 | Sonda live de Bibliotecario enfocada en ECP | VALIDADA LIVE — BLOQUEO REAL CONFIRMADO | Workflow run `37876540709`: autenticación WIF y lectura del índice v011 exitosas; prueba con `projectId: ecp` recuperó 0 registros aprobados y el Context Gate devolvió `BLOCKED` sin fallback. Vitest: 2 pruebas live pasaron. No es fallo de transporte: falta el registro ECP aprobado. |
 | Conector live Bibliotecario → runtime | NO IMPLEMENTADO | `InstitutionalAuthorityReader` sigue siendo una interfaz; no existe implementación externa concreta conectada al runtime |
@@ -34,7 +37,11 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
 - **ADAPTATION:** el pipeline ECP falla de forma cerrada ante recuperación vacía, proyecto incorrecto, citas locales o metadatos incompletos. Mantener separación entre evidencia primaria, continuidad heredada y aprendizaje documentado.
-- **NEXT ACTION:** (1) registrar ECP mediante el flujo autorizado del Bibliotecario, sin editar el índice manualmente; (2) conectar el adaptador de ejecución ya probado a una ruta de runtime ECP dedicada; (3) implementar/validar ingesta por lotes de PDF/Excel y referencias a páginas; (4) ejecutar evaluación con los originales del expediente y Red Team.
+- **NEXT ACTION:** (1) habilitar un mecanismo autorizado de escritura en Drive para la cuenta/flujo institucional, con mínimo privilegio y sin claves largas incrustadas; (2) ejecutar el procedimiento AKL-046: crear el archivo institucional en `03_AGENTES`, completar ficha/acta, crear `INDICE_MAESTRO_v012.json` sin sobrescribir v011 y releer para verificar; (3) conectar el adaptador de ejecución a una ruta ECP dedicada con proveedor institucional real; (4) implementar/validar ingesta por lotes PDF/Excel con localizadores; (5) evaluar con ofertas originales y Red Team.
+
+## Intervención requerida del usuario
+
+No se requiere una acción en el plan ChatGPT Plus ni comprar otra suscripción. El bloqueo externo es la ausencia de un mecanismo de escritura autorizado a Google Drive en el flujo disponible: la conexión de GitHub puede leer el estado del repositorio y los workflows, pero el acceso institucional probado está limitado a `drive.readonly`. Cuando el administrador del flujo habilite escritura con mínimo privilegio en las carpetas necesarias (`03_AGENTES` y `00_CONTROL`/`ACTAS`), el procedimiento debe verificar permisos y escribir solo nuevos archivos/versiones; nunca sobrescribir v011. No se deben compartir claves privadas ni secretos en el chat.
 
 ## Condiciones para declarar OPERATIVO
 
