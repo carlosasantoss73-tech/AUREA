@@ -12,6 +12,26 @@ const SOURCES = [
   { title: "Registro Oficial del Ecuador", url: "https://www.registroficial.gob.ec/" }
 ] as const;
 
+// Best-effort pilot guard only: isolate memory can reset and is not a durable global quota.
+const recentByIp = new Map<string, number[]>();
+const recentGlobal: number[] = [];
+function allowPilotRequest(ip: string, now = Date.now()): boolean {
+  const windowMs = 10 * 60 * 1000;
+  const ipRecent = (recentByIp.get(ip) || []).filter(t => now - t < windowMs);
+  const globalRecent = recentGlobal.filter(t => now - t < 60 * 60 * 1000);
+  if (ipRecent.length >= 6 || globalRecent.length >= 40) return false;
+  ipRecent.push(now);
+  globalRecent.push(now);
+  recentByIp.set(ip, ipRecent);
+  recentGlobal.splice(0, recentGlobal.length, ...globalRecent);
+  if (recentByIp.size > 500) {
+    for (const [key, values] of recentByIp) {
+      if (!values.some(t => now - t < windowMs)) recentByIp.delete(key);
+    }
+  }
+  return true;
+}
+
 function cleanHtml(html: string): string {
   return html.replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -50,6 +70,8 @@ export default {
     if (request.method !== "POST" || url.pathname !== "/api/answer") {
       return env.ASSETS.fetch(request);
     }
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+    if (!allowPilotRequest(clientIp)) return Response.json({ error: "Límite temporal del piloto alcanzado. Espera unos minutos antes de intentar de nuevo." }, { status: 429 });
     if (!(request.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
       return Response.json({ error: "Se esperaba JSON." }, { status: 415 });
     }
