@@ -23,6 +23,7 @@ Antes de evaluar requisitos, registrar:
 
 La página oficial de SERCOP consultada muestra la R.E-SERCOP-2026-0006 como vigente, emitida el 27-ago-2026, con reglas transitorias sobre el Portal y el RUP: https://portal.compraspublicas.gob.ec/sercop/normativa/nor_res_ext/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-08-resolucion-nro-r-e-sercop-2026-0006-pdf
 El Registro Oficial identifica el Decreto Ejecutivo 193 como el que expide el Reglamento General, publicado el 28-oct-2025: https://www.registroficial.gob.ec/noveno-suplemento-no-153/
+SERCOP informó oficialmente que el Decreto Ejecutivo 461 reformó el Reglamento General y que los procedimientos deben seguir el régimen aplicable al momento de su inicio, según el régimen transitorio: https://portal.compraspublicas.gob.ec/sercop/comunicado-oficial-reformas-al-reglamento-de-contratacion-publica-mantienen-una-transicion-ordenada-para-garantizar-la-continuidad-de-los-procedimientos/ ; texto del Decreto 461: https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf
 Estas fuentes son un punto de partida, no sustituyen verificar el texto consolidado, reformas posteriores ni la fecha del procedimiento.
 
 ## Matriz obligatoria por requisito y oferente
