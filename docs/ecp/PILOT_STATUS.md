@@ -22,13 +22,14 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 | Sonda live de Bibliotecario enfocada en ECP | VALIDADA LIVE — BLOQUEO REAL CONFIRMADO | Workflow run `37876540709`: autenticación WIF y lectura del índice v011 exitosas; prueba con `projectId: ecp` recuperó 0 registros aprobados y el Context Gate devolvió `BLOCKED` sin fallback. Vitest: 2 pruebas live pasaron. No es fallo de transporte: falta el registro ECP aprobado. |
 | Conector live Bibliotecario → runtime | NO IMPLEMENTADO | `InstitutionalAuthorityReader` sigue siendo una interfaz; no existe implementación externa concreta conectada al runtime |
 | Contexto recuperado entregado al modelo | ADAPTADOR IMPLEMENTADO; DEPLOYMENT NO INTEGRADO | `EcpInstitutionalExecutionAdapter` inyecta pack/citas cuando se registra en una ruta ECP dedicada; el worker actual sigue con provider vacío y no registra la ruta ECP |
-| Ingestión de PDF/Excel/OCR y archivos grandes | NO VALIDADA | Endpoint HTTP revisado es JSON y tiene límite de cuerpo de 16.384 bytes |
+| Segmentación de texto extraído con localizadores | IMPLEMENTADA + CI VALIDADO | PR #173 fusionada; conserva documento/versión/localizador y bloquea truncado silencioso. No extrae texto del archivo original. |
+| Ingestión de PDF/Excel/OCR y archivos grandes | NO VALIDADA | El chunker no es parser. Endpoint HTTP revisado es JSON y tiene límite de cuerpo de 16.384 bytes |
 | Auditoría real de ofertas originales | NO VALIDADA | La biblioteca no devolvió los originales de las tres ofertas en las búsquedas efectuadas |
 | Piloto ECP completo | **NO OPERATIVO** | Faltan recuperación live de registros, conexión al runtime, ingesta y caso real con evidencia primaria |
 
 ## RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION
 
-- **RESULT:** el gate ECP, el pack con citas, el pipeline de composición y el adaptador de inyección de contexto institucional ECP están en main; la inyección solo se activa al registrar el adaptador en una ruta ECP dedicada.
+- **RESULT:** el gate ECP, el pack con citas, el pipeline de composición, el adaptador de inyección de contexto institucional y el segmentador de evidencia extraída están en main; la inyección solo se activa al registrar el adaptador en una ruta ECP dedicada.
 - ****EVIDENCE:** PR #169 fusionado tras CI exitoso; PR #170 tiene typecheck y suite P0 aprobados en run #731. Workflow Knowledge OS #106 autenticó por WIF y descargó el contenido real del índice: v011, VIGENTE, 45 registros declarados, cadena de 11 índices desde v011 hasta v001 y 45 IDs únicos recolectados.
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
