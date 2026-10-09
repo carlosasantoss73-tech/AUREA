@@ -109,7 +109,7 @@ export function chunkExtractedEvidence(
   const normalized = input.blocks.flatMap((block) => {
     if (!block.text.trim()) return [];
     required(block.locator, "block.locator");
-    const prefixLength = `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\\n`.length;
+    const prefixLength = `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\n`.length;
     const contentLimit = Math.min(maxBlock, maxChars) - prefixLength;
     if (contentLimit < 1) throw new EvidenceChunkingError("ECP_LOCATOR_EXCEEDS_LIMIT", block.locator);
     return splitOversizedBlock(block, contentLimit);
@@ -117,7 +117,7 @@ export function chunkExtractedEvidence(
   if (!normalized.length) throw new EvidenceChunkingError("ECP_DOCUMENT_TEXT_EMPTY", metadata.documentId);
 
   const renderBlock = (block: ExtractedEvidenceBlock) =>
-    `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\\n${block.text}`;
+    `[LOCALIZADOR ${block.locatorKind}: ${block.locator}]\n${block.text}`;
   const groups: ExtractedEvidenceBlock[][] = [];
   let current: ExtractedEvidenceBlock[] = [];
   let length = 0;
