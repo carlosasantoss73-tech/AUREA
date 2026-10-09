@@ -66,7 +66,7 @@ const OFFER_SOURCE = (e: EcpEvidenceReference) =>
   e.sourceKind === "PRIMARY_OFFER" && e.primary;
 
 function hasTraceableLocation(e: EcpEvidenceReference): boolean {
-  return Boolean(e.document.trim() && (e.pageOrSection?.trim() || e.excerpt?.trim()));
+  return Boolean(e.document.trim() && e.pageOrSection?.trim());
 }
 
 /**
@@ -111,7 +111,10 @@ export function assessEcpFinding(input: EcpAssessmentInput): EcpAssessmentResult
   if (input.defectKind && input.defectKind !== "NONE" &&
       ["FORMAL_OMISSION", "ILLEGIBLE_COPY", "IDENTITY_CLARIFICATION"].includes(input.defectKind)) {
     if (input.createsNewCapacityOrMaterialChange === true) {
-      return finish("NO_CUMPLE", "PROPOSED_CORRECTION_CREATES_CAPACITY_OR_MATERIALLY_CHANGES_OFFER");
+      if (input.evidenceShowsRequirementFailed === true) {
+        return finish("NO_CUMPLE", "PROPOSED_CORRECTION_CREATES_CAPACITY_OR_MATERIALLY_CHANGES_OFFER");
+      }
+      return finish("NO_CONCLUYENTE", "MATERIAL_CHANGE_PROPOSED_BUT_BASELINE_FAILURE_NOT_ESTABLISHED");
     }
     const preexistingEvidence = input.offerEvidence.some(
       e => OFFER_SOURCE(e) && e.existedByOfferDeadline === true && hasTraceableLocation(e),
