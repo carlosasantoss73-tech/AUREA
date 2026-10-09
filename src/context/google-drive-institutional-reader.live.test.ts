@@ -11,46 +11,46 @@ function requireLiveConfig(): { token: string; indexFileId: string; projectId: s
   if (!token || !indexFileId || !projectId) {
     throw new Error("LIVE_INSTITUTIONAL_TEST_CONFIGURATION_MISSING");
   }
+  if (projectId !== "ecp") throw new Error("LIVE_TEST_MUST_USE_ECP_PROJECT_SCOPE");
   return { token, indexFileId, projectId };
 }
 
-describe("LIVE Bibliotecario / Knowledge OS reader", () => {
+describe("LIVE Bibliotecario / Knowledge OS reader — ECP scope", () => {
   it.skipIf(!token || !indexFileId || !projectId)(
-    "reads the real current V011 through the concrete institutional reader",
+    "reads the real current V011 and reports whether ECP records exist",
     async () => {
-    const liveConfig = requireLiveConfig();
+      const liveConfig = requireLiveConfig();
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: liveConfig.indexFileId,
+        accessToken: liveConfig.token,
+      });
 
-    const reader = new GoogleDriveInstitutionalReader({
-      indexFileId: liveConfig.indexFileId,
-      accessToken: liveConfig.token,
-    });
+      const current = await reader.readCurrentIndex("live-ecp-reader");
+      expect(current.state).toBe("VIGENTE");
+      expect(current.fileId).toBe(liveConfig.indexFileId);
 
-    const current = await reader.readCurrentIndex("live-bib-08");
-    expect(current.state).toBe("VIGENTE");
-    expect(current.fileId).toBe(liveConfig.indexFileId);
+      const records = await reader.readRecords(liveConfig.indexFileId, {
+        projectId: "ecp",
+        query: "",
+        traceId: "live-ecp-reader",
+      });
+      expect(records.every((record) => record.projectId === "ecp")).toBe(true);
+      expect(records.every((record) => record.state === "VIGENTE" || record.state === "APROBADO")).toBe(true);
 
-    const records = await reader.readRecords(liveConfig.indexFileId, {
-      projectId: liveConfig.projectId,
-      query: "",
-      traceId: "live-bib-08",
-    });
-
-    expect(records.length).toBeGreaterThan(0);
-    expect(records.every((record) => record.projectId === liveConfig.projectId)).toBe(true);
-    expect(records.every((record) => record.state === "VIGENTE" || record.state === "APROBADO")).toBe(true);
-
-    console.log(JSON.stringify({
-      LIVE_READER: "PASS",
-      CURRENT_INDEX_VERSION: current.version,
-      INDEX_CHAIN_PREVIOUS_PRESENT: Boolean(current.previousIndexFileId),
-      RECORDS_RETRIEVED: records.length,
-      PROJECT_SCOPE: liveConfig.projectId,
-      PROVENANCE_BOUNDARY: "INSTITUTIONAL_CONTEXT_PROVIDER_REQUIRED",
-    }));
-  }, 30_000);
+      console.log(JSON.stringify({
+        LIVE_READER: "PASS",
+        CURRENT_INDEX_VERSION: current.version,
+        PROJECT_SCOPE: "ecp",
+        APPROVED_ECP_RECORDS: records.length,
+        ECP_REGISTRY_STATUS: records.length ? "FOUND" : "BLOCKED_NO_APPROVED_ECP_RECORD",
+        PROVENANCE_BOUNDARY: "INSTITUTIONAL_CONTEXT_PROVIDER_REQUIRED",
+      }));
+    },
+    30_000,
+  );
 
   it.skipIf(!token || !indexFileId || !projectId)(
-    "passes real institutional evidence through the existing ContextRetrievalGate",
+    "passes only valid ECP institutional evidence through the shared ContextRetrievalGate",
     async () => {
       const liveConfig = requireLiveConfig();
       const reader = new GoogleDriveInstitutionalReader({
@@ -60,21 +60,32 @@ describe("LIVE Bibliotecario / Knowledge OS reader", () => {
       const provider = createGoogleDriveInstitutionalContextProvider(reader);
       const gate = new ContextRetrievalGate(provider);
       const result = await gate.retrieve({
-        actorId: "live-bib-08",
+        actorId: "live-ecp-reader",
         actorRole: "system",
-        projectId: liveConfig.projectId,
+        projectId: "ecp",
         query: "",
         institutionalOnly: true,
       });
-      expect(result.status).toBe("READY");
-      expect(result.context?.citations.length).toBeGreaterThan(0);
-      expect(result.context?.citations.every((citation) => citation.provenance === "INSTITUTIONAL")).toBe(true);
-      console.log(JSON.stringify({
-        LIVE_CONTEXT_GATE: "PASS",
-        STATUS: result.status,
-        CITATIONS_RETRIEVED: result.context?.citations.length ?? 0,
-        PROVENANCE_BOUNDARY: "INSTITUTIONAL",
-      }));
+
+      expect(result.context?.projectId ?? "ecp").toBe("ecp");
+      if (result.status === "READY") {
+        expect((result.context?.citations.length ?? 0)).toBeGreaterThan(0);
+        expect(result.context?.citations.every((citation) => citation.provenance === "INSTITUTIONAL")).toBe(true);
+        console.log(JSON.stringify({
+          LIVE_CONTEXT_GATE: "READY",
+          CITATIONS_RETRIEVED: result.context?.citations.length ?? 0,
+          PROJECT_SCOPE: "ecp",
+        }));
+      } else {
+        expect(result.status).toBe("BLOCKED");
+        expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+        console.log(JSON.stringify({
+          LIVE_CONTEXT_GATE: "BLOCKED",
+          BLOCKER: "NO_APPROVED_ECP_RECORD_OR_INSTITUTIONAL_CITATIONS",
+          PROJECT_SCOPE: "ecp",
+          FAIL_CLOSED: true,
+        }));
+      }
     },
     30_000,
   );

@@ -25,6 +25,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Preflight required GCP WIF configuration
         id: wif_gate
         env:
@@ -51,12 +54,15 @@ jobs:
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to Google Cloud through WIF
+        id: auth
         if: steps.wif_gate.outputs.configured == 'true'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
           service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive.readonly
 
       - name: Install Google API client
         if: steps.wif_gate.outputs.configured == 'true'
@@ -249,3 +255,44 @@ jobs:
 
           print("V011_CONTENT_PROBE: PASS")
           PY
+
+      - name: Set explicit ECP project scope for live reader
+        if: steps.wif_gate.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          echo "AUREA_LIVE_PROJECT_ID=ecp" >> "$GITHUB_ENV"
+          echo "LIVE_READER_PROJECT_SCOPE: ecp (explicit target; no first-record inference)"
+
+      - name: Setup Node for live institutional reader
+        if: steps.wif_gate.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install AUREA runtime dependencies
+        if: steps.wif_gate.outputs.configured == 'true'
+        run: npm install --no-audit --no-fund
+
+      - name: Execute live ECP institutional reader and context gate
+        if: steps.wif_gate.outputs.configured == 'true'
+        env:
+          AUREA_LIVE_DRIVE_TOKEN: ${{ steps.auth.outputs.access_token }}
+          AUREA_KNOWLEDGE_OS_INDEX_ID: ${{ env.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+          AUREA_LIVE_PROJECT_ID: ecp
+        run: |
+          set -euo pipefail
+          if [ -z "${AUREA_LIVE_DRIVE_TOKEN:-}" ]; then
+            echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: BLOCKED_NO_ACCESS_TOKEN"
+            exit 1
+          fi
+          echo "::add-mask::$AUREA_LIVE_DRIVE_TOKEN"
+          output="$(npx vitest run src/context/google-drive-institutional-reader.live.test.ts 2>&1)" || {
+            printf '%s\n' "$output"
+            exit 1
+          }
+          printf '%s\n' "$output"
+          if grep -Eq '[0-9]+ skipped' <<< "$output"; then
+            echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: BLOCKED_TESTS_SKIPPED"
+            exit 1
+          fi
+          echo "BIBLIOTECARIO_LIVE_ECP_SCOPE_PROBE: PASS"
