@@ -62,6 +62,43 @@ jobs:
         if: steps.wif_gate.outputs.configured == 'true'
         run: python -m pip install --quiet google-api-python-client google-auth
 
+
+      - name: Discover authoritative index candidates and reusable agent documents
+        if: steps.wif_gate.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from googleapiclient.discovery import build
+          drive = build("drive", "v3")
+          queries = [
+              "name contains 'INDICE_MAESTRO' and trashed = false",
+              "name contains 'BIBLIOTECARIO_IA_AUREA_UNIVERSAL' and trashed = false",
+              "name contains 'PROTOCOLO_OPERATIVO_v2' and trashed = false",
+              "name contains 'MANUAL_CONEXION_MULTI_IA_v2' and trashed = false",
+              "name contains 'MANUAL_INSTALACION_v2' and trashed = false",
+          ]
+          all_files = {}
+          for query in queries:
+              token = None
+              while True:
+                  result = drive.files().list(
+                      q=query, pageSize=1000, pageToken=token,
+                      orderBy="name",
+                      fields="nextPageToken,files(id,name,mimeType,modifiedTime,parents,capabilities(canEdit))",
+                      includeItemsFromAllDrives=True, supportsAllDrives=True
+                  ).execute()
+                  for item in result.get("files", []):
+                      all_files[item["id"]] = item
+                  token = result.get("nextPageToken")
+                  if not token:
+                      break
+          print(f"KNOWLEDGE_OS_REUSABLE_CANDIDATE_COUNT: {len(all_files)}")
+          print("=== INDEX / BIBLIOTECARIO / PROTOCOL CANDIDATES (METADATA ONLY) ===")
+          print(json.dumps(sorted(all_files.values(), key=lambda x: x.get("name", "")), indent=2, ensure_ascii=False))
+          print("DISCOVERY_COMPLETE: PASS")
+          PY
+
       - name: Read exact institutional v011 index content
         if: steps.wif_gate.outputs.configured == 'true'
         env:
@@ -70,16 +107,27 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import hashlib
+          import io
           import json
           import os
           from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+
+          def download_text(drive, file_id):
+              request = drive.files().get_media(fileId=file_id)
+              buffer = io.BytesIO()
+              downloader = MediaIoBaseDownload(buffer, request)
+              done = False
+              while not done:
+                  _, done = downloader.next_chunk()
+              return buffer.getvalue().decode("utf-8")
 
           index_id = os.environ["INDEX_ID"]
           drive = build("drive", "v3")
 
           meta = drive.files().get(
               fileId=index_id,
-              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy)"
+              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy),shortcutDetails(targetId,targetMimeType)"
           ).execute()
 
           print("=== V011 METADATA ===")
@@ -90,13 +138,7 @@ jobs:
           if meta.get("capabilities", {}).get("canEdit") is not False:
               raise SystemExit("KNOWLEDGE_OS_INDEX_WRITE_CAPABILITY_NOT_DENIED")
 
-          response = drive.files().get(fileId=index_id, alt="media").execute()
-          if isinstance(response, bytes):
-              raw = response.decode("utf-8")
-          elif isinstance(response, str):
-              raw = response
-          else:
-              raw = json.dumps(response, ensure_ascii=False, sort_keys=True)
+          raw = download_text(drive, index_id)
 
           digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
           print(f"V011_CONTENT_SHA256: {digest}")
@@ -115,5 +157,95 @@ jobs:
               print(f"LIST_LENGTH: {len(parsed)}")
           else:
               print(f"ROOT_TYPE: {type(parsed).__name__}")
+
+          print("=== V007 AUTHORITATIVE CANDIDATE CHECK ===")
+          v007_id = "1K9cWDYsTBr9ctkh6rnr-vONy8yFGnoGY"
+          v007_meta = drive.files().get(
+              fileId=v007_id,
+              fields="id,name,mimeType,parents,modifiedTime,version,capabilities(canEdit,canDownload,canCopy),shortcutDetails(targetId,targetMimeType)"
+          ).execute()
+          print(json.dumps(v007_meta, indent=2))
+          v007_raw = download_text(drive, v007_id)
+          print(f"V007_CONTENT_BYTES: {len(v007_raw.encode('utf-8'))}")
+          try:
+              v007 = json.loads(v007_raw)
+              print("V007_TOP_LEVEL_KEYS: " + ",".join(sorted(v007.keys())) if isinstance(v007, dict) else f"V007_ROOT_TYPE: {type(v007).__name__}")
+              if isinstance(v007, dict):
+                  print(f"V007_REGISTROS_COUNT: {len(v007.get('registros', []))}")
+                  print(f"V007_VERSION: {v007.get('version', v007.get('version_indice', 'NOT_EXPLICIT'))}")
+          except json.JSONDecodeError as exc:
+              print(f"V007_NOT_JSON: {exc}")
+          print("V007_CANDIDATE_CHECK: COMPLETE")
+
+
+          if isinstance(parsed, dict):
+              print(f"V011_VERSION: {parsed.get('version_indice', 'NOT_EXPLICIT')}")
+              print(f"V011_STATE: {parsed.get('estado_indice', 'NOT_EXPLICIT')}")
+              print(f"V011_TOTAL_REGISTROS: {parsed.get('total_registros', 'NOT_EXPLICIT')}")
+              print(f"V011_NEW_RECORDS_COUNT: {len(parsed.get('registros_nuevos_v011', []))}")
+              print(f"V011_PREVIOUS_INDEX_REF: {parsed.get('indice_anterior', 'NOT_EXPLICIT')}")
+              print(f"V011_INDEX_FIELD_TYPE: {type(parsed.get('indice')).__name__}")
+              new_records = parsed.get("registros_nuevos_v011", [])
+              print("=== V011 NEW RECORD METADATA ===")
+              print(json.dumps([
+                  {k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version")}
+                  for item in new_records if isinstance(item, dict)
+              ], indent=2, ensure_ascii=False))
+
+
+          print("=== V011 VERSION-CHAIN SUMMARY ===")
+          cursor_id = index_id
+          seen_index_ids = set()
+          indexed_records = {}
+          chain_summary = []
+          while cursor_id and cursor_id not in seen_index_ids:
+              seen_index_ids.add(cursor_id)
+              version_meta = drive.files().get(
+                  fileId=cursor_id,
+                  fields="id,name,modifiedTime,capabilities(canEdit)"
+              ).execute()
+              version_raw = download_text(drive, cursor_id)
+              try:
+                  version_data = json.loads(version_raw)
+              except json.JSONDecodeError:
+                  print(f"INDEX_CHAIN_INVALID_JSON: {cursor_id}")
+                  break
+              record_lists = []
+              if isinstance(version_data, dict):
+                  if isinstance(version_data.get("registros"), list):
+                      record_lists.append(version_data["registros"])
+                  for key, value in version_data.items():
+                      if key.startswith("registros_nuevos") and isinstance(value, list):
+                          record_lists.append(value)
+                  local_count = sum(len(items) for items in record_lists)
+                  chain_summary.append({
+                      "fileId": cursor_id,
+                      "name": version_meta.get("name"),
+                      "version": version_data.get("version_indice"),
+                      "state": version_data.get("estado_indice"),
+                      "declaredTotal": version_data.get("total_registros"),
+                      "recordsInLists": local_count,
+                  })
+                  for items in record_lists:
+                      for item in items:
+                          if isinstance(item, dict) and item.get("id"):
+                              indexed_records[item["id"]] = item
+                  previous = version_data.get("indice_anterior")
+                  cursor_id = previous.get("fileId") if isinstance(previous, dict) else None
+              else:
+                  break
+          print("INDEX_CHAIN: " + json.dumps(chain_summary, ensure_ascii=False))
+          print(f"INDEX_CHAIN_UNIQUE_RECORD_IDS: {len(indexed_records)}")
+          print("=== ECP / REUSABLE AGENT RECORD MATCHES ===")
+          matches = [
+              {k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "componente_reutilizable", "ubicacion")}
+              for item in indexed_records.values()
+              if "ECP" in str(item).upper()
+              or "CONTRATACION PUBLICA" in str(item).upper()
+              or item.get("id") in {"AKL-002", "AKL-031", "AKL-034", "AKL-035"}
+          ]
+          print(json.dumps(matches, indent=2, ensure_ascii=False))
+          print("VERSION_CHAIN_READ_ONLY: PASS")
+
           print("V011_CONTENT_PROBE: PASS")
           PY
