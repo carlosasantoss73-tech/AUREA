@@ -4,7 +4,7 @@
 
 ECP no tendrá un segundo Bibliotecario ni un índice institucional paralelo. Su conocimiento específico será un **ámbito de proyecto dentro del Universal AI Librarian / Knowledge OS**, con identificador lógico `ecp`, sujeto al índice maestro vigente y a las reglas del Bibliotecario Universal.
 
-La entrada de ECP en la biblioteca institucional aún requiere confirmación/registro en el índice maestro por el procedimiento autorizado. Este documento de código no modifica Google Drive ni declara que ese registro ya exista.
+La lectura real de v011 (estado VIGENTE) recorrió la cadena v011→v001 y recuperó 45 IDs únicos; no se encontró un registro cuyo proyecto sea ECP. La entrada de ECP requiere una propuesta de registro y aprobación/incorporación mediante el flujo autorizado. Este código no modifica Google Drive ni declara que el registro ya exista.
 
 ## Tipos de conocimiento ECP
 
@@ -42,5 +42,8 @@ El runtime ECP no modifica directamente el índice maestro ni documentos institu
 
 - Contrato de alcance: DOCUMENTADO.
 - Composición del Context Retrieval Gate compartido con el pack ECP: IMPLEMENTADA en código; CI pendiente.
-- Conector live al Bibliotecario y registro efectivo de ECP en el índice vigente: NO DEMOSTRADOS.
+- Lectura real de metadatos/índice: VALIDADA en GitHub Actions mediante WIF y descarga de medios.
+- Búsqueda por proyecto y recuperación del archivo fuente en runtime: NO IMPLEMENTADAS.
+- Registro efectivo de ECP en el índice vigente: NO DEMOSTRADO.
+- Inconsistencia documental pendiente: AKL-002 aparece con estado PROPUESTA en v011, aunque una referencia de continuidad declara DEC-001 como aprobación; no resolver sin leer ambas fuentes primarias.
 - Operación de auditoría completa: NO OPERATIVA hasta validar recuperación, ingesta, citas y expediente original.
