@@ -48,7 +48,8 @@ describe("chunkExtractedEvidence", () => {
   it("rejects missing source metadata and empty extracted documents", () => {
     expect(() => chunkExtractedEvidence({ ...base, documentId: " " })).toThrowError(EvidenceChunkingError);
     try { chunkExtractedEvidence({ ...base, documentId: " " }); } catch (error) { expect((error as EvidenceChunkingError).code).toBe("ECP_SOURCE_METADATA_REQUIRED"); }
-    expect(() => chunkExtractedEvidence({ ...base, blocks: [] })).toThrow("ECP_DOCUMENT_TEXT_EMPTY");
+    expect(() => chunkExtractedEvidence({ ...base, blocks: [] })).toThrowError(EvidenceChunkingError);
+    try { chunkExtractedEvidence({ ...base, blocks: [] }); } catch (error) { expect((error as EvidenceChunkingError).code).toBe("ECP_DOCUMENT_TEXT_EMPTY"); }
   });
 
   it("rejects invalid limits", () => {
