@@ -65,35 +65,37 @@ jobs:
 
       - name: Discover authoritative index candidates and reusable agent documents
         if: steps.wif_gate.outputs.configured == 'true'
-        env:
-          ROOT_ID: ${{ env.AUREA_KNOWLEDGE_OS_ROOT_ID }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os
+          import json
           from googleapiclient.discovery import build
           drive = build("drive", "v3")
-          root_id = os.environ["ROOT_ID"]
-          query = f"'{root_id}' in parents and trashed = false"
-          fields = "files(id,name,mimeType,modifiedTime,parents,capabilities(canEdit))"
-          result = drive.files().list(
-              q=query, pageSize=1000, orderBy="name", fields=fields,
-              includeItemsFromAllDrives=True, supportsAllDrives=True
-          ).execute()
-          files = result.get("files", [])
-          print(f"KNOWLEDGE_OS_ROOT_CHILDREN_COUNT: {len(files)}")
-          names = {
-              "INDICE_MAESTRO_v007.json",
-              "INDICE_MAESTRO_v011.json",
-              "INDICE_MAESTRO_v011",
-              "BIBLIOTECARIO_IA_AUREA_UNIVERSAL_v2.md",
-              "PROTOCOLO_OPERATIVO_v2.md",
-              "MANUAL_CONEXION_MULTI_IA_v2.md",
-              "MANUAL_INSTALACION_v2.md",
-          }
-          candidates = [f for f in files if f.get("name") in names or "INDICE_MAESTRO" in f.get("name", "")]
-          print("=== AUTHORITATIVE INDEX / REUSABLE DOCUMENT CANDIDATES ===")
-          print(json.dumps(candidates, indent=2, ensure_ascii=False))
+          queries = [
+              "name contains 'INDICE_MAESTRO' and trashed = false",
+              "name contains 'BIBLIOTECARIO_IA_AUREA_UNIVERSAL' and trashed = false",
+              "name contains 'PROTOCOLO_OPERATIVO_v2' and trashed = false",
+              "name contains 'MANUAL_CONEXION_MULTI_IA_v2' and trashed = false",
+              "name contains 'MANUAL_INSTALACION_v2' and trashed = false",
+          ]
+          all_files = {}
+          for query in queries:
+              token = None
+              while True:
+                  result = drive.files().list(
+                      q=query, pageSize=1000, pageToken=token,
+                      orderBy="name",
+                      fields="nextPageToken,files(id,name,mimeType,modifiedTime,parents,capabilities(canEdit))",
+                      includeItemsFromAllDrives=True, supportsAllDrives=True
+                  ).execute()
+                  for item in result.get("files", []):
+                      all_files[item["id"]] = item
+                  token = result.get("nextPageToken")
+                  if not token:
+                      break
+          print(f"KNOWLEDGE_OS_REUSABLE_CANDIDATE_COUNT: {len(all_files)}")
+          print("=== INDEX / BIBLIOTECARIO / PROTOCOL CANDIDATES (METADATA ONLY) ===")
+          print(json.dumps(sorted(all_files.values(), key=lambda x: x.get("name", "")), indent=2, ensure_ascii=False))
           print("DISCOVERY_COMPLETE: PASS")
           PY
 
