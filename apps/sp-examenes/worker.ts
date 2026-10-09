@@ -1,5 +1,5 @@
 interface Env {
-  ANTHROPIC_API_KEY: string;
+  GEMINI_API_KEY: string;
   SP_EXAMENES_MODEL?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
@@ -92,7 +92,7 @@ export default {
     if (image && (!["image/jpeg", "image/png", "image/webp"].includes(mimeType) || image.length > 5_600_000)) {
       return Response.json({ error: "Imagen no admitida o demasiado grande." }, { status: 400 });
     }
-    if (!env.ANTHROPIC_API_KEY) return Response.json({ error: "El motor de respuestas aún no está configurado." }, { status: 503 });
+    if (!env.GEMINI_API_KEY) return Response.json({ error: "El motor Gemini aún no está configurado. El administrador debe añadir el secreto GEMINI_API_KEY al entorno de despliegue." }, { status: 503 });
 
     const official = await readOfficialSources();
     const goodSources = official.results.filter(s => s.ok);
@@ -131,31 +131,38 @@ export default {
       "6. Cita título y URL oficial exactos; no fabriques enlaces. Incluye fecha/hora de consulta " + official.checkedAt + ".\n" +
       "7. Devuelve: Respuesta propuesta; Fundamento verificable; Fuentes oficiales; Qué no se pudo verificar; Confianza (alta/media/baja).\n" +
       "8. Si la imagen está borrosa o la pregunta/opciones están incompletas, pide una foto más clara o el texto.\n\n" +
-      "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext;
+      "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext + "\nPDF NORMATIVOS ADJUNTOS A ESTA SOLICITUD:\n" + selectedDocs.map(d => d.title + " — " + d.url).join("\n");
 
     const userContent: Array<Record<string, unknown>> = [];
     for (const doc of selectedDocs) {
-      userContent.push({ type: "document", title: doc.title, context: "Documento normativo oficial alojado en el dominio de SERCOP. Verifica la vigencia y las reformas posteriores antes de usarlo.", source: { type: "url", url: doc.url } });
+      userContent.push({ type: "document", uri: doc.url, mime_type: "application/pdf" });
     }
-    if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question }); 
-    if (image) userContent.push({ type: "image", source: { type: "base64", media_type: mimeType, data: image } });
+    if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question });
+    if (image) userContent.push({ type: "image", data: image, mime_type: mimeType });
     userContent.push({ type: "text", text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1/interactions", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({
-          model: env.SP_EXAMENES_MODEL || "claude-sonnet-5",
-          max_tokens: 1400,
-          system: system,
-          messages: [{ role: "user", content: userContent }]
+          model: env.SP_EXAMENES_MODEL || "gemini-3.8-flash",
+          store: false,
+          system_instruction: system,
+          generation_config: { max_output_tokens: 1400, thinking_level: "low" },
+          input: userContent
         })
       });
-      const data = await response.json() as { content?: Array<{ type?: string; text?: string }>; error?: { message?: string } };
-      if (!response.ok) return Response.json({ error: "El proveedor de IA no respondió correctamente (" + response.status + ")." }, { status: 502 });
-      const answer = (data.content || []).filter(x => x.type === "text").map(x => x.text || "").join("\n").trim();
-      if (!answer) return Response.json({ error: "El proveedor no devolvió texto verificable." }, { status: 502 });
+      const data = await response.json() as {
+        steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+        error?: { message?: string };
+        status?: string;
+      };
+      if (!response.ok) return Response.json({ error: "Gemini no respondió correctamente (" + response.status + ")." }, { status: 502 });
+      const answer = (data.steps || []).filter(s => s.type === "model_output")
+        .flatMap(s => s.content || []).filter(x => x.type === "text")
+        .map(x => x.text || "").join("\n").trim();
+      if (!answer) return Response.json({ error: "Gemini no devolvió texto verificable." }, { status: 502 });
       return Response.json({
         answer: answer,
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })).concat(selectedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt }))),
