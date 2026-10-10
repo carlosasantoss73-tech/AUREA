@@ -41,9 +41,11 @@ El runtime ECP no modifica directamente el índice maestro ni documentos institu
 ## Estado
 
 - Contrato de alcance: DOCUMENTADO.
-- Composición del Context Retrieval Gate compartido con el pack ECP: IMPLEMENTADA en código; CI pendiente.
+- Composición lector Google Drive → proveedor institucional → Context Retrieval Gate → adaptador ECP: IMPLEMENTADA en `src/ecp/register-google-drive-ecp-execution.ts`; PR #186 fusionada y CI aprobado.
+- Prueba live de la composición: VALIDADA en GitHub Actions (run #117, 3/3 pruebas); con el índice real v011 la ruta se bloqueó de forma segura porque no hay registros ECP aprobados y el proveedor no fue invocado.
 - Lectura real de metadatos/índice: VALIDADA en GitHub Actions mediante WIF y descarga de medios.
-- Búsqueda por proyecto y recuperación del archivo fuente en runtime: NO IMPLEMENTADAS.
+- Lectura del índice, búsqueda explícita por proyecto y filtro de estados: VALIDADOS en prueba live; la consulta `ecp` devuelve cero registros aprobados.
+- Recuperación y lectura del contenido de los archivos fuente institucionales como parte de una auditoría real: PENDIENTE DE VALIDACIÓN END-TO-END.
 - Registro efectivo de ECP en el índice vigente: NO DEMOSTRADO.
 - Inconsistencia documental pendiente: AKL-002 aparece con estado PROPUESTA en v011, aunque una referencia de continuidad declara DEC-001 como aprobación; no resolver sin leer ambas fuentes primarias.
-- Operación de auditoría completa: NO OPERATIVA hasta validar recuperación, ingesta, citas y expediente original.
+- Operación de auditoría completa: NO OPERATIVA hasta incorporar el registro ECP por el flujo institucional autorizado y validar ingesta, citas y un expediente original.
