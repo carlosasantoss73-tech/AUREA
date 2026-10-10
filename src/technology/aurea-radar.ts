@@ -1,0 +1,6 @@
+export type RadarDisposition = "EXPLOIT" | "INTEGRATE" | "EXPERIMENT" | "WATCH" | "DISCARD";
+export interface RadarEvidence { sourceId:string; sourceType:"VIDEO"|"ARTICLE"|"REPOSITORY"|"DOCUMENT"|"OTHER"; capturedAt:string; claims:string[]; verified:boolean; }
+export interface RadarOpportunity { id:string; title:string; category:"AGENT"|"SKILL"|"CONNECTOR"|"PROVIDER"|"MEDIA"|"EDUCATION"|"PLATFORM"|"OTHER"; evidence:RadarEvidence[]; reuseTargets:string[]; disposition:RadarDisposition; rationale:string; confidence:"LOW"|"MEDIUM"|"HIGH"; }
+export interface RadarReport { reportId:string; createdAt:string; subject:string; opportunities:RadarOpportunity[]; unresolvedQuestions:string[]; }
+export function validateRadarOpportunity(o:RadarOpportunity):void { if(!o.id.trim())throw new Error("RADAR_ID_REQUIRED"); if(!o.title.trim())throw new Error("RADAR_TITLE_REQUIRED"); if(!o.evidence.length)throw new Error("RADAR_EVIDENCE_REQUIRED"); if(o.evidence.some(e=>!e.sourceId.trim()))throw new Error("RADAR_SOURCE_ID_REQUIRED"); if(!o.rationale.trim())throw new Error("RADAR_RATIONALE_REQUIRED"); }
+export function buildRadarOpportunity(input:Omit<RadarOpportunity,"evidence">&{evidence:RadarEvidence[]}):RadarOpportunity { const o={...input}; validateRadarOpportunity(o); return o; }
