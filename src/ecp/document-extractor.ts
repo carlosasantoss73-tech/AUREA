@@ -79,11 +79,9 @@ function scalarText(value: unknown): string {
 }
 
 async function extractPdf(bytes: Uint8Array, limits: Required<DocumentExtractionLimits>): Promise<ExtractedDocumentEvidence> {
-  let document: Awaited<ReturnType<ReturnType<typeof getDocument>["promise"]["then"]>> | undefined;
   const loadingTask = getDocument({ data: new Uint8Array(bytes) });
   try {
     const pdf = await loadingTask.promise;
-    document = pdf as never;
     if (pdf.numPages > limits.maxPdfPages) {
       throw new DocumentExtractionError("ECP_PDF_PAGE_LIMIT_EXCEEDED", `pages=${pdf.numPages};limit=${limits.maxPdfPages}`);
     }
