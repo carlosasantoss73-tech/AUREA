@@ -25,8 +25,10 @@ describe("ingestEcpDocument", () => {
     expect(result.chunks[0].projectId).toBe("ecp");
     expect(result.chunks[0].documentId).toBe("MATRIZ-ORIGINAL-01");
     expect(result.chunks[0].version).toBe(result.sourceVersion);
-    expect(result.chunks[0].locator).toBe("Requisitos!A1:B1");
-    expect(result.chunks.some((chunk) => chunk.locator === "Requisitos!A2:B2")).toBe(true);
+    expect(result.chunks[0].locator).toContain("Requisitos!A1:B1");
+    expect(result.chunks[0].locator).toContain("Requisitos!A2:B2");
+    expect(result.chunks[0].text).toContain("LOCALIZADOR ROW_RANGE: Requisitos!A1:B1");
+    expect(result.chunks[0].text).toContain("LOCALIZADOR ROW_RANGE: Requisitos!A2:B2");
   });
 
   it("rejects non-ECP scope before parsing the source", async () => {
