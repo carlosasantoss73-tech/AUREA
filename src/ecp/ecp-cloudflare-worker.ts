@@ -5,9 +5,15 @@ import { createEcpExpedientHttpHandler } from "./expedient-http-api.js";
 import { EcpDurableObjectExpedientStore, EcpExpedientStateDurableObject, type DurableObjectNamespaceBinding } from "./expedient-store.js";
 import { verifyCloudflareAccessJwt } from "./cloudflare-access-auth.js";
 import { ECP_PILOT_HTML } from "./pilot-ui.js";
+import { ConchitaAnthropicExecutionAdapter } from "../conchita-anthropic-execution-adapter.js";
+import { ConchitaDurableObjectExecutionResultStore, ConchitaExecutionStateDurableObject, type ConchitaExecutionStateStub } from "../conchita-durable-object-execution-result-store.js";
+import { executeEcpExpedientAnalysis } from "./expedient-analysis-runtime.js";
 
 interface Env {
   ECP_EXPEDIENT_STATE: DurableObjectNamespaceBinding;
+  ECP_EXECUTION_STATE: { idFromName(name: string): unknown; get(id: unknown): ConchitaExecutionStateStub };
+  ANTHROPIC_API_KEY: string;
+  ECP_ANTHROPIC_MODEL: string;
   ECP_ACCESS_TEAM_DOMAIN: string;
   ECP_ACCESS_AUD: string;
   ECP_ACCESS_ACTOR_ROLE: string;
@@ -35,7 +41,7 @@ function contextReadiness(env: Env) {
   return { missing, ready: missing.length === 0 };
 }
 
-export { EcpExpedientStateDurableObject };
+export { EcpExpedientStateDurableObject, ConchitaExecutionStateDurableObject };
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -55,12 +61,15 @@ export default {
     if (url.pathname === "/health") {
       const runtime = runtimeReadiness(env);
       const context = contextReadiness(env);
+      const providerMissing = [!env.ANTHROPIC_API_KEY ? "ANTHROPIC_API_KEY" : "", !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "", !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : ""].filter(Boolean);
       const ready = runtime.ready;
       return response({
         status: !runtime.ready ? "BLOCKED" : context.ready ? "HEALTHY" : "INTAKE_READY_CONTEXT_BLOCKED",
         missing: [...runtime.missing, ...context.missing],
         runtimeReady: runtime.ready,
         institutionalContextReady: context.ready,
+        analysisReady: runtime.ready && context.ready && providerMissing.length === 0,
+        analysisMissing: providerMissing,
       }, ready ? 200 : 503);
     }
 
@@ -73,7 +82,7 @@ export default {
     });
     if (!jwt || !jwt.subject.trim()) return response({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
 
-    if (url.pathname.endsWith("/analysis-readiness")) {
+    if (url.pathname.endsWith("/analysis-readiness") || url.pathname.endsWith("/analyze")) {
       const context = contextReadiness(env);
       if (!context.ready) return response({
         status: "BLOCKED",
@@ -100,6 +109,19 @@ export default {
       authenticate: async () => ({ clientId, actorId, actorRole: env.ECP_ACCESS_ACTOR_ROLE }),
       store: new EcpDurableObjectExpedientStore(clientId, env.ECP_EXPEDIENT_STATE.get(stateId)),
       contextGate: new ContextRetrievalGate(createGoogleDriveInstitutionalContextProvider(reader)),
+      analyze: async (record, principal) => {
+        if (!env.ANTHROPIC_API_KEY) return { status: "BLOCKED", traceId: crypto.randomUUID(), evidence: [], error: "ANTHROPIC_API_KEY_MISSING" };
+        if (!env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_")) return { status: "BLOCKED", traceId: crypto.randomUUID(), evidence: [], error: "ECP_ANTHROPIC_MODEL_MISSING" };
+        if (!env.ECP_EXECUTION_STATE) return { status: "BLOCKED", traceId: crypto.randomUUID(), evidence: [], error: "ECP_EXECUTION_STATE_MISSING" };
+        const resultStateId = env.ECP_EXECUTION_STATE.idFromName(`ecp-analysis:${principal.clientId}`);
+        const providerAdapter = new ConchitaAnthropicExecutionAdapter("anthropic", { apiKey: env.ANTHROPIC_API_KEY, maxTokens: 4096 });
+        return executeEcpExpedientAnalysis(record, principal, {
+          providerAdapter,
+          modelId: env.ECP_ANTHROPIC_MODEL,
+          contextGate: new ContextRetrievalGate(createGoogleDriveInstitutionalContextProvider(reader)),
+          resultStore: new ConchitaDurableObjectExecutionResultStore(env.ECP_EXECUTION_STATE.get(resultStateId)),
+        });
+      },
     });
     return handler(request);
   },
