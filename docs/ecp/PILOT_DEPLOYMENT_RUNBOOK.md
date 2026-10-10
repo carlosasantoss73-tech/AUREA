@@ -1,10 +1,10 @@
 # ECP pilot — deployment and acceptance runbook
 
-**Status at 2026-10-10:** implementation branch/PR #199; not merged or deployed. Do not call the pilot operational until the end-to-end gates below pass.
+**Status at 2026-10-10:** PR #199 is merged into `main` at `41cccaa57a3369d7bad89185cc6fc5c6d3ec7bed`. The Worker is **not deployed** and the pilot is **not operational**. Do not call the pilot operational until the end-to-end gates below pass.
 
 ## A. Deploy the intake shell safely
 
-1. Merge PR #199 only after CI passes, including `ECP Cloudflare Worker Build` (Wrangler dry-run) and `AUREA P0`.
+1. PR #199 is already merged. Post-merge evidence checked: AUREA Cloud Continuity, Windows Migration Audit, and the AUREA P0 check passed; the ECP Worker Build is a dry-run only and does not deploy.
 2. In GitHub Actions, run **ECP Cloudflare Pilot Deploy** with `confirm_deploy=true`. Required repository secrets:
    - `CLOUDFLARE_API_TOKEN` — least-privilege token for Worker deployment and secret updates.
    - `CLOUDFLARE_ACCOUNT_ID`.
@@ -45,6 +45,7 @@ Until this is complete, the ECP institutional gate must block provider execution
 
 ## Current evidence
 
-- PR #199 contains the browser UI, secure Access JWT validation, Durable Object RPC persistence, batch ingestion, and the ECP analysis route composed through AUREA RuntimeAdmission/ExecutionRuntime.
+- Merged PR #199 contains the browser UI, secure Access JWT validation, Durable Object RPC persistence, batch ingestion, and the ECP analysis route composed through AUREA RuntimeAdmission/ExecutionRuntime.
+- Main commit: `41cccaa57a3369d7bad89185cc6fc5c6d3ec7bed`.
 - `ECP Cloudflare Worker Build` uses `wrangler deploy --dry-run --config wrangler.ecp.jsonc`; it bundles the Worker without deploying it.
 - Code and CI status are not evidence of a live deployment or real-expediente analysis.
