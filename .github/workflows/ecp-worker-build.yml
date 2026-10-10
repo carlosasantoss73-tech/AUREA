@@ -1,0 +1,40 @@
+name: ECP Cloudflare Worker Build
+
+on:
+  pull_request:
+    paths:
+      - "src/ecp/**"
+      - "src/context/**"
+      - "src/conchita-anthropic-execution-adapter.ts"
+      - "src/conchita-durable-object-execution-result-store.ts"
+      - "src/execution-runtime.ts"
+      - "src/runtime-admission.ts"
+      - "src/provider-runtime.ts"
+      - "src/execution-gate.ts"
+      - "src/aurea-platform-integration.ts"
+      - "src/work-cell.ts"
+      - "src/sentinel.ts"
+      - "src/health-ledger.ts"
+      - "wrangler.ecp.jsonc"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ecp-worker-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Bundle ECP Worker without deploying
+        run: npx wrangler deploy --dry-run --config wrangler.ecp.jsonc
