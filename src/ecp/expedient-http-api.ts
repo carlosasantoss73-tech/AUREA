@@ -1,6 +1,6 @@
 import type { ContextRetrievalGate } from "../context/context-retrieval-gate.js";
 import { composeEcpContext } from "./context-pipeline.js";
-import { intakeEcpExpedient, type EcpExpedientDocumentInput, type EcpExpedientIntakeInput } from "./expedient-intake.js";
+import { appendEcpExpedientIntake, intakeEcpExpedient, type EcpExpedientDocumentInput, type EcpExpedientIntakeInput } from "./expedient-intake.js";
 import type { EcpExpedientStore } from "./expedient-store.js";
 
 export interface EcpAuthenticatedPrincipal { clientId: string; actorId: string; actorRole: string; }
@@ -14,6 +14,7 @@ export interface EcpExpedientHttpDependencies {
 
 type ApiDocument = Omit<EcpExpedientDocumentInput, "bytes" | "projectId"> & { contentBase64: string };
 type ApiIntake = { metadata: EcpExpedientIntakeInput["metadata"]; documents: ApiDocument[] };
+type ApiAppend = { documents: ApiDocument[] };
 const MAX_REQUEST_BYTES = 28 * 1024 * 1024;
 
 function json(body: unknown, status = 200): Response {
@@ -46,6 +47,7 @@ export function createEcpExpedientHttpHandler(deps: EcpExpedientHttpDependencies
     if (!match) return json({ status: "BLOCKED", error: "NOT_FOUND" }, 404);
     if (request.method === "POST" && !match[1]) return createIntake(request, principal, deps);
     if (request.method === "GET" && match[1] && !match[2]) return readIntake(match[1], principal, deps);
+    if (request.method === "POST" && match[1] && match[2] === "documents") return appendDocuments(request, match[1], principal, deps);
     if (request.method === "POST" && match[1] && match[2] === "analysis-readiness") return analysisReadiness(match[1], principal, deps);
     return json({ status: "BLOCKED", error: "METHOD_NOT_ALLOWED" }, 405);
   };
@@ -83,4 +85,22 @@ async function analysisReadiness(expedientId: string, principal: EcpAuthenticate
     if (composed.status !== "READY") return json({ status: "BLOCKED", error: "ECP_INSTITUTIONAL_CONTEXT_BLOCKED", blockers: composed.blockers, traceId: composed.traceId }, 409);
     return json({ status: "READY_FOR_CONTROLLED_EXECUTION", expedientId, traceId: composed.traceId, contextSources: composed.pack?.sources.map((source) => ({ documentId: source.documentId, version: source.version })) ?? [] });
   } catch (error) { return json({ status: "BLOCKED", error: error instanceof Error ? error.message : "ECP_CONTEXT_RETRIEVAL_FAILED" }, 503); }
+}
+
+async function appendDocuments(request: Request, expedientId: string, principal: EcpAuthenticatedPrincipal, deps: EcpExpedientHttpDependencies): Promise<Response> {
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return json({ status: "BLOCKED", error: "JSON_REQUIRED" }, 415);
+  const body = await request.arrayBuffer();
+  if (body.byteLength > MAX_REQUEST_BYTES) return json({ status: "BLOCKED", error: "REQUEST_TOO_LARGE" }, 413);
+  let parsed: ApiAppend;
+  try { parsed = JSON.parse(new TextDecoder().decode(body)) as ApiAppend; } catch { return json({ status: "BLOCKED", error: "INVALID_JSON" }, 400); }
+  if (!parsed || !Array.isArray(parsed.documents) || parsed.documents.length === 0) return json({ status: "BLOCKED", error: "INVALID_APPEND_REQUEST" }, 400);
+  const existing = await deps.store.get(principal.clientId, expedientId);
+  if (!existing) return json({ status: "BLOCKED", error: "EXPEDIENT_NOT_FOUND" }, 404);
+  try {
+    const documents = parsed.documents.map(({ contentBase64, ...document }) => ({ ...document, projectId: "ecp", bytes: decodeBase64(contentBase64) }));
+    const intake = await appendEcpExpedientIntake(existing.intake, documents);
+    const updated = { ...existing, intake };
+    await deps.store.save(updated);
+    return json({ status: "UPDATED", expedientId, intake: summary(intake) });
+  } catch (error) { return json({ status: "BLOCKED", error: error instanceof Error ? error.message : "ECP_APPEND_FAILED" }, 422); }
 }
