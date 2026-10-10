@@ -1,0 +1,64 @@
+import { ContextRetrievalGate } from "../context/context-retrieval-gate.js";
+import { createGoogleDriveInstitutionalContextProvider } from "../context/google-drive-institutional-context-provider.js";
+import { GoogleDriveInstitutionalReader } from "../context/google-drive-institutional-reader.js";
+import { createEcpExpedientHttpHandler } from "./expedient-http-api.js";
+import { EcpDurableObjectExpedientStore, EcpExpedientStateDurableObject, type DurableObjectNamespaceBinding } from "./expedient-store.js";
+import { verifyCloudflareAccessJwt } from "./cloudflare-access-auth.js";
+
+interface Env {
+  ECP_EXPEDIENT_STATE: DurableObjectNamespaceBinding;
+  ECP_ACCESS_TEAM_DOMAIN: string;
+  ECP_ACCESS_AUD: string;
+  ECP_ACCESS_ACTOR_ROLE: string;
+  ECP_INSTITUTIONAL_INDEX_FILE_ID: string;
+  ECP_GOOGLE_DRIVE_ACCESS_TOKEN: string;
+}
+
+function response(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+}
+
+function readiness(env: Env) {
+  const missing: string[] = [];
+  if (!env.ECP_EXPEDIENT_STATE) missing.push("ECP_EXPEDIENT_STATE");
+  if (!env.ECP_ACCESS_TEAM_DOMAIN || env.ECP_ACCESS_TEAM_DOMAIN.startsWith("REPLACE_")) missing.push("ECP_ACCESS_TEAM_DOMAIN");
+  if (!env.ECP_ACCESS_AUD || env.ECP_ACCESS_AUD.startsWith("REPLACE_")) missing.push("ECP_ACCESS_AUD");
+  if (!env.ECP_ACCESS_ACTOR_ROLE || env.ECP_ACCESS_ACTOR_ROLE.startsWith("REPLACE_")) missing.push("ECP_ACCESS_ACTOR_ROLE");
+  if (!env.ECP_INSTITUTIONAL_INDEX_FILE_ID || env.ECP_INSTITUTIONAL_INDEX_FILE_ID.startsWith("REPLACE_")) missing.push("ECP_INSTITUTIONAL_INDEX_FILE_ID");
+  if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
+  return { missing, ready: missing.length === 0 };
+}
+
+export { EcpExpedientStateDurableObject };
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/health") {
+      const state = readiness(env);
+      return response({ status: state.ready ? "HEALTHY" : "BLOCKED", missing: state.missing }, state.ready ? 200 : 503);
+    }
+
+    const state = readiness(env);
+    if (!state.ready) return response({ status: "BLOCKED", error: "ECP_WORKER_CONFIGURATION_INCOMPLETE", missing: state.missing }, 503);
+
+    const jwt = await verifyCloudflareAccessJwt(request.headers.get("cf-access-jwt-assertion"), {
+      teamDomain: env.ECP_ACCESS_TEAM_DOMAIN,
+      audience: env.ECP_ACCESS_AUD,
+    });
+    if (!jwt || !jwt.subject.trim()) return response({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
+
+    // Identity is derived only from the cryptographically verified Access JWT.
+    // Per-subject isolation is safe for the pilot; organization-level tenancy is a later explicit contract.
+    const clientId = jwt.subject;
+    const actorId = jwt.subject;
+    const stateId = env.ECP_EXPEDIENT_STATE.idFromName(`ecp-subject:${clientId}`);
+    const reader = new GoogleDriveInstitutionalReader({ indexFileId: env.ECP_INSTITUTIONAL_INDEX_FILE_ID, accessToken: env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN });
+    const handler = createEcpExpedientHttpHandler({
+      authenticate: async () => ({ clientId, actorId, actorRole: env.ECP_ACCESS_ACTOR_ROLE }),
+      store: new EcpDurableObjectExpedientStore(clientId, env.ECP_EXPEDIENT_STATE.get(stateId)),
+      contextGate: new ContextRetrievalGate(createGoogleDriveInstitutionalContextProvider(reader)),
+    });
+    return handler(request);
+  },
+};
