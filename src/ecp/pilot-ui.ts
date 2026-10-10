@@ -30,12 +30,12 @@ button{border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700
 <div class="field wide"><label for="source">URL oficial del procedimiento (si existe)</label><input id="source" type="url" placeholder="https://..."></div>
 </div></section>
 <section class="panel"><h2>2. Cargar originales</h2><p class="small">Selecciona documentos del procedimiento y ofertas. Para cada oferta identifica al oferente tal como aparece en el expediente. No se infiere identidad desde el nombre del archivo.</p>
-<div class="field"><label for="files">Archivos PDF o Excel * (máximo 19 MB por lote)</label><input id="files" type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain"></div>
+<div class="field"><label for="files">Archivos PDF con texto seleccionable o XLSX * (máximo 19 MB por lote)</label><input id="files" type="file" multiple accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
 <div id="fileRows" aria-live="polite"></div>
 <div class="actions"><button id="submit" type="button">Procesar recepción</button></div>
 </section>
 <section class="panel"><h2>3. Resultado de recepción</h2><div id="status" class="status" role="status" aria-live="polite">Consultando estado del servicio…</div><div id="result"></div><div class="actions"><button id="gate" class="secondary" type="button" disabled>Comprobar habilitación normativa</button></div></section>
-<p class="small">Los archivos se envían al servicio protegido. No cargues credenciales ni información ajena al procedimiento. Si la habilitación institucional está bloqueada, la app lo indicará y no continuará a análisis.</p>
+<p class="small">Se admiten PDF con texto seleccionable y XLSX; OCR de PDF escaneados y XLS antiguos aún no están implementados. Los archivos se envían al servicio protegido. No cargues credenciales ni información ajena al procedimiento. Si la habilitación institucional está bloqueada, la app lo indicará y no continuará a análisis.</p>
 </main>
 <script>
 (function(){
