@@ -83,7 +83,7 @@ describe("ECP Durable Object store", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ operation: "save", record: { ...record, clientId: "subject-b" } }),
     });
-    const { store } = makeStore();
+    const store = new EcpDurableObjectExpedientStore("subject-a", direct);
     await expect(store.get("subject-a", "exp-1")).resolves.toBeNull();
   });
 });
