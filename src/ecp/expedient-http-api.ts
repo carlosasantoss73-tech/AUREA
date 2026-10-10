@@ -43,7 +43,7 @@ export function createEcpExpedientHttpHandler(deps: EcpExpedientHttpDependencies
     const principal = await deps.authenticate(request);
     if (!principal?.clientId.trim() || !principal.actorId.trim() || !principal.actorRole.trim()) return json({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
     const url = new URL(request.url);
-    const match = /^\/ecp\/v1\/expedients(?:\/([a-zA-Z0-9_-]{1,80})(?:\/(analysis-readiness))?)?$/.exec(url.pathname);
+    const match = /^\/ecp\/v1\/expedients(?:\/([a-zA-Z0-9_-]{1,80})(?:\/(analysis-readiness|documents))?)?$/.exec(url.pathname);
     if (!match) return json({ status: "BLOCKED", error: "NOT_FOUND" }, 404);
     if (request.method === "POST" && !match[1]) return createIntake(request, principal, deps);
     if (request.method === "GET" && match[1] && !match[2]) return readIntake(match[1], principal, deps);
