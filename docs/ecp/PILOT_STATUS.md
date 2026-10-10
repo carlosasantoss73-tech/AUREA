@@ -1,6 +1,8 @@
 # ECP IA — estado del piloto
 
-Corte: 09-oct-2026. Estado documental separado de operación real.
+Corte: 10-oct-2026. Estado documental separado de operación real.
+
+Actualización técnica: PR #184 (corrección de autorización de lectura) y PR #178 (pruebas del adaptador registrado) fusionadas; PR #186 fusionada con la composición `GoogleDriveInstitutionalReader → ContextProvider → ContextRetrievalGate → ECP adapter`. CI P0 y typecheck pasaron para la composición. PR #185 incorporó `docs/agent-factory/PLANTILLA_MAESTRA_ADAPTACION_AGENTE.md`. Estas integraciones y pruebas no equivalen a despliegue live ni resuelven la falta de registros ECP aprobados en el índice institucional.
 
 Última actualización de continuidad: PR #175 fusionada en `main` (commit `bee1133f70c10f3f4ba5d8d611b0c919024eaa62`; workflow AUREA Cloud Continuity run `37879263548` terminó `success`). El paquete AKL-046 existe en el repositorio como propuesta y borrador de acta; esto NO demuestra que se haya escrito en Drive ni cambia el índice institucional vigente.
 
@@ -23,12 +25,12 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 | Registro efectivo de ECP en el índice maestro vigente | NO DEMOSTRADO | No se halló registro ECP. La propuesta está preparada; falta escritura institucional con permisos autorizados y verificación de lectura posterior. No editar Drive directamente fuera del procedimiento. |
 | Adaptador de ejecución ECP con inyección de contexto institucional | IMPLEMENTADO + PRUEBAS CI APROBADAS | `src/ecp/institutional-execution-adapter.ts`; PR #171 fusionada. En ruta ECP dedicada, exige pack institucional READY antes de llamar al proveedor; aún no está registrada en un deployment ECP. |
 | Sonda live de Bibliotecario enfocada en ECP | VALIDADA LIVE — BLOQUEO REAL CONFIRMADO | Workflow run `37876540709`: autenticación WIF y lectura del índice v011 exitosas; prueba con `projectId: ecp` recuperó 0 registros aprobados y el Context Gate devolvió `BLOCKED` sin fallback. Vitest: 2 pruebas live pasaron. No es fallo de transporte: falta el registro ECP aprobado. |
-| Conector live Bibliotecario → runtime | NO IMPLEMENTADO | `InstitutionalAuthorityReader` sigue siendo una interfaz; no existe implementación externa concreta conectada al runtime |
-| Contexto recuperado entregado al modelo | ADAPTADOR IMPLEMENTADO; DEPLOYMENT NO INTEGRADO | `EcpInstitutionalExecutionAdapter` inyecta pack/citas cuando se registra en una ruta ECP dedicada; el worker actual sigue con provider vacío y no registra la ruta ECP |
+| Composición lector Bibliotecario → contexto ECP → adaptador | IMPLEMENTADA + CI VALIDADO | `src/ecp/register-google-drive-ecp-execution.ts`; PR #186 fusionada. Compone el lector real existente, el proveedor institucional, el gate y el adaptador ECP; requiere token autorizado e ID de índice verificado en el entorno que la invoque. |
+| Contexto recuperado entregado al modelo | COMPOSICIÓN DISPONIBLE; DEPLOYMENT NO INTEGRADO | La nueva función registra el adaptador ECP en un runtime dedicado cuando se invoca; el worker de Conchita sigue con proveedor de contexto vacío y no registra una ruta ECP de producción. |
 | Segmentación de texto extraído con localizadores | IMPLEMENTADA + CI VALIDADO | PR #173 fusionada; conserva documento/versión/localizador y bloquea truncado silencioso. No extrae texto del archivo original. |
 | Ingestión de PDF/Excel/OCR y archivos grandes | NO VALIDADA | El chunker no es parser. Endpoint HTTP revisado es JSON y tiene límite de cuerpo de 16.384 bytes |
 | Auditoría real de ofertas originales | NO VALIDADA | La biblioteca no devolvió los originales de las tres ofertas en las búsquedas efectuadas |
-| Piloto ECP completo | **NO OPERATIVO** | Faltan recuperación live de registros, conexión al runtime, ingesta y caso real con evidencia primaria |
+| Piloto ECP completo | **NO OPERATIVO** | La composición de código está fusionada y pasa CI, pero la sonda live sigue recuperando 0 registros aprobados `ecp`; faltan incorporación institucional autorizada, ruta/runtime desplegado, ingesta de documentos originales y prueba de extremo a extremo con expediente real. |
 
 ## RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION
 
@@ -37,7 +39,7 @@ Corte: 09-oct-2026. Estado documental separado de operación real.
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
 - **ADAPTATION:** el pipeline ECP falla de forma cerrada ante recuperación vacía, proyecto incorrecto, citas locales o metadatos incompletos. Mantener separación entre evidencia primaria, continuidad heredada y aprendizaje documentado.
-- **NEXT ACTION:** (1) habilitar un mecanismo autorizado de escritura en Drive para la cuenta/flujo institucional, con mínimo privilegio y sin claves largas incrustadas; (2) ejecutar el procedimiento AKL-046: crear el archivo institucional en `03_AGENTES`, completar ficha/acta, crear `INDICE_MAESTRO_v012.json` sin sobrescribir v011 y releer para verificar; (3) conectar el adaptador de ejecución a una ruta ECP dedicada con proveedor institucional real; (4) implementar/validar ingesta por lotes PDF/Excel con localizadores; (5) evaluar con ofertas originales y Red Team.
+- **NEXT ACTION:** (1) completar por el flujo autorizado la incorporación institucional del registro ECP en el índice vigente, con mínimo privilegio y sin claves largas incrustadas; (2) ejecutar el procedimiento AKL-046: crear el archivo institucional en `03_AGENTES`, completar ficha/acta, crear `INDICE_MAESTRO_v012.json` sin sobrescribir v011 y releer para verificar; (3) conectar el adaptador de ejecución a una ruta ECP dedicada con proveedor institucional real; (4) implementar/validar ingesta por lotes PDF/Excel con localizadores; (5) evaluar con ofertas originales y Red Team.
 
 ## Intervención requerida del usuario
 
