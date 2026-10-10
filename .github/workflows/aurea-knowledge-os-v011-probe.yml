@@ -252,6 +252,44 @@ jobs:
           ]
           print(json.dumps(matches, indent=2, ensure_ascii=False))
           print("VERSION_CHAIN_READ_ONLY: PASS")
+          existing_akl_046 = indexed_records.get("AKL-046")
+          print("AKL_046_INDEX_STATUS: " + ("PRESENT" if existing_akl_046 else "ABSENT_FROM_READ_INDEX_CHAIN"))
+          if existing_akl_046:
+              print("AKL_046_INDEX_RECORD: " + json.dumps({
+                  k: existing_akl_046.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "ubicacion")
+              }, ensure_ascii=False))
+
+          print("=== READ-ONLY WRITE-PERMISSION PREFLIGHT ===")
+          agent_doc_candidates = drive.files().list(
+              q="name = 'BIBLIOTECARIO_IA_AUREA_UNIVERSAL_v2.md' and trashed = false",
+              pageSize=100,
+              fields="files(id,name,mimeType,parents,capabilities(canEdit))",
+              includeItemsFromAllDrives=True,
+              supportsAllDrives=True,
+          ).execute().get("files", [])
+          agent_folders = []
+          for agent_doc in agent_doc_candidates:
+              for parent_id in agent_doc.get("parents", []):
+                  folder_meta = drive.files().get(
+                      fileId=parent_id,
+                      fields="id,name,mimeType,parents,capabilities(canAddChildren,canEdit)"
+                  ).execute()
+                  agent_folders.append({
+                      "agentDocumentId": agent_doc.get("id"),
+                      "agentDocumentName": agent_doc.get("name"),
+                      "folder": folder_meta,
+                  })
+          print("BIBLIOTECARIO_PARENT_FOLDER_CAPABILITIES: " + json.dumps(agent_folders, ensure_ascii=False))
+
+          proposed_doc_candidates = drive.files().list(
+              q="name = 'ECP_AGENTE_CONTRATACION_PUBLICA_ECUADOR_v1.md' and trashed = false",
+              pageSize=100,
+              fields="files(id,name,mimeType,parents,modifiedTime,capabilities(canEdit))",
+              includeItemsFromAllDrives=True,
+              supportsAllDrives=True,
+          ).execute().get("files", [])
+          print("ECP_PROPOSAL_FILE_DUPLICATE_CHECK: " + json.dumps(proposed_doc_candidates, ensure_ascii=False))
+          print("READ_ONLY_WRITE_PREFLIGHT: COMPLETE")
 
           print("V011_CONTENT_PROBE: PASS")
           PY
