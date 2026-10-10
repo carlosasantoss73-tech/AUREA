@@ -32,6 +32,15 @@ Actualización técnica: PR #184 (corrección de autorización de lectura) y PR 
 | Auditoría real de ofertas originales | NO VALIDADA | La biblioteca no devolvió los originales de las tres ofertas en las búsquedas efectuadas |
 | Piloto ECP completo | **NO OPERATIVO** | La composición de código está fusionada y pasa CI, pero la sonda live sigue recuperando 0 registros aprobados `ecp`; faltan incorporación institucional autorizada, ruta/runtime desplegado, ingesta de documentos originales y prueba de extremo a extremo con expediente real. |
 
+## FINAL DELIVERY GATE — 2026-10-10
+
+- `main` verificado en `0adb8f22d0ce5f98a54caef57912995234ac6745`.
+- CI posterior a la integración de la ingesta local: `AUREA P0` SUCCESS y `AUREA Cloud Continuity` SUCCESS (run IDs `38025636314` y `38025636265`). Esto valida el repositorio y la continuidad, no un despliegue ECP.
+- La ingesta local PDF/XLSX con SHA-256 y localizadores está fusionada y probada; no se ha conectado aún a un endpoint ECP dedicado.
+- El bloqueo institucional sigue sin resolver: AKL-046 no está en la cadena real del índice, no existe el archivo de propuesta en Drive, la identidad de CI no puede añadir archivos a `03_AGENTES` y el OAuth scope configurado es `drive.readonly`.
+- No se crea un índice paralelo, no se altera `INDICE_MAESTRO_v011.json` y no se escribe en Drive sin una identidad autorizada y lectura posterior de verificación.
+- **Criterio de aceptación de piloto operativo:** (1) AKL-046 y documento ECP incorporados por procedimiento autorizado en v012 conservando v011; (2) lectura live de registro ECP aprobado distinta de cero; (3) ruta ECP dedicada desplegada con lector institucional y proveedor real; (4) documentos originales del expediente ingeridos con cobertura y citas verificables; (5) prueba end-to-end de revisión de ofertas y prueba negativa fail-closed; (6) evidencia y decisión humana registradas. Hasta completar los seis, estado `NO OPERATIVO`.
+
 ## RESULT → EVIDENCE → DECISION → LEARNING → ADAPTATION → NEXT ACTION
 
 - **RESULT:** el gate ECP, el pack con citas, el pipeline de composición, el adaptador de inyección de contexto institucional y el segmentador de evidencia extraída están en main; la inyección solo se activa al registrar el adaptador en una ruta ECP dedicada.
@@ -39,7 +48,7 @@ Actualización técnica: PR #184 (corrección de autorización de lectura) y PR 
 - **DECISION:** reutilizar Universal AI Librarian con un ámbito de proyecto `ecp`; no crear un segundo Bibliotecario ni declarar operación completa.
 - **LEARNING:** autenticación real no equivale a recuperación de registros. Hay que identificar el archivo/estructura que contiene los registros del índice y el mecanismo de consulta autorizado.
 - **ADAPTATION:** el pipeline ECP falla de forma cerrada ante recuperación vacía, proyecto incorrecto, citas locales o metadatos incompletos. Mantener separación entre evidencia primaria, continuidad heredada y aprendizaje documentado.
-- **NEXT ACTION:** (1) resolver el permiso de escritura institucional: la identidad actual no puede agregar archivos a `03_AGENTES` (`canAddChildren=false`) y usa `drive.readonly`; obtener autorización de administrador para un flujo de mínimo privilegio antes de crear el documento o v012; (2) ejecutar el procedimiento AKL-046: crear el archivo institucional en `03_AGENTES`, completar ficha/acta, crear `INDICE_MAESTRO_v012.json` sin sobrescribir v011 y releer para verificar; (3) conectar el adaptador de ejecución a una ruta ECP dedicada con proveedor institucional real; (4) integrar `document-ingestion.ts` en una ruta ECP dedicada; probar los originales del expediente, archivos grandes y OCR por una vía explícita; mantener bloqueo ante documentos sin texto; (5) evaluar con ofertas originales y Red Team.
+- **NEXT ACTION — ÚNICA DEPENDENCIA EXTERNA INMEDIATA:** un administrador de Google Drive debe habilitar una ruta de escritura de mínimo privilegio para la identidad autorizada en la carpeta `03_AGENTES` y un mecanismo OAuth compatible con esa escritura. El estado actual `canAddChildren=false` y `drive.readonly` no puede corregirse desde el repositorio. Tras habilitarlo, ejecutar el procedimiento de incorporación y volver a comprobar permisos/lectura live; (2) ejecutar el procedimiento AKL-046: crear el archivo institucional en `03_AGENTES`, completar ficha/acta, crear `INDICE_MAESTRO_v012.json` sin sobrescribir v011 y releer para verificar; (3) conectar el adaptador de ejecución a una ruta ECP dedicada con proveedor institucional real; (4) integrar `document-ingestion.ts` en una ruta ECP dedicada; probar los originales del expediente, archivos grandes y OCR por una vía explícita; mantener bloqueo ante documentos sin texto; (5) evaluar con ofertas originales y Red Team.
 
 ## Intervención requerida del usuario
 
