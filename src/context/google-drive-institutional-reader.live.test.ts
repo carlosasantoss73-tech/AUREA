@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GoogleDriveInstitutionalReader } from "./google-drive-institutional-reader";
 import { createGoogleDriveInstitutionalContextProvider } from "./google-drive-institutional-context-provider";
 import { ContextRetrievalGate } from "./context-retrieval-gate";
+import { ExecutionRuntime, type ExecutionAdapter } from "../execution-runtime";
+import { registerGoogleDriveEcpExecutionAdapter } from "../ecp/register-google-drive-ecp-execution";
 
 const token = process.env.AUREA_LIVE_DRIVE_TOKEN;
 const indexFileId = process.env.AUREA_KNOWLEDGE_OS_INDEX_ID;
@@ -88,5 +90,70 @@ describe("LIVE Bibliotecario / Knowledge OS reader — ECP scope", () => {
       }
     },
     30_000,
+  );
+});
+
+
+describe("LIVE ECP execution composition — authorized institutional source", () => {
+  it.skipIf(!token || !indexFileId || !projectId)(
+    "uses the real current index and either executes with approved ECP context or blocks before provider invocation",
+    async () => {
+      const liveConfig = requireLiveConfig();
+      const runtime = new ExecutionRuntime();
+      let providerCalls = 0;
+      const delegate: ExecutionAdapter = {
+        providerId: "ecp-live-composition-test-provider",
+        async execute() {
+          providerCalls += 1;
+          return { output: "LIVE_COMPOSITION_SMOKE_OK", evidence: ["LIVE_TEST_PROVIDER_CALLED"] };
+        },
+      };
+      const registered = registerGoogleDriveEcpExecutionAdapter({
+        runtime,
+        providerAdapter: delegate,
+        indexFileId: liveConfig.indexFileId,
+        accessToken: liveConfig.token,
+        config: { actorId: "live-ecp-composition", actorRole: "system" },
+      });
+
+      let executionResult: Awaited<ReturnType<typeof registered.execute>> | undefined;
+      let executionError: unknown;
+      try {
+        executionResult = await registered.execute({
+          traceId: "live-ecp-composition",
+          provider: {
+            providerId: "ecp-live-composition-test-provider",
+            modelId: "test-model",
+            status: "EXECUTABLE",
+            capabilities: ["ecp.analyze"],
+            healthEvidence: ["LIVE_TEST_PROVIDER_READY"],
+          },
+          input: { message: "Smoke test: cita evidencia institucional ECP." },
+        });
+      } catch (error) {
+        executionError = error;
+      }
+
+      if (executionError !== undefined) {
+        expect(String(executionError)).toContain("ECP_INSTITUTIONAL_CONTEXT_BLOCKED");
+        expect(providerCalls).toBe(0);
+        console.log(JSON.stringify({
+          LIVE_ECP_COMPOSITION: "PASS_FAIL_CLOSED",
+          PROVIDER_CALLS: providerCalls,
+          BLOCKER: "NO_APPROVED_ECP_RECORD_OR_INSTITUTIONAL_CITATIONS",
+        }));
+        return;
+      }
+
+      expect(executionResult).toBeDefined();
+      expect(providerCalls).toBe(1);
+      expect(executionResult?.evidence).toContain("ECP_CONTEXT_PIPELINE:READY");
+      expect(executionResult?.evidence.some((item) => item.startsWith("ECP_CONTEXT_SOURCE:"))).toBe(true);
+      console.log(JSON.stringify({
+        LIVE_ECP_COMPOSITION: "PASS_WITH_APPROVED_CONTEXT",
+        PROVIDER_CALLS: providerCalls,
+      }));
+    },
+    60_000,
   );
 });
