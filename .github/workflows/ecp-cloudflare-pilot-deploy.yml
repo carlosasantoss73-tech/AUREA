@@ -9,11 +9,11 @@ on:
         required: true
         default: false
       access_team_domain:
-        description: "Cloudflare Access team name (without .cloudflareaccess.com); blank only for first blocked bootstrap deploy"
+        description: "Required Cloudflare Access team name (without .cloudflareaccess.com)"
         type: string
         required: false
       access_audience:
-        description: "Access application AUD tag; blank only for first blocked bootstrap deploy"
+        description: "Required Access application AUD tag"
         type: string
         required: false
       institutional_index_file_id:
@@ -46,6 +46,13 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing GitHub Actions secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing GitHub Actions secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+      - name: Require Access protection configuration
+        env:
+          ECP_ACCESS_TEAM_DOMAIN: ${{ inputs.access_team_domain }}
+          ECP_ACCESS_AUD: ${{ inputs.access_audience }}
+        run: |
+          test -n "$ECP_ACCESS_TEAM_DOMAIN" || { echo "::error::Cloudflare Access team domain is required; refusing an unprotected bootstrap deploy."; exit 1; }
+          test -n "$ECP_ACCESS_AUD" || { echo "::error::Cloudflare Access AUD is required; refusing an unprotected bootstrap deploy."; exit 1; }
       - name: Apply supplied non-secret pilot configuration
         env:
           ECP_ACCESS_TEAM_DOMAIN: ${{ inputs.access_team_domain }}
