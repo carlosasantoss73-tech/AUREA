@@ -1,13 +1,15 @@
 import type { ContextRetrievalGate } from "../context/context-retrieval-gate.js";
 import { composeEcpContext } from "./context-pipeline.js";
 import { appendEcpExpedientIntake, intakeEcpExpedient, type EcpExpedientDocumentInput, type EcpExpedientIntakeInput } from "./expedient-intake.js";
-import type { EcpExpedientStore } from "./expedient-store.js";
+import type { EcpExpedientStore, EcpStoredExpedient } from "./expedient-store.js";
+import type { EcpAnalysisResult } from "./expedient-analysis-runtime.js";
 
 export interface EcpAuthenticatedPrincipal { clientId: string; actorId: string; actorRole: string; }
 export interface EcpExpedientHttpDependencies {
   authenticate(request: Request): Promise<EcpAuthenticatedPrincipal | null>;
   store: EcpExpedientStore;
   contextGate: Pick<ContextRetrievalGate, "retrieve">;
+  analyze?(record: EcpStoredExpedient, principal: EcpAuthenticatedPrincipal): Promise<EcpAnalysisResult>;
   now?: () => Date;
   randomId?: () => string;
 }
@@ -43,12 +45,13 @@ export function createEcpExpedientHttpHandler(deps: EcpExpedientHttpDependencies
     const principal = await deps.authenticate(request);
     if (!principal?.clientId.trim() || !principal.actorId.trim() || !principal.actorRole.trim()) return json({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
     const url = new URL(request.url);
-    const match = /^\/ecp\/v1\/expedients(?:\/([a-zA-Z0-9_-]{1,80})(?:\/(analysis-readiness|documents))?)?$/.exec(url.pathname);
+    const match = /^\/ecp\/v1\/expedients(?:\/([a-zA-Z0-9_-]{1,80})(?:\/(analysis-readiness|documents|analyze))?)?$/.exec(url.pathname);
     if (!match) return json({ status: "BLOCKED", error: "NOT_FOUND" }, 404);
     if (request.method === "POST" && !match[1]) return createIntake(request, principal, deps);
     if (request.method === "GET" && match[1] && !match[2]) return readIntake(match[1], principal, deps);
     if (request.method === "POST" && match[1] && match[2] === "documents") return appendDocuments(request, match[1], principal, deps);
     if (request.method === "POST" && match[1] && match[2] === "analysis-readiness") return analysisReadiness(match[1], principal, deps);
+    if (request.method === "POST" && match[1] && match[2] === "analyze") return analyzeExpedient(match[1], principal, deps);
     return json({ status: "BLOCKED", error: "METHOD_NOT_ALLOWED" }, 405);
   };
 }
@@ -103,4 +106,22 @@ async function appendDocuments(request: Request, expedientId: string, principal:
     await deps.store.save(updated);
     return json({ status: "UPDATED", expedientId, intake: summary(intake) });
   } catch (error) { return json({ status: "BLOCKED", error: error instanceof Error ? error.message : "ECP_APPEND_FAILED" }, 422); }
+}
+
+
+async function analyzeExpedient(expedientId: string, principal: EcpAuthenticatedPrincipal, deps: EcpExpedientHttpDependencies): Promise<Response> {
+  const record = await deps.store.get(principal.clientId, expedientId);
+  if (!record) return json({ status: "BLOCKED", error: "EXPEDIENT_NOT_FOUND" }, 404);
+  if (record.intake.readiness !== "READY_FOR_EVIDENCE_REVIEW") {
+    return json({ status: "BLOCKED", error: "ECP_EXPEDIENT_INTAKE_INCOMPLETE", blockers: record.intake.blockers }, 409);
+  }
+  if (!deps.analyze) return json({ status: "BLOCKED", error: "ECP_ANALYSIS_RUNTIME_NOT_CONFIGURED" }, 503);
+  try {
+    const result = await deps.analyze(record, principal);
+    const status = result.status === "SUCCEEDED" || result.status === "REPLAYED" ? 200
+      : result.status === "BLOCKED" ? 409 : 502;
+    return json({ ...result, expedientId }, status);
+  } catch (error) {
+    return json({ status: "BLOCKED", error: error instanceof Error ? error.message : "ECP_ANALYSIS_FAILED" }, 503);
+  }
 }
