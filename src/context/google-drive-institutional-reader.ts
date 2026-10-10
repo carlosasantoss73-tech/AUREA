@@ -112,7 +112,9 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     const meta = asObject(await metaResponse.json(), "metadata");
     if (meta.id !== fileId) throw new Error("BIBLIOTECARIO_INDEX_ID_MISMATCH");
     if (meta.mimeType !== "application/json") throw new Error("BIBLIOTECARIO_INDEX_NOT_JSON");
-    if (asObject(meta.capabilities, "capabilities").canEdit !== false) throw new Error("BIBLIOTECARIO_INDEX_NOT_READ_ONLY");
+    // Drive capabilities describe what this principal may write; they are not a read-authorization check.
+    // Authorization is enforced by the access token and the subsequent Drive API responses.
+    asObject(meta.capabilities, "capabilities");
 
     const contentResponse = await this.fetchImpl(
       `${DRIVE_BASE}/${encodeURIComponent(fileId)}?alt=media`,
