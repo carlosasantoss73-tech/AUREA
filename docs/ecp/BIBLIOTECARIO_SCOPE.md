@@ -45,7 +45,7 @@ El runtime ECP no modifica directamente el índice maestro ni documentos institu
 - Prueba live de la composición: VALIDADA en GitHub Actions (run #117, 3/3 pruebas); con el índice real v011 la ruta se bloqueó de forma segura porque no hay registros ECP aprobados y el proveedor no fue invocado.
 - Lectura real de metadatos/índice: VALIDADA en GitHub Actions mediante WIF y descarga de medios.
 - Lectura del índice, búsqueda explícita por proyecto y filtro de estados: VALIDADOS en prueba live; la consulta `ecp` devuelve cero registros aprobados.
-- Extractor de texto PDF/XLSX con localizadores: IMPLEMENTADO en `src/ecp/document-extractor.ts`, con pruebas unitarias y CI aprobados; no equivale a ingesta institucional end-to-end.
+- Extractor PDF/XLSX y pipeline local de ingesta: IMPLEMENTADOS en `src/ecp/document-extractor.ts` y `src/ecp/document-ingestion.ts`; el pipeline calcula SHA-256 y conserva localizadores en chunks; pruebas unitarias y CI aprobados. No equivale a ingesta institucional end-to-end ni persiste en Drive.
 - Recuperación y lectura del contenido de los archivos fuente institucionales como parte de una auditoría real: PENDIENTE DE VALIDACIÓN END-TO-END.
 - Registro efectivo de ECP en el índice vigente: NO DEMOSTRADO. Preflight live #118 confirmó que `AKL-046` no está en la cadena y que el archivo propuesto no existe en Drive.
 - Escritura institucional desde la identidad de CI: BLOQUEADA; la carpeta `03_AGENTES` reporta `canAddChildren=false`/`canEdit=false` y el workflow usa OAuth scope `drive.readonly`.
