@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import * as ExcelJS from "exceljs";
+import * as ExcelJS from "@ayocore/exceljs";
 import { describe, expect, it } from "vitest";
 import {
   DocumentExtractionError,
