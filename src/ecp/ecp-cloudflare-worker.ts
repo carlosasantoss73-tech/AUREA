@@ -19,12 +19,17 @@ function response(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 }
 
-function readiness(env: Env) {
+function runtimeReadiness(env: Env) {
   const missing: string[] = [];
   if (!env.ECP_EXPEDIENT_STATE) missing.push("ECP_EXPEDIENT_STATE");
   if (!env.ECP_ACCESS_TEAM_DOMAIN || env.ECP_ACCESS_TEAM_DOMAIN.startsWith("REPLACE_")) missing.push("ECP_ACCESS_TEAM_DOMAIN");
   if (!env.ECP_ACCESS_AUD || env.ECP_ACCESS_AUD.startsWith("REPLACE_")) missing.push("ECP_ACCESS_AUD");
   if (!env.ECP_ACCESS_ACTOR_ROLE || env.ECP_ACCESS_ACTOR_ROLE.startsWith("REPLACE_")) missing.push("ECP_ACCESS_ACTOR_ROLE");
+  return { missing, ready: missing.length === 0 };
+}
+
+function contextReadiness(env: Env) {
+  const missing: string[] = [];
   if (!env.ECP_INSTITUTIONAL_INDEX_FILE_ID || env.ECP_INSTITUTIONAL_INDEX_FILE_ID.startsWith("REPLACE_")) missing.push("ECP_INSTITUTIONAL_INDEX_FILE_ID");
   if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
   return { missing, ready: missing.length === 0 };
@@ -48,18 +53,34 @@ export default {
     }
 
     if (url.pathname === "/health") {
-      const state = readiness(env);
-      return response({ status: state.ready ? "HEALTHY" : "BLOCKED", missing: state.missing }, state.ready ? 200 : 503);
+      const runtime = runtimeReadiness(env);
+      const context = contextReadiness(env);
+      const ready = runtime.ready;
+      return response({
+        status: !runtime.ready ? "BLOCKED" : context.ready ? "HEALTHY" : "INTAKE_READY_CONTEXT_BLOCKED",
+        missing: [...runtime.missing, ...context.missing],
+        runtimeReady: runtime.ready,
+        institutionalContextReady: context.ready,
+      }, ready ? 200 : 503);
     }
 
-    const state = readiness(env);
-    if (!state.ready) return response({ status: "BLOCKED", error: "ECP_WORKER_CONFIGURATION_INCOMPLETE", missing: state.missing }, 503);
+    const runtime = runtimeReadiness(env);
+    if (!runtime.ready) return response({ status: "BLOCKED", error: "ECP_WORKER_CONFIGURATION_INCOMPLETE", missing: runtime.missing }, 503);
 
     const jwt = await verifyCloudflareAccessJwt(request.headers.get("cf-access-jwt-assertion"), {
       teamDomain: env.ECP_ACCESS_TEAM_DOMAIN,
       audience: env.ECP_ACCESS_AUD,
     });
     if (!jwt || !jwt.subject.trim()) return response({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
+
+    if (url.pathname.endsWith("/analysis-readiness")) {
+      const context = contextReadiness(env);
+      if (!context.ready) return response({
+        status: "BLOCKED",
+        error: "ECP_INSTITUTIONAL_CONTEXT_CONFIGURATION_INCOMPLETE",
+        blockers: context.missing,
+      }, 503);
+    }
 
     // Identity is derived only from the cryptographically verified Access JWT.
     // Per-subject isolation is safe for the pilot; organization-level tenancy is a later explicit contract.
