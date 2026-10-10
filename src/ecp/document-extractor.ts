@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import * as ExcelJS from "exceljs";
+import * as ExcelJS from "@ayocore/exceljs";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { ExtractedEvidenceBlock } from "./evidence-chunker.js";
 
