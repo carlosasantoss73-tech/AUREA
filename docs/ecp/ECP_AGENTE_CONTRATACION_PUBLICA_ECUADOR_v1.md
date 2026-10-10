@@ -53,7 +53,7 @@ Apoyar la revisión técnico-documental de procedimientos de contratación públ
 - Universal AI Librarian / Knowledge OS y su índice vigente.
 - Protocolos operativos, detección de conocimiento nuevo, actualización de memoria y control de versiones.
 - ECP Evidence Gate, Context Pack con citas, Context Retrieval Gate, pipeline de contexto y adaptador institucional de ejecución.
-- Extractores PDF/Excel/OCR validados y límites explícitos para archivos grandes.
+- Extractor PDF/XLSX de texto con localizadores implementado en `src/ecp/document-extractor.ts`; límites explícitos para bytes, páginas, hojas y filas. OCR, XLS legado, archivos originales y conexión al runtime dedicando siguen pendientes de validación.
 
 Los identificadores de dependencias AKL deben cotejarse con el índice vigente antes de declarar que son vigentes. No cambiar estados por inferencia.
 
