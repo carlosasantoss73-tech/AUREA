@@ -30,7 +30,7 @@ button{border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700
 <div class="field wide"><label for="source">URL oficial del procedimiento (si existe)</label><input id="source" type="url" placeholder="https://..."></div>
 </div></section>
 <section class="panel"><h2>2. Cargar originales</h2><p class="small">Selecciona documentos del procedimiento y ofertas. Para cada oferta identifica al oferente tal como aparece en el expediente. No se infiere identidad desde el nombre del archivo.</p>
-<div class="field"><label for="files">Archivos PDF o Excel *</label><input id="files" type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain"></div>
+<div class="field"><label for="files">Archivos PDF o Excel * (máximo 19 MB por lote)</label><input id="files" type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain"></div>
 <div id="fileRows" aria-live="polite"></div>
 <div class="actions"><button id="submit" type="button">Procesar recepción</button></div>
 </section>
@@ -50,15 +50,20 @@ submit.addEventListener("click",async function(){
 var code=document.getElementById("code").value.trim(),entity=document.getElementById("entity").value.trim(),object=document.getElementById("object").value.trim(),source=document.getElementById("source").value.trim();
 if(!code||!entity||!object){setStatus("Completa código, entidad y objeto del procedimiento.","error");return;}
 if(!selected.length){setStatus("Selecciona al menos un documento original.","error");return;}
+if(selected.reduce(function(total,file){return total+file.size;},0)>19000000){setStatus("Este lote supera 19 MB. Divide los documentos en lotes más pequeños; si un archivo individual supera el límite, divídelo antes de cargarlo.","error");return;}
 if(selected.some(function(f){return !f._ecpRole.value;})){setStatus("Selecciona el tipo de cada documento.","error");return;}
-if(selected.some(function(f){return f._ecpRole.value==="OFFER"&&!f._ecpOfferor.value.trim();})){setStatus("Identifica al oferente de cada oferta.","error");return;}
-if(!selected.some(function(f){return f._ecpRole.value==="PROCEDURE";})||!selected.some(function(f){return f._ecpRole.value==="OFFER";})){setStatus("Para habilitar la revisión deben existir al menos un documento del procedimiento y una oferta identificada.","error");return;}
+if(selected.some(function(f){return f._ecpRole.value==="OFFER"&&!f._ecpOfferor.value.trim();})){setStatus("Identifica el oferente de cada oferta.","error");return;}
 submit.disabled=true;gate.disabled=true;resultBox.replaceChildren();setStatus("Leyendo y procesando documentos. No cierres esta ventana…","");
 try{
 var docs=await Promise.all(selected.map(async function(file){return {documentId:crypto.randomUUID(),title:file.name,mediaType:file.type||"application/octet-stream",sourceUri:"uploaded://local-expedient/"+encodeURIComponent(file.name),role:file._ecpRole.value,offeror:file._ecpRole.value==="OFFER"?file._ecpOfferor.value.trim():undefined,contentBase64:await b64(file)};}));
-var response=await fetch("/ecp/v1/expedients",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({metadata:{procedureCode:code,contractingEntity:entity,objectDescription:object,sourceUrl:source||undefined},documents:docs})});
-var data=await response.json();if(!response.ok)throw new Error(data.error||"No se pudo procesar el expediente (HTTP "+response.status+").");
-currentId=data.expedientId;gate.disabled=false;setStatus("Recepción completada. ID: "+currentId,data.intake.readiness==="READY_FOR_EVIDENCE_REVIEW"?"good":"");var pre=el("pre","",JSON.stringify(data.intake,null,2));resultBox.replaceChildren(pre);
+var endpoint=currentId?"/ecp/v1/expedients/"+encodeURIComponent(currentId)+"/documents":"/ecp/v1/expedients";
+var payload=currentId?{documents:docs}:{metadata:{procedureCode:code,contractingEntity:entity,objectDescription:object,sourceUrl:source||undefined},documents:docs};
+var response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+var data=await response.json();if(!response.ok)throw new Error(data.error||"No se pudo procesar el lote (HTTP "+response.status+").");
+currentId=data.expedientId;submit.textContent="Añadir documentos al expediente";["code","entity","object","source"].forEach(function(id){document.getElementById(id).disabled=true;});
+gate.disabled=data.intake.readiness!=="READY_FOR_EVIDENCE_REVIEW";
+setStatus((data.status==="UPDATED"?"Lote añadido.":"Recepción completada.")+" ID: "+currentId,data.intake.readiness==="READY_FOR_EVIDENCE_REVIEW"?"good":"");
+var pre=el("pre","",JSON.stringify(data.intake,null,2));resultBox.replaceChildren(pre);selected=[];filesInput.value="";rows.replaceChildren();
 }catch(error){setStatus(error instanceof Error?error.message:"Error inesperado al procesar el expediente.","error");}finally{submit.disabled=false;}
 });
 gate.addEventListener("click",async function(){if(!currentId)return;gate.disabled=true;setStatus("Consultando la fuente institucional autorizada…","");try{var response=await fetch("/ecp/v1/expedients/"+encodeURIComponent(currentId)+"/analysis-readiness",{method:"POST"});var data=await response.json();if(!response.ok){setStatus("Revisión detenida: "+(data.error||"la fuente institucional no habilitó el análisis")+".","error");resultBox.replaceChildren(el("pre","",JSON.stringify(data,null,2)));return;}setStatus("Contexto institucional disponible para la siguiente etapa controlada.","good");resultBox.replaceChildren(el("pre","",JSON.stringify(data,null,2)));}catch(error){setStatus(error instanceof Error?error.message:"Error al consultar el contexto institucional.","error");}finally{gate.disabled=false;}});
