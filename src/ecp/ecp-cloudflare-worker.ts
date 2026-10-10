@@ -87,7 +87,15 @@ export default {
     const clientId = jwt.subject;
     const actorId = jwt.subject;
     const stateId = env.ECP_EXPEDIENT_STATE.idFromName(`ecp-subject:${clientId}`);
-    const reader = new GoogleDriveInstitutionalReader({ indexFileId: env.ECP_INSTITUTIONAL_INDEX_FILE_ID, accessToken: env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN });
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: env.ECP_INSTITUTIONAL_INDEX_FILE_ID || "REPLACE_WITH_VERIFIED_CURRENT_INDEX_ID",
+      // Intake does not need Drive access. Resolve the secret only when the
+      // Context Retrieval Gate actually requests institutional evidence.
+      accessToken: async () => {
+        if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN) throw new Error("ECP_GOOGLE_DRIVE_ACCESS_TOKEN_MISSING");
+        return env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN;
+      },
+    });
     const handler = createEcpExpedientHttpHandler({
       authenticate: async () => ({ clientId, actorId, actorRole: env.ECP_ACCESS_ACTOR_ROLE }),
       store: new EcpDurableObjectExpedientStore(clientId, env.ECP_EXPEDIENT_STATE.get(stateId)),
