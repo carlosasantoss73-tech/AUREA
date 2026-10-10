@@ -148,17 +148,32 @@ describe("Google Drive institutional reader", () => {
     expect(records).toHaveLength(0);
   });
 
-  it("fails closed when the index is writable", async () => {
+  it("does not confuse write capability with read authorization", async () => {
+    const payload = {
+      estado_indice: "VIGENTE",
+      version_indice: "11",
+      registros_nuevos_v011: [],
+    };
     const reader = new GoogleDriveInstitutionalReader({
       indexFileId: "current",
       accessToken: "test-token",
-      fetchImpl: async () => new Response(JSON.stringify({
-        id: "current",
-        mimeType: "application/json",
-        capabilities: { canEdit: true },
-      }), { status: 200 }),
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("alt=media")) {
+          return new Response(JSON.stringify(payload), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          id: "current",
+          mimeType: "application/json",
+          capabilities: { canEdit: true, canDownload: true, canCopy: true },
+        }), { status: 200 });
+      },
     });
 
-    await expect(reader.readCurrentIndex("trace-2")).rejects.toThrow("BIBLIOTECARIO_INDEX_NOT_READ_ONLY");
+    await expect(reader.readCurrentIndex("trace-2")).resolves.toMatchObject({
+      fileId: "current",
+      version: 11,
+      state: "VIGENTE",
+    });
   });
 });
