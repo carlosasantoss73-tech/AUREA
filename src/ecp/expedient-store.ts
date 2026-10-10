@@ -13,8 +13,7 @@ export interface EcpExpedientStore {
 }
 
 export interface EcpExpedientStateStub {
-  save(record: EcpStoredExpedient): Promise<void>;
-  get(expedientId: string): Promise<EcpStoredExpedient | null>;
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 }
 
 export interface DurableObjectStorageLike {
@@ -34,15 +33,21 @@ interface ExpedientManifest {
   chunkCount: number;
 }
 
-// SQLite-backed Durable Objects cap each key + value at 2 MB. Keep individual
-// JSON fragments well below that limit, including UTF-8 expansion.
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+// SQLite-backed Durable Objects cap each key + value at 2 MB. Keep fragments
+// well below that limit, including UTF-8 expansion.
 const MAX_CHUNK_CODE_UNITS = 150_000;
 
 function splitJsonIntoChunks(serialized: string): string[] {
   const chunks: string[] = [];
   for (let start = 0; start < serialized.length;) {
     let end = Math.min(start + MAX_CHUNK_CODE_UNITS, serialized.length);
-    // Do not split a UTF-16 surrogate pair across independently stored values.
     if (end < serialized.length) {
       const previous = serialized.charCodeAt(end - 1);
       if (previous >= 0xd800 && previous <= 0xdbff) end -= 1;
@@ -57,14 +62,33 @@ function splitJsonIntoChunks(serialized: string): string[] {
 export class EcpExpedientStateDurableObject {
   constructor(private readonly state: DurableObjectStateLike) {}
 
-  async save(record: EcpStoredExpedient): Promise<void> {
-    if (!record.clientId.trim() || !record.expedientId.trim()) throw new Error("ECP_STORE_ID_REQUIRED");
+  async fetch(request: Request): Promise<Response> {
+    if (request.method !== "POST") return json({ status: "BLOCKED", error: "METHOD_NOT_ALLOWED" }, 405);
+    try {
+      const body = await request.json() as { operation?: unknown; record?: EcpStoredExpedient; expedientId?: unknown };
+      if (body.operation === "save") {
+        if (!body.record || typeof body.record !== "object") return json({ status: "BLOCKED", error: "RECORD_REQUIRED" }, 400);
+        await this.save(body.record);
+        return json({ status: "OK" });
+      }
+      if (body.operation === "get") {
+        if (typeof body.expedientId !== "string") return json({ status: "BLOCKED", error: "EXPEDIENT_ID_REQUIRED" }, 400);
+        return json({ status: "OK", record: await this.get(body.expedientId) });
+      }
+      return json({ status: "BLOCKED", error: "OPERATION_NOT_SUPPORTED" }, 400);
+    } catch {
+      return json({ status: "BLOCKED", error: "ECP_DURABLE_OBJECT_FAILURE" }, 503);
+    }
+  }
+
+  private async save(record: EcpStoredExpedient): Promise<void> {
+    if (!record.clientId?.trim() || !record.expedientId?.trim()) throw new Error("ECP_STORE_ID_REQUIRED");
     const serialized = JSON.stringify(record);
     const chunks = splitJsonIntoChunks(serialized);
     const prefix = `expedient:${record.expedientId}`;
 
-    // Write the payload first and publish the manifest last. Readers will not
-    // observe a newly saved record until every fragment has been written.
+    // Write payload first and publish manifest last; readers never observe a
+    // new manifest until all fragments have been written.
     for (let index = 0; index < chunks.length; index += 1) {
       await this.state.storage.put<string>(`${prefix}:part:${index}`, chunks[index]);
     }
@@ -78,7 +102,7 @@ export class EcpExpedientStateDurableObject {
     await this.state.storage.put<ExpedientManifest>(prefix, manifest);
   }
 
-  async get(expedientId: string): Promise<EcpStoredExpedient | null> {
+  private async get(expedientId: string): Promise<EcpStoredExpedient | null> {
     if (!expedientId.trim()) return null;
     const prefix = `expedient:${expedientId}`;
     const manifest = await this.state.storage.get<ExpedientManifest>(prefix);
@@ -91,15 +115,12 @@ export class EcpExpedientStateDurableObject {
       if (typeof chunk !== "string") return null;
       chunks.push(chunk);
     }
-
     try {
       const record = JSON.parse(chunks.join("")) as EcpStoredExpedient;
       if (record.clientId !== manifest.clientId || record.expedientId !== manifest.expedientId ||
           record.createdAt !== manifest.createdAt) return null;
       return record;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 }
 
@@ -108,6 +129,7 @@ export interface DurableObjectNamespaceBinding {
   get(id: unknown): EcpExpedientStateStub;
 }
 
+/** RPC adapter for a real Cloudflare Durable Object stub (fetch-only boundary). */
 export class EcpDurableObjectExpedientStore implements EcpExpedientStore {
   constructor(private readonly clientId: string, private readonly stub: EcpExpedientStateStub) {
     if (!clientId.trim()) throw new Error("ECP_STORE_CLIENT_REQUIRED");
@@ -115,12 +137,27 @@ export class EcpDurableObjectExpedientStore implements EcpExpedientStore {
 
   async save(record: EcpStoredExpedient): Promise<void> {
     if (record.clientId !== this.clientId) throw new Error("ECP_STORE_CLIENT_SCOPE_MISMATCH");
-    await this.stub.save(record);
+    const response = await this.stub.fetch("https://ecp-expedient-state.internal/", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "save", record }),
+    });
+    if (!response.ok) throw new Error(`ECP_STORE_DO_HTTP_${response.status}`);
+    const body = await response.json() as { status?: string };
+    if (body.status !== "OK") throw new Error("ECP_STORE_DO_REJECTED");
   }
 
   async get(clientId: string, expedientId: string): Promise<EcpStoredExpedient | null> {
     if (clientId !== this.clientId) return null;
-    const record = await this.stub.get(expedientId);
+    const response = await this.stub.fetch("https://ecp-expedient-state.internal/", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "get", expedientId }),
+    });
+    if (!response.ok) throw new Error(`ECP_STORE_DO_HTTP_${response.status}`);
+    const body = await response.json() as { status?: string; record?: EcpStoredExpedient | null };
+    if (body.status !== "OK") throw new Error("ECP_STORE_DO_REJECTED");
+    const record = body.record ?? null;
     if (!record || record.clientId !== this.clientId || record.expedientId !== expedientId) return null;
     return record;
   }
