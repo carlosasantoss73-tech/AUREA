@@ -125,3 +125,48 @@ export async function intakeEcpExpedient(
     totalChunks: records.reduce((total, record) => total + record.ingestion.chunks.length, 0),
   };
 }
+
+/** Adds another batch of originals to an existing expediente without losing
+ * the prior evidence manifest. This supports splitting a large expediente
+ * across multiple HTTP requests while preserving one readiness decision. */
+export async function appendEcpExpedientIntake(
+  existing: EcpExpedientIntakeResult,
+  documents: EcpExpedientDocumentInput[],
+  options: EcpExpedientIntakeOptions = {},
+): Promise<EcpExpedientIntakeResult> {
+  if (!Array.isArray(documents) || documents.length === 0) {
+    throw new Error("ECP_INTAKE_DOCUMENTS_REQUIRED");
+  }
+  const knownIds = new Set(existing.documents.map((record) => record.ingestion.documentId));
+  for (const document of documents) {
+    const id = required(document.documentId, "ECP_INTAKE_DOCUMENT_ID_REQUIRED");
+    if (knownIds.has(id)) throw new Error(`ECP_INTAKE_DUPLICATE_DOCUMENT_ID:${id}`);
+    knownIds.add(id);
+  }
+
+  const incoming = await intakeEcpExpedient({
+    metadata: existing.metadata,
+    documents,
+  }, options);
+  const allDocuments = [...existing.documents, ...incoming.documents];
+  const procedureCount = allDocuments.filter((record) => record.role === "PROCEDURE").length;
+  const offerDocuments = allDocuments.filter((record) => record.role === "OFFER");
+  const offerors = [...new Set(offerDocuments.map((record) => record.offeror).filter((value): value is string => Boolean(value)))].sort();
+  const blockers: string[] = [];
+  if (procedureCount === 0) blockers.push("ECP_INTAKE_PROCEDURE_DOCUMENT_REQUIRED");
+  if (offerDocuments.length === 0) blockers.push("ECP_INTAKE_OFFER_DOCUMENT_REQUIRED");
+  if (offerors.length === 0) blockers.push("ECP_INTAKE_OFFEROR_REQUIRED");
+
+  return {
+    projectId: "ecp",
+    metadata: existing.metadata,
+    readiness: blockers.length === 0 ? "READY_FOR_EVIDENCE_REVIEW" : "BLOCKED",
+    blockers,
+    warnings: allDocuments.flatMap((record) =>
+      record.ingestion.warnings.map((warning) => `${record.ingestion.documentId}:${warning}`),
+    ),
+    documents: allDocuments,
+    offerors,
+    totalChunks: allDocuments.reduce((total, record) => total + record.ingestion.chunks.length, 0),
+  };
+}
