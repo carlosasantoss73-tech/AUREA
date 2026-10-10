@@ -125,7 +125,7 @@ async function extractPdf(bytes: Uint8Array, limits: Required<DocumentExtraction
 async function extractXlsx(bytes: Uint8Array, limits: Required<DocumentExtractionLimits>): Promise<ExtractedDocumentEvidence> {
   const workbook = new ExcelJS.Workbook();
   try {
-    await workbook.xlsx.load(Buffer.from(bytes));
+    await workbook.xlsx.load(Buffer.from(bytes) as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   } catch {
     throw new DocumentExtractionError("ECP_XLSX_PARSE_FAILED", "Workbook could not be parsed as a valid XLSX file.");
   }
