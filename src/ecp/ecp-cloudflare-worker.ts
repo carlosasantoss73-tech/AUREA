@@ -4,6 +4,7 @@ import { GoogleDriveInstitutionalReader } from "../context/google-drive-institut
 import { createEcpExpedientHttpHandler } from "./expedient-http-api.js";
 import { EcpDurableObjectExpedientStore, EcpExpedientStateDurableObject, type DurableObjectNamespaceBinding } from "./expedient-store.js";
 import { verifyCloudflareAccessJwt } from "./cloudflare-access-auth.js";
+import { ECP_PILOT_HTML } from "./pilot-ui.js";
 
 interface Env {
   ECP_EXPEDIENT_STATE: DurableObjectNamespaceBinding;
@@ -34,6 +35,18 @@ export { EcpExpedientStateDurableObject };
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/app")) {
+      return new Response(ECP_PILOT_HTML, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+          "referrer-policy": "no-referrer",
+          "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        },
+      });
+    }
+
     if (url.pathname === "/health") {
       const state = readiness(env);
       return response({ status: state.ready ? "HEALTHY" : "BLOCKED", missing: state.missing }, state.ready ? 200 : 503);
