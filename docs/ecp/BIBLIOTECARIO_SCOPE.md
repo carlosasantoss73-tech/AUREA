@@ -51,3 +51,10 @@ El runtime ECP no modifica directamente el índice maestro ni documentos institu
 - Escritura institucional desde la identidad de CI: BLOQUEADA; la carpeta `03_AGENTES` reporta `canAddChildren=false`/`canEdit=false` y el workflow usa OAuth scope `drive.readonly`.
 - Inconsistencia documental pendiente: AKL-002 aparece con estado PROPUESTA en v011, aunque una referencia de continuidad declara DEC-001 como aprobación; no resolver sin leer ambas fuentes primarias.
 - Operación de auditoría completa: NO OPERATIVA hasta incorporar el registro ECP por el flujo institucional autorizado y validar ingesta, citas y un expediente original.
+
+
+## Gate final de piloto — 2026-10-10
+- Repositorio `main` y continuidad: CI SUCCESS en runs `38025636314` y `38025636265`.
+- Extractor/ingesta PDF-XLSX local: implementado, hash SHA-256 y localizadores preservados en chunks; no está desplegado como endpoint ECP.
+- Bibliotecario institucional: lectura live probada, pero 0 registros ECP aprobados; AKL-046 no está en la cadena de índices y la identidad actual carece de permisos de escritura.
+- `INDICE_MAESTRO_v011.json` se mantiene sin cambios. No se declara piloto operativo hasta incorporar por vía autorizada, desplegar ruta ECP dedicada y aprobar prueba real de extremo a extremo.
