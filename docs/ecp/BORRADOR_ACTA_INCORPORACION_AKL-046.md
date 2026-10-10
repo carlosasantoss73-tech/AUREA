@@ -24,8 +24,8 @@ Esta autorización no equivale a aprobación final del agente ni a autorización
 
 ## 4. Verificaciones pendientes antes de emitir el acta institucional
 
-- [ ] Confirmar en Drive la disponibilidad de AKL-046 y ausencia de duplicado.
-- [ ] Crear el documento en `03_AGENTES` mediante el flujo autorizado.
+- [x] Confirmar en Drive la disponibilidad de AKL-046 y ausencia de duplicado: la prueba live #118 no encontró `AKL-046` en la cadena institucional ni encontró `ECP_AGENTE_CONTRATACION_PUBLICA_ECUADOR_v1.md` en Drive.
+- [ ] Crear el documento en `03_AGENTES` mediante el flujo autorizado. **Bloqueado:** la identidad actual informa `canAddChildren=false`, `canEdit=false` y el workflow solicita scope `drive.readonly`.
 - [ ] Registrar fileId institucional y verificar metadatos.
 - [ ] Completar la ficha con los campos obligatorios de la plantilla institucional.
 - [ ] Revisar dependencias y la discrepancia documental identificada en la propuesta AKL-046.
@@ -36,6 +36,6 @@ Esta autorización no equivale a aprobación final del agente ni a autorización
 
 ## 5. Resultado
 
-**Estado actual:** autorización recibida; paquete preparatorio en repositorio de código; escritura institucional de Drive y actualización de índice aún no ejecutadas ni verificadas.
+**Estado actual:** autorización de usuario para tramitar la incorporación y paquete preparatorio en repositorio. Preflight live #118 confirma que AKL-046 no está duplicado, pero la identidad actual no puede escribir en `03_AGENTES`; la escritura institucional y la actualización de índice siguen sin ejecutarse. Próxima dependencia: habilitación de un flujo de escritura con mínimo privilegio, sin editar v011.
 
 **Firmas / aprobaciones institucionales:** no completadas en este borrador.
