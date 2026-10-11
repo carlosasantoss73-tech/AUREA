@@ -47,6 +47,15 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/app")) {
+      // Bootstrap safety: never serve the pilot UI until a real Cloudflare Access
+      // JWT can be verified. Placeholder team/AUD values fail closed.
+      const uiJwt = await verifyCloudflareAccessJwt(request.headers.get("cf-access-jwt-assertion"), {
+        teamDomain: env.ECP_ACCESS_TEAM_DOMAIN,
+        audience: env.ECP_ACCESS_AUD,
+      });
+      if (!uiJwt || !uiJwt.subject.trim()) {
+        return response({ status: "BLOCKED", error: "AUTHENTICATION_REQUIRED" }, 401);
+      }
       return new Response(ECP_PILOT_HTML, {
         headers: {
           "content-type": "text/html; charset=utf-8",
