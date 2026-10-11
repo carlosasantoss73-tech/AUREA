@@ -46,13 +46,17 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing GitHub Actions secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing GitHub Actions secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
-      - name: Require Access protection configuration
+      - name: Validate Access configuration or deny-by-default bootstrap
         env:
           ECP_ACCESS_TEAM_DOMAIN: ${{ inputs.access_team_domain }}
           ECP_ACCESS_AUD: ${{ inputs.access_audience }}
         run: |
-          test -n "$ECP_ACCESS_TEAM_DOMAIN" || { echo "::error::Cloudflare Access team domain is required; refusing an unprotected bootstrap deploy."; exit 1; }
-          test -n "$ECP_ACCESS_AUD" || { echo "::error::Cloudflare Access AUD is required; refusing an unprotected bootstrap deploy."; exit 1; }
+          if [ -z "$ECP_ACCESS_TEAM_DOMAIN" ] && [ -z "$ECP_ACCESS_AUD" ]; then
+            echo "::warning::Bootstrap deployment only. Worker UI and API must deny requests until real Access team and AUD are configured."
+          else
+            test -n "$ECP_ACCESS_TEAM_DOMAIN" || { echo "::error::Cloudflare Access team domain and AUD must both be supplied."; exit 1; }
+            test -n "$ECP_ACCESS_AUD" || { echo "::error::Cloudflare Access team domain and AUD must both be supplied."; exit 1; }
+          fi
       - name: Apply supplied non-secret pilot configuration
         env:
           ECP_ACCESS_TEAM_DOMAIN: ${{ inputs.access_team_domain }}
