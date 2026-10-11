@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer";
 import * as ExcelJS from "@ayocore/exceljs";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { ExtractedEvidenceBlock } from "./evidence-chunker.js";
 
 export const ECP_SUPPORTED_DOCUMENT_TYPES = {
@@ -79,6 +78,10 @@ function scalarText(value: unknown): string {
 }
 
 async function extractPdf(bytes: Uint8Array, limits: Required<DocumentExtractionLimits>): Promise<ExtractedDocumentEvidence> {
+  // Load PDF.js only when a PDF is actually processed. Importing it at Worker
+  // startup evaluates canvas globals such as DOMMatrix, which are unavailable
+  // in the Cloudflare Workers runtime and otherwise prevents deployment.
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const loadingTask = getDocument({ data: new Uint8Array(bytes) });
   try {
     const pdf = await loadingTask.promise;
