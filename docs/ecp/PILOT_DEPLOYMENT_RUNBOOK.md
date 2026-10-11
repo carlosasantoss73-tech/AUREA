@@ -4,8 +4,8 @@
 
 ## A. Deploy the intake shell safely
 
-1. PR #199 is already merged. Post-merge evidence checked: AUREA Cloud Continuity, Windows Migration Audit, and the AUREA P0 check passed; the ECP Worker Build is a dry-run only and does not deploy.
-2. First create and verify the Cloudflare Access application and policy for the intended pilot user. Obtain its team domain and AUD. The deployment workflow now refuses to deploy unless both values are supplied; this prevents an unprotected bootstrap deployment. Required repository secrets:
+1. PR #199 is already merged. The ECP Worker Build is a dry-run only and does not deploy. Latest validation after fail-closed UI/test correction: AUREA P0 passed (run 38107454714) and AUREA Cloud Continuity passed (run 38107454650); Windows Migration Audit was still running at last check.
+2. Initial bootstrap is fail-closed: if Access team domain and AUD are both blank, the Worker UI rejects requests without a valid Access JWT and the API remains blocked by placeholder configuration. This allows the Worker to be created first. Do not share the URL. Immediately configure Worker-level Cloudflare Access in the dashboard, then redeploy with the real team domain and AUD. If either Access value is supplied, both must be supplied. Required repository secrets:
    - `CLOUDFLARE_API_TOKEN` — least-privilege token for Worker deployment and secret updates.
    - `CLOUDFLARE_ACCOUNT_ID`.
    Optional secrets:
