@@ -81,6 +81,26 @@ jobs:
           NODE
       - name: Install dependencies
         run: npm install
+      - name: Verify Cloudflare account identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set +e
+          npx --yes wrangler@3.90.0 whoami
+          WHOAMI_EXIT=$?
+          if [ "$WHOAMI_EXIT" -ne 0 ]; then
+            echo "::error::Cloudflare token validation failed. Check token scope and account access in Cloudflare; do not print or paste the token."
+            exit "$WHOAMI_EXIT"
+          fi
+          node --input-type=module <<'NODE'
+          const id = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+          if (!/^[a-f0-9]{32}$/i.test(id)) {
+            console.error("::error::CLOUDFLARE_ACCOUNT_ID must be a 32-character hexadecimal Cloudflare account ID.");
+            process.exit(1);
+          }
+          console.log("Cloudflare account ID format: valid (value intentionally hidden).");
+          NODE
       - name: Deploy ECP Worker
         uses: cloudflare/wrangler-action@v3
         with:
