@@ -73,6 +73,10 @@ jobs:
               ).execute()
               return result.get("permissions", [])
 
+          target_ids = [os.environ["AGENTS_FOLDER_ID"], os.environ["ACTAS_FOLDER_ID"], os.environ["INDEX_FILE_ID"]]
+          if len(set(target_ids)) != len(target_ids):
+              raise SystemExit("PREFLIGHT_BLOCKED: folder and index IDs must be distinct")
+
           principal = os.environ["SERVICE_ACCOUNT"].lower()
           folders = [
               ("03_AGENTES", os.environ["AGENTS_FOLDER_ID"]),
