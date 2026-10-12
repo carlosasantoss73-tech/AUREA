@@ -63,7 +63,7 @@ describe("ECP isolated pilot security contract", () => {
     });
 
     await expect(registered.execute(request)).rejects.toThrow(
-      "ECP_INSTITUTIONAL_CONTEXT_BLOCKED: ECP_RETRIEVAL_BLOCKED:INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK",
+      "ECP_INSTITUTIONAL_CONTEXT_BLOCKED:ECP_RETRIEVAL_BLOCKED:INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK",
     );
     expect(delegate.execute).not.toHaveBeenCalled();
   });
