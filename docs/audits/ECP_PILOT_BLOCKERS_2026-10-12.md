@@ -18,8 +18,8 @@ Base revisada: `main` en `2bf60b76ca8d775435373c9feda7c510cf22415e`.
 - `ECP-B2`: auditar ACL directas/heredadas y demostrar mínimo privilegio antes de conceder capacidad de escritura.
 - `ECP-B3`: confirmar fuente/token de solo lectura para el runtime ECP. No reutilizar el token de escritura como token del Worker.
 - `ECP-B4`: registrar `AKL-046` y publicar `INDICE_MAESTRO_v012.json` mediante un flujo separado, versionado y verificable; conservar v011 intacto.
-- `ECP-B5`: registrar una ruta ECP dedicada que use el lector institucional real y `EcpInstitutionalExecutionAdapter`; no conectarlo al runtime general de Conchita.
-- `ECP-B6`: desplegar y probar endpoint protegido con casos de contexto institucional presente, ausente y no autorizado.
+- `ECP-B5`: confirmar que la ruta ECP desplegada está conectada al lector institucional aprobado y al adaptador de ejecución previsto; no conectarlo al runtime general de Conchita.
+- `ECP-B6`: configurar y probar el endpoint protegido con casos de contexto institucional presente, ausente y no autorizado.
 
 ## Criterio de aceptación del piloto
 
@@ -27,7 +27,7 @@ El piloto no se declara operativo hasta que una ejecución real demuestre: (a) r
 
 ## Integridad
 
-Esta auditoría documenta lo que el código permite afirmar; no declara validación externa, permisos concedidos, escritura en Drive, registro de AKL-046, creación de v012 ni despliegue ECP. `main` y `INDICE_MAESTRO_v011.json` no se modifican.
+Esta auditoría no declara validación institucional, permisos concedidos, recuperación real del Bibliotecario, escritura en Drive, registro de AKL-046 ni creación de v012. Hay un despliegue bootstrap del Worker en `main`, pero no equivale a un piloto operativo. `main` y `INDICE_MAESTRO_v011.json` no se modifican.
 
 ## Revisión del preflight — actualización
 
@@ -35,13 +35,11 @@ Se corrigió el guard estático del índice: ahora el workflow bloquea si el ID 
 
 Esto corrige la condición del código, pero todavía no demuestra que los IDs configurados sean los correctos ni que Google Drive/WIF permita las operaciones previstas. El workflow no se ha ejecutado con configuración institucional real y no se debe declarar `PREFLIGHT_PASS` hasta conservar evidencia de esa ejecución. Las pruebas CI de TypeScript no validan por sí mismas el YAML del workflow ni la autenticación externa.
 
-
 ## Revisión adicional de ACL — cierre conservador
 
 El preflight ahora bloquea no solo permisos de escritura heredados, sino cualquier permiso write-capable inesperado en la ACL de cada carpeta objetivo: propietario, usuario distinto de la cuenta de servicio, grupo o dominio. La única concesión de escritura aceptada por el guard es una concesión directa a la cuenta de servicio configurada en la carpeta objetivo. Esto puede producir un bloqueo legítimo en carpetas institucionales con otros editores; en ese caso se debe revisar el modelo de permisos antes de continuar, no debilitar el guard automáticamente.
 
 Este cambio es una mejora estática de fail-closed. No demuestra todavía que Google Drive devuelva todos los detalles de permisos esperados en el entorno institucional, ni que WIF/ACL pasen en vivo. Las pruebas CI asociadas al commit deben confirmarse por separado.
-
 
 ## Evidencia CI — actualización posterior
 
@@ -49,6 +47,18 @@ Commit revisado: `987e3836cdeca170b53fba4d52f1bfc3b38f56a7`.
 
 - **ECP Preflight Static Guard #1:** concluido con éxito. Los pasos `Parse workflow YAML` y `Assert conservative preflight invariants` terminaron correctamente. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620727
 - **AUREA P0 #863:** concluido con éxito; typecheck y tests pasaron. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620686
-- **Conchita Typecheck Diagnostic #362:** concluido con éxito. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620703
+- **Conchita Typecheck Diagnostic #362:** concluyó correctamente. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620703
 
-Estos resultados confirman validaciones estáticas y de código para el commit indicado. No prueban la autenticación WIF, los permisos reales de Google Drive, recuperación institucional, registro de AKL-046, publicación de v012 ni despliegue del endpoint ECP. Los bloqueos ECP-B1 a ECP-B6 permanecen abiertos hasta obtener evidencia específica.
+Estos resultados confirman validaciones estáticas y de código para el commit indicado. No prueban la autenticación WIF, los permisos reales de Google Drive, recuperación institucional, registro de AKL-046 ni publicación de v012. Los bloqueos ECP-B1 a ECP-B6 permanecen abiertos hasta obtener evidencia específica.
+
+## Evidencia de despliegue — bootstrap no operativo
+
+Se inspeccionó la ejecución [ECP Cloudflare Pilot Deploy #38113326270](https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38113326270), ejecutada el 2026-10-11 desde `main` en `2bf60b76ca8d775435373c9feda7c510cf22415e`.
+
+- El paso `Deploy ECP Worker` concluyó correctamente y registró el Worker `aurea-ecp-pilot` en `https://aurea-ecp-pilot.carlosasantoss73.workers.dev`.
+- Los parámetros de Cloudflare Access quedaron vacíos; los valores provisionales de Access y del índice institucional permanecieron en la configuración.
+- Los logs indicaron que `ANTHROPIC_API_KEY` y `ECP_GOOGLE_DRIVE_ACCESS_TOKEN` no estaban configurados.
+- La ejecución, por tanto, demuestra publicación del Worker en modo bootstrap, no acceso protegido, recuperación del Bibliotecario ni análisis real.
+- La rama `feat/ecp-controlled-drive-write-preflight` está 23 commits por delante de `main`; los cambios de esa rama, incluida la corrección del estado `/health`, no forman parte de ese despliegue.
+
+Siguiente verificación segura: ejecutar desde la interfaz de GitHub el workflow existente `AUREA GCP Access Gate` en `main`. Es manual, usa alcance `drive.readonly` y verifica la federación WIF y el acceso al índice sin modificar Drive. No debe sustituirse por un despliegue ni por un flujo de escritura.
