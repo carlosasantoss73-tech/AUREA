@@ -111,15 +111,21 @@ jobs:
                   for p in acl
               )
               # Conservative: any inherited write-capable role can widen access through a group/domain.
-              inherited_writer = any(
-                  p.get("role") in ("writer", "fileOrganizer", "organizer")
-                  and any(detail.get("inherited") for detail in p.get("permissionDetails", []))
+              write_roles = ("owner", "writer", "fileOrganizer", "organizer")
+              unexpected_writer = any(
+                  p.get("role") in write_roles
+                  and not (
+                      p.get("type") == "user"
+                      and (p.get("emailAddress") or "").lower() == principal
+                      and p.get("role") in ("writer", "fileOrganizer", "organizer")
+                      and not any(detail.get("inherited") for detail in p.get("permissionDetails", []))
+                  )
                   for p in acl
               )
               if not direct_writer:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: no direct write grant for configured service account on {label}; grant must be explicit on the target folder")
-              if inherited_writer:
-                  raise SystemExit(f"PREFLIGHT_BLOCKED: inherited write-capable permission detected on {label}; least privilege is not demonstrated")
+              if unexpected_writer:
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: another direct, inherited, group, domain, or owner write-capable permission is present on {label}; least privilege is not demonstrated")
 
           index = metadata(os.environ["INDEX_FILE_ID"])
           if index.get("id") != os.environ["INDEX_FILE_ID"]:
