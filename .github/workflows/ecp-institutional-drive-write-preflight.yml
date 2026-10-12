@@ -1,0 +1,92 @@
+name: ECP Institutional Drive Write Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required configuration
+        id: gate
+        env:
+          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
+          AGENTS_FOLDER_ID: ${{ vars.AUREA_ECP_AGENTS_FOLDER_ID }}
+          ACTAS_FOLDER_ID: ${{ vars.AUREA_CONTROL_ACTAS_FOLDER_ID }}
+          INDEX_FILE_ID: ${{ vars.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          for key in WIF_PROVIDER SERVICE_ACCOUNT AGENTS_FOLDER_ID ACTAS_FOLDER_ID INDEX_FILE_ID; do
+            if [ -z "${!key:-}" ]; then
+              echo "PREFLIGHT_BLOCKED: missing configuration: $key"
+              exit 1
+            fi
+          done
+          printf '%s' "$WIF_PROVIDER" | grep -Eq '^projects/[0-9]+/locations/global/workloadIdentityPools/[^/]+/providers/[^/]+$'
+          printf '%s' "$SERVICE_ACCOUNT" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\.iam\.gserviceaccount\.com$'
+          echo "Configuration names and formats validated; no secret values printed."
+
+      - name: Authenticate through Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive
+
+      - name: Install Google API client
+        run: python -m pip install --quiet google-api-python-client google-auth
+
+      - name: Verify folder capabilities and protect current index
+        env:
+          AGENTS_FOLDER_ID: ${{ vars.AUREA_ECP_AGENTS_FOLDER_ID }}
+          ACTAS_FOLDER_ID: ${{ vars.AUREA_CONTROL_ACTAS_FOLDER_ID }}
+          INDEX_FILE_ID: ${{ vars.AUREA_KNOWLEDGE_OS_INDEX_ID }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from googleapiclient.discovery import build
+          from googleapiclient.errors import HttpError
+
+          drive = build("drive", "v3")
+          def metadata(file_id):
+              return drive.files().get(
+                  fileId=file_id,
+                  fields="id,name,mimeType,parents,capabilities(canAddChildren,canEdit,canDownload)",
+                  supportsAllDrives=True,
+              ).execute()
+
+          folders = [
+              ("03_AGENTES", os.environ["AGENTS_FOLDER_ID"]),
+              ("00_CONTROL/ACTAS", os.environ["ACTAS_FOLDER_ID"]),
+          ]
+          for label, file_id in folders:
+              item = metadata(file_id)
+              print(json.dumps({"target": label, **item}, ensure_ascii=False))
+              if item.get("mimeType") != "application/vnd.google-apps.folder":
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: {label} is not a Drive folder")
+              caps = item.get("capabilities", {})
+              if caps.get("canAddChildren") is not True or caps.get("canEdit") is not True:
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: required folder capabilities absent for {label}")
+
+          index = metadata(os.environ["INDEX_FILE_ID"])
+          print(json.dumps({
+              "protected_index": {
+                  "id": index.get("id"),
+                  "name": index.get("name"),
+                  "mimeType": index.get("mimeType"),
+                  "capabilities": index.get("capabilities", {}),
+              }
+          }, ensure_ascii=False))
+          if index.get("name") == "INDICE_MAESTRO_v011.json" and index.get("capabilities", {}).get("canEdit") is True:
+              print("WARNING: principal can edit v011; workflow will not modify it.")
+          print("PREFLIGHT_PASS: destination capabilities verified; no Drive files created or modified.")
+          PY
