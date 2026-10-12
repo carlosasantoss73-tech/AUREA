@@ -41,3 +41,14 @@ Esto corrige la condición del código, pero todavía no demuestra que los IDs c
 El preflight ahora bloquea no solo permisos de escritura heredados, sino cualquier permiso write-capable inesperado en la ACL de cada carpeta objetivo: propietario, usuario distinto de la cuenta de servicio, grupo o dominio. La única concesión de escritura aceptada por el guard es una concesión directa a la cuenta de servicio configurada en la carpeta objetivo. Esto puede producir un bloqueo legítimo en carpetas institucionales con otros editores; en ese caso se debe revisar el modelo de permisos antes de continuar, no debilitar el guard automáticamente.
 
 Este cambio es una mejora estática de fail-closed. No demuestra todavía que Google Drive devuelva todos los detalles de permisos esperados en el entorno institucional, ni que WIF/ACL pasen en vivo. Las pruebas CI asociadas al commit deben confirmarse por separado.
+
+
+## Evidencia CI — actualización posterior
+
+Commit revisado: `987e3836cdeca170b53fba4d52f1bfc3b38f56a7`.
+
+- **ECP Preflight Static Guard #1:** concluido con éxito. Los pasos `Parse workflow YAML` y `Assert conservative preflight invariants` terminaron correctamente. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620727
+- **AUREA P0 #863:** concluido con éxito; typecheck y tests pasaron. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620686
+- **Conchita Typecheck Diagnostic #362:** concluido con éxito. Evidencia: https://github.com/carlosasantoss73-tech/AUREA/actions/runs/38194620703
+
+Estos resultados confirman validaciones estáticas y de código para el commit indicado. No prueban la autenticación WIF, los permisos reales de Google Drive, recuperación institucional, registro de AKL-046, publicación de v012 ni despliegue del endpoint ECP. Los bloqueos ECP-B1 a ECP-B6 permanecen abiertos hasta obtener evidencia específica.
