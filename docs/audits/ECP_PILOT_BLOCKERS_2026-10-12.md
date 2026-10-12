@@ -28,3 +28,8 @@ El piloto no se declara operativo hasta que una ejecución real demuestre: (a) r
 ## Integridad
 
 Esta auditoría documenta lo que el código permite afirmar; no declara validación externa, permisos concedidos, escritura en Drive, registro de AKL-046, creación de v012 ni despliegue ECP. `main` y `INDICE_MAESTRO_v011.json` no se modifican.
+
+## Hallazgo adicional de revisión del preflight
+
+La revisión estática detectó que la protección del índice debe ser más estricta antes de usar el flujo: el script actual solo bloquea edición cuando el nombre del archivo consultado coincide con `INDICE_MAESTRO_v011.json`. Si el ID configurado resuelve a otro archivo, la condición por nombre no garantiza que se haya protegido el índice correcto. El siguiente cambio requerido es bloquear si el ID no resuelve exactamente al nombre esperado, si el MIME type no es JSON o si `capabilities.canEdit` no es explícitamente `false`; también deben ser distintos los IDs de las dos carpetas objetivo y del índice. Este hallazgo es una revisión estática, no una prueba de permisos reales.
+
