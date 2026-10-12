@@ -104,15 +104,10 @@ jobs:
                   and not any(detail.get("inherited") for detail in p.get("permissionDetails", []))
                   for p in acl
               )
+              # Conservative: any inherited write-capable role can widen access through a group/domain.
               inherited_writer = any(
                   p.get("role") in ("writer", "fileOrganizer", "organizer")
                   and any(detail.get("inherited") for detail in p.get("permissionDetails", []))
-                  and (
-                      p.get("type") == "domain"
-                      or p.get("type") == "anyone"
-                      or (p.get("type") == "user" and (p.get("emailAddress") or "").lower() == principal)
-                      or any(detail.get("permissionType") == "member" for detail in p.get("permissionDetails", []))
-                  )
                   for p in acl
               )
               if not direct_writer:
