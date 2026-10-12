@@ -124,7 +124,11 @@ jobs:
                   "canEdit": index.get("capabilities", {}).get("canEdit"),
               }
           }, ensure_ascii=False))
-          if index.get("name") == "INDICE_MAESTRO_v011.json" and index.get("capabilities", {}).get("canEdit") is True:
-              raise SystemExit("PREFLIGHT_BLOCKED: service account can edit protected INDICE_MAESTRO_v011.json")
+          if index.get("name") != "INDICE_MAESTRO_v011.json":
+              raise SystemExit("PREFLIGHT_BLOCKED: configured ID is not INDICE_MAESTRO_v011.json")
+          if index.get("mimeType") != "application/json":
+              raise SystemExit("PREFLIGHT_BLOCKED: protected index is not application/json")
+          if index.get("capabilities", {}).get("canEdit") is not False:
+              raise SystemExit("PREFLIGHT_BLOCKED: read-only capability for v011 is not demonstrated")
           print("PREFLIGHT_PASS: explicit folder write grants and index protection verified; no Drive files created or modified.")
           PY
