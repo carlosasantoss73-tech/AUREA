@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate required configuration
-        id: gate
         env:
           WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
           SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
@@ -43,8 +42,9 @@ jobs:
       - name: Install Google API client
         run: python -m pip install --quiet google-api-python-client google-auth
 
-      - name: Verify folder capabilities and protect current index
+      - name: Verify folder capabilities, ACL inheritance, and index protection
         env:
+          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
           AGENTS_FOLDER_ID: ${{ vars.AUREA_ECP_AGENTS_FOLDER_ID }}
           ACTAS_FOLDER_ID: ${{ vars.AUREA_CONTROL_ACTAS_FOLDER_ID }}
           INDEX_FILE_ID: ${{ vars.AUREA_KNOWLEDGE_OS_INDEX_ID }}
@@ -54,9 +54,9 @@ jobs:
           import json
           import os
           from googleapiclient.discovery import build
-          from googleapiclient.errors import HttpError
 
           drive = build("drive", "v3")
+
           def metadata(file_id):
               return drive.files().get(
                   fileId=file_id,
@@ -64,18 +64,61 @@ jobs:
                   supportsAllDrives=True,
               ).execute()
 
+          def permissions(file_id):
+              result = drive.permissions().list(
+                  fileId=file_id,
+                  fields="permissions(id,type,emailAddress,domain,role,permissionDetails(inherited,inheritedFrom,role,permissionType))",
+                  supportsAllDrives=True,
+                  supportsTeamDrives=True,
+              ).execute()
+              return result.get("permissions", [])
+
+          principal = os.environ["SERVICE_ACCOUNT"].lower()
           folders = [
               ("03_AGENTES", os.environ["AGENTS_FOLDER_ID"]),
               ("00_CONTROL/ACTAS", os.environ["ACTAS_FOLDER_ID"]),
           ]
+
           for label, file_id in folders:
               item = metadata(file_id)
-              print(json.dumps({"target": label, **item}, ensure_ascii=False))
               if item.get("mimeType") != "application/vnd.google-apps.folder":
                   raise SystemExit(f"PREFLIGHT_BLOCKED: {label} is not a Drive folder")
               caps = item.get("capabilities", {})
               if caps.get("canAddChildren") is not True or caps.get("canEdit") is not True:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: required folder capabilities absent for {label}")
+
+              acl = permissions(file_id)
+              # Log ACL structure without printing permission IDs or unrelated email addresses.
+              summary = [{
+                  "type": p.get("type"),
+                  "principal_matches_service_account": p.get("type") == "user" and (p.get("emailAddress") or "").lower() == principal,
+                  "role": p.get("role"),
+                  "permissionDetails": p.get("permissionDetails", []),
+              } for p in acl]
+              print(json.dumps({"target": label, "folder_id": file_id, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
+
+              direct_writer = any(
+                  p.get("type") == "user"
+                  and (p.get("emailAddress") or "").lower() == principal
+                  and p.get("role") in ("writer", "fileOrganizer", "organizer")
+                  and not any(detail.get("inherited") for detail in p.get("permissionDetails", []))
+                  for p in acl
+              )
+              inherited_writer = any(
+                  p.get("role") in ("writer", "fileOrganizer", "organizer")
+                  and any(detail.get("inherited") for detail in p.get("permissionDetails", []))
+                  and (
+                      p.get("type") == "domain"
+                      or p.get("type") == "anyone"
+                      or (p.get("type") == "user" and (p.get("emailAddress") or "").lower() == principal)
+                      or any(detail.get("permissionType") == "member" for detail in p.get("permissionDetails", []))
+                  )
+                  for p in acl
+              )
+              if not direct_writer:
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: no direct write grant for configured service account on {label}; grant must be explicit on the target folder")
+              if inherited_writer:
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: inherited write-capable permission detected on {label}; least privilege is not demonstrated")
 
           index = metadata(os.environ["INDEX_FILE_ID"])
           print(json.dumps({
@@ -83,10 +126,10 @@ jobs:
                   "id": index.get("id"),
                   "name": index.get("name"),
                   "mimeType": index.get("mimeType"),
-                  "capabilities": index.get("capabilities", {}),
+                  "canEdit": index.get("capabilities", {}).get("canEdit"),
               }
           }, ensure_ascii=False))
           if index.get("name") == "INDICE_MAESTRO_v011.json" and index.get("capabilities", {}).get("canEdit") is True:
-              print("WARNING: principal can edit v011; workflow will not modify it.")
-          print("PREFLIGHT_PASS: destination capabilities verified; no Drive files created or modified.")
+              raise SystemExit("PREFLIGHT_BLOCKED: service account can edit protected INDICE_MAESTRO_v011.json")
+          print("PREFLIGHT_PASS: explicit folder write grants and index protection verified; no Drive files created or modified.")
           PY
