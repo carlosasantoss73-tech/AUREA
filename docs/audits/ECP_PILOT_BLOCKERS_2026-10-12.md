@@ -35,3 +35,9 @@ Se corrigió el guard estático del índice: ahora el workflow bloquea si el ID 
 
 Esto corrige la condición del código, pero todavía no demuestra que los IDs configurados sean los correctos ni que Google Drive/WIF permita las operaciones previstas. El workflow no se ha ejecutado con configuración institucional real y no se debe declarar `PREFLIGHT_PASS` hasta conservar evidencia de esa ejecución. Las pruebas CI de TypeScript no validan por sí mismas el YAML del workflow ni la autenticación externa.
 
+
+## Revisión adicional de ACL — cierre conservador
+
+El preflight ahora bloquea no solo permisos de escritura heredados, sino cualquier permiso write-capable inesperado en la ACL de cada carpeta objetivo: propietario, usuario distinto de la cuenta de servicio, grupo o dominio. La única concesión de escritura aceptada por el guard es una concesión directa a la cuenta de servicio configurada en la carpeta objetivo. Esto puede producir un bloqueo legítimo en carpetas institucionales con otros editores; en ese caso se debe revisar el modelo de permisos antes de continuar, no debilitar el guard automáticamente.
+
+Este cambio es una mejora estática de fail-closed. No demuestra todavía que Google Drive devuelva todos los detalles de permisos esperados en el entorno institucional, ni que WIF/ACL pasen en vivo. Las pruebas CI asociadas al commit deben confirmarse por separado.
