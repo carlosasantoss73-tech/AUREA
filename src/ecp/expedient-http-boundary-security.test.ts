@@ -46,7 +46,10 @@ function readyFixtureRecord(): EcpStoredExpedient {
         {
           role: "PROCEDURE",
           ingestion: {
+            projectId: "ecp",
             documentId: "fixture-procedure-001",
+            sourceUri: "fixture://procedure",
+            sourceBytes: 1,
             title: "FIXTURE_pliego.pdf",
             mediaType: "application/pdf",
             sourceVersion: "sha256:fixture-procedure",
@@ -61,7 +64,10 @@ function readyFixtureRecord(): EcpStoredExpedient {
           role: "OFFER",
           offeror: "Oferente ficticio A",
           ingestion: {
+            projectId: "ecp",
             documentId: "fixture-offer-001",
+            sourceUri: "fixture://offer",
+            sourceBytes: 1,
             title: "FIXTURE_oferta.pdf",
             mediaType: "application/pdf",
             sourceVersion: "sha256:fixture-offer",
