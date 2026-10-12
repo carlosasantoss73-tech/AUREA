@@ -247,11 +247,11 @@ jobs:
           token="$DRIVE_ACCESS_TOKEN"
           test -n "$token"
           echo "::add-mask::$token"
-          raw="$(curl -fsS -H "Authorization: Bearer $token" "https://www.googleapis.com/drive/v3/files/$AUREA_KNOWLEDGE_OS_INDEX_ID?alt=media")"
-          project_id="$(python -c 'import json,sys; p=json.load(sys.stdin); r=p.get("registros_nuevos_v011") or []; print((r[0].get("proyecto") if r and isinstance(r[0],dict) else "") or "")' <<< "$raw")"
-          test -n "$project_id"
-          echo "AUREA_LIVE_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
-          echo "LIVE_READER_PROJECT_SCOPE: PRESENT"
+          # The live reader test has an explicit ECP-only scope contract.
+          # Do not infer its project ID from the first arbitrary record in v011:
+          # that record may belong to another project and would fail before ECP is tested.
+          echo "AUREA_LIVE_PROJECT_ID=ecp" >> "$GITHUB_ENV"
+          echo "LIVE_READER_PROJECT_SCOPE: ecp"
 
       - name: Setup Node for live institutional reader
         uses: actions/setup-node@v4
