@@ -85,6 +85,8 @@ jobs:
 
           for label, file_id in folders:
               item = metadata(file_id)
+              if item.get("id") != file_id:
+                  raise SystemExit(f"PREFLIGHT_BLOCKED: returned Drive ID mismatch for {label}")
               if item.get("mimeType") != "application/vnd.google-apps.folder":
                   raise SystemExit(f"PREFLIGHT_BLOCKED: {label} is not a Drive folder")
               caps = item.get("capabilities", {})
@@ -120,6 +122,8 @@ jobs:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: inherited write-capable permission detected on {label}; least privilege is not demonstrated")
 
           index = metadata(os.environ["INDEX_FILE_ID"])
+          if index.get("id") != os.environ["INDEX_FILE_ID"]:
+              raise SystemExit("PREFLIGHT_BLOCKED: returned Drive ID mismatch for index")
           print(json.dumps({
               "protected_index": {
                   "id": index.get("id"),
