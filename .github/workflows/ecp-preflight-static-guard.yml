@@ -1,0 +1,40 @@
+name: ECP Preflight Static Guard
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ecp-institutional-drive-write-preflight.yml"
+      - ".github/workflows/ecp-preflight-static-guard.yml"
+      - "docs/audits/ECP_PILOT_BLOCKERS_2026-10-12.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse workflow YAML
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0), aliases: true); puts "YAML_PARSE_PASS"' .github/workflows/ecp-institutional-drive-write-preflight.yml
+
+      - name: Assert conservative preflight invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=.github/workflows/ecp-institutional-drive-write-preflight.yml
+          grep -Eq '^  workflow_dispatch:$' "$FILE"
+          ! grep -Eq '^  (push|schedule|pull_request|pull_request_target):' "$FILE"
+          grep -Fq 'INDICE_MAESTRO_v011.json' "$FILE"
+          grep -Fq 'application/json' "$FILE"
+          grep -Fq 'capabilities' "$FILE"
+          grep -Fq 'unexpected_writer' "$FILE"
+          grep -Fq 'direct write grant' "$FILE"
+          ! grep -Eiq 'drive\(\)\.files\(\)\.(create|update|delete)|drive\(\)\.permissions\(\)\.(create|update|delete)' "$FILE"
+          echo "STATIC_GUARD_PASS: manual-only trigger and required fail-closed guards present; no Drive write API call patterns found."
