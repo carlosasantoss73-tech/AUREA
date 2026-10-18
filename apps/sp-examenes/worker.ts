@@ -180,7 +180,7 @@ export default {
         error?: { message?: string };
         status?: string;
       };
-      if (!response.ok) return Response.json({ error: "Gemini no respondió correctamente (" + response.status + ").", detail: String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500) }, { status: 502 });
+      if (!response.ok) { const detail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500); return Response.json({ error: "Gemini no respondió correctamente (" + response.status + "): " + detail, detail }, { status: 502 }); }
       const answer = (data.steps || []).filter(s => s.type === "model_output")
         .flatMap(s => s.content || []).filter(x => x.type === "text")
         .map(x => x.text || "").join("\n").trim();
