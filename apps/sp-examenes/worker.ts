@@ -185,7 +185,7 @@ export default {
         };
         if (response.ok) {
           answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
-            .map(x => x.text || "").join("\\n").trim();
+            .map(x => x.text || "").join("\n").trim();
           if (answer) break;
           lastStatus = 502;
           lastDetail = "Gemini respondió sin texto verificable.";
