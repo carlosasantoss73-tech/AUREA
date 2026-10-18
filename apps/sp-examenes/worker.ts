@@ -238,7 +238,7 @@ export default {
           });
         }
         if (env.AZURE_OPENAI_API_KEY && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_DEPLOYMENT) {
-          const endpoint = env.AZURE_OPENAI_ENDPOINT.replace(/\\/+$/, "");
+          const endpoint = env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, "");
           const deployment = encodeURIComponent(env.AZURE_OPENAI_DEPLOYMENT);
           const apiVersion = env.AZURE_OPENAI_API_VERSION || "2024-10-21";
           alternateProviders.push({
