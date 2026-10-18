@@ -137,51 +137,46 @@ export default {
       "8. Si la imagen está borrosa o la pregunta/opciones están incompletas, pide una foto más clara o el texto.\n\n" +
       "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext + "\nPDF NORMATIVOS ADJUNTOS A ESTA SOLICITUD:\n" + selectedDocs.map(d => d.title + " — " + d.url).join("\n");
 
-    const userContent: Array<Record<string, unknown>> = [];
-    // Interactions API accepts document data/file references, not arbitrary HTTPS "uri" fields.
-    // Fetch the official PDFs and pass their bytes as base64 document content.
+    const userParts: Array<Record<string, unknown>> = [];
+    // Use Gemini's documented generateContent Part schema (inlineData + text).
     for (const doc of selectedDocs) {
       try {
         const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(12000) });
         if (!pdfResponse.ok) continue;
-        const contentType = (pdfResponse.headers.get("content-type") || "").toLowerCase();
-        if (!contentType.includes("pdf") && !doc.url.toLowerCase().includes(".pdf")) continue;
         const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
         if (!bytes.length || bytes.length > 15_000_000) continue;
+        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") continue;
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
         }
-        userContent.push({ type: "document", data: btoa(binary), mime_type: "application/pdf" });
+        userParts.push({ inlineData: { mimeType: "application/pdf", data: btoa(binary) } });
       } catch {
-        // Keep operating with the live official-page context; the answer must disclose limitations.
+        // Keep operating with live official-page context; disclose source limitations.
       }
     }
-    if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question });
-    if (image) userContent.push({ type: "image", data: image, mime_type: mimeType });
-    userContent.push({ type: "text", text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
+    if (question) userParts.push({ text: "PREGUNTA:\\n" + question });
+    if (image) userParts.push({ inlineData: { mimeType, data: image } });
+    userParts.push({ text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1/interactions", {
+      const model = env.SP_EXAMENES_MODEL || "gemini-3.8-flash";
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({
-          model: env.SP_EXAMENES_MODEL || "gemini-3.8-flash",
-          store: false,
-          system_instruction: system,
-          generation_config: { max_output_tokens: 1400, thinking_level: "low" },
-          input: userContent
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: userParts }],
+          generationConfig: { maxOutputTokens: 1400 }
         })
       });
       const data = await response.json() as {
-        steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
         error?: { message?: string };
-        status?: string;
       };
-      if (!response.ok) return Response.json({ error: "Gemini no respondió correctamente (" + response.status + ")." }, { status: 502 });
-      const answer = (data.steps || []).filter(s => s.type === "model_output")
-        .flatMap(s => s.content || []).filter(x => x.type === "text")
-        .map(x => x.text || "").join("\n").trim();
+      if (!response.ok) { const detail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500); return Response.json({ error: "Gemini no respondió correctamente (" + response.status + "): " + detail, detail }, { status: 502 }); }
+      const answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
+        .map(x => x.text || "").join("\\n").trim();
       if (!answer) return Response.json({ error: "Gemini no devolvió texto verificable." }, { status: 502 });
       return Response.json({
         answer: answer,
