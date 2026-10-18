@@ -92,6 +92,7 @@ export default {
     }
     if (!env.GEMINI_API_KEY) return Response.json({ error: "El motor Gemini aún no está configurado. El administrador debe añadir el secreto GEMINI_API_KEY al entorno de despliegue." }, { status: 503 });
 
+    const requestStartedAt = Date.now();
     const liveSources: Array<{ title: string; url: string }> = [...CORE_SOURCES];
     if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(question)) {
       liveSources.push({ title: "SERCOP — Circulares 2026", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" });
@@ -215,10 +216,14 @@ export default {
       return Response.json({
         answer: answer,
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })).concat(selectedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt }))),
-        sourceStatus: sourceStatus
+        sourceStatus: sourceStatus,
+        latencyMs: Date.now() - requestStartedAt
       }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
-    } catch {
-      return Response.json({ error: "No fue posible contactar el motor de respuestas. Intenta de nuevo más tarde." }, { status: 502 });
+    } catch (error) {
+      const message = error instanceof Error && error.name === "TimeoutError"
+        ? "El motor de respuestas agotó el tiempo de espera. Se intentó el modelo alternativo; vuelve a intentarlo en unos minutos."
+        : "Fallo de conexión con el motor de respuestas. Revisa tu conexión e inténtalo de nuevo.";
+      return Response.json({ error: message }, { status: 502 });
     }
   }
 };
