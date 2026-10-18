@@ -166,33 +166,43 @@ export default {
 
       for (let attempt = 0; attempt < models.length; attempt++) {
         const model = models[attempt];
-        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: "user", parts: userParts }],
-            generationConfig: { maxOutputTokens: 1400 }
-          }),
-          signal: AbortSignal.timeout(45000)
-        });
-        const data = await response.json() as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-          error?: { message?: string };
-        };
-        if (response.ok) {
-          answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
-            .map(x => x.text || "").join("\n").trim();
-          if (answer) break;
-          lastStatus = 502;
-          lastDetail = "Gemini respondió sin texto verificable.";
-          break;
-        }
+        try {
+          const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: [{ role: "user", parts: userParts }],
+              generationConfig: { maxOutputTokens: 1100 }
+            }),
+            signal: AbortSignal.timeout(28000)
+          });
+          const data = await response.json() as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+            error?: { message?: string };
+          };
+          if (response.ok) {
+            answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
+              .map(x => x.text || "").join("\n").trim();
+            if (answer) break;
+            lastStatus = 502;
+            lastDetail = "Gemini respondió sin texto verificable.";
+            // An empty candidate can be transient; try fallback model.
+            continue;
+          }
 
-        lastStatus = response.status;
-        lastDetail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500);
-        const transient = response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
-        if (!transient || attempt === models.length - 1) break;
+          lastStatus = response.status;
+          lastDetail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500);
+          const transient = response.status === 408 || response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
+          if (!transient || attempt === models.length - 1) break;
+        } catch (error) {
+          lastStatus = 504;
+          lastDetail = error instanceof Error && error.name === "TimeoutError"
+            ? "Tiempo de espera agotado al consultar " + model + "."
+            : "Fallo de conexión al consultar " + model + ".";
+          // Crucial: network errors and timeouts also advance to the fallback model.
+          if (attempt === models.length - 1) break;
+        }
       }
 
       if (!answer) {
