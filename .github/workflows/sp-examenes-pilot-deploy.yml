@@ -73,3 +73,28 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@4 secret put GEMINI_API_KEY --config wrangler.jsonc
+
+      - name: Set optional OpenAI runtime secret
+        if: ${{ secrets.OPENAI_API_KEY != '' }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@4 secret put OPENAI_API_KEY --config wrangler.jsonc
+
+      - name: Set optional OpenAI model
+        if: ${{ vars.SP_EXAMENES_OPENAI_MODEL != '' }}
+        env:
+          SP_EXAMENES_OPENAI_MODEL: ${{ vars.SP_EXAMENES_OPENAI_MODEL }}
+        run: printf '%s' "$SP_EXAMENES_OPENAI_MODEL" | npx --yes wrangler@4 secret put SP_EXAMENES_OPENAI_MODEL --config wrangler.jsonc
+
+      - name: Set optional Azure OpenAI runtime configuration
+        if: ${{ secrets.AZURE_OPENAI_API_KEY != '' && vars.AZURE_OPENAI_ENDPOINT != '' && vars.AZURE_OPENAI_DEPLOYMENT != '' }}
+        env:
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION || '2024-10-21' }}
+        run: |
+          printf '%s' "$AZURE_OPENAI_API_KEY" | npx --yes wrangler@4 secret put AZURE_OPENAI_API_KEY --config wrangler.jsonc
+          printf '%s' "$AZURE_OPENAI_ENDPOINT" | npx --yes wrangler@4 secret put AZURE_OPENAI_ENDPOINT --config wrangler.jsonc
+          printf '%s' "$AZURE_OPENAI_DEPLOYMENT" | npx --yes wrangler@4 secret put AZURE_OPENAI_DEPLOYMENT --config wrangler.jsonc
+          printf '%s' "$AZURE_OPENAI_API_VERSION" | npx --yes wrangler@4 secret put AZURE_OPENAI_API_VERSION --config wrangler.jsonc

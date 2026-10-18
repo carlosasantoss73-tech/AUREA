@@ -3,6 +3,12 @@ import PAGE from "./public/index.html";
 interface Env {
   GEMINI_API_KEY: string;
   SP_EXAMENES_MODEL?: string;
+  OPENAI_API_KEY?: string;
+  SP_EXAMENES_OPENAI_MODEL?: string;
+  AZURE_OPENAI_API_KEY?: string;
+  AZURE_OPENAI_ENDPOINT?: string;
+  AZURE_OPENAI_DEPLOYMENT?: string;
+  AZURE_OPENAI_API_VERSION?: string;
 }
 
 const CORE_SOURCES = [
@@ -206,10 +212,92 @@ export default {
         }
       }
 
+      // Cross-provider failover is opt-in: only use providers with explicitly configured runtime secrets.
+      // PDF inlineData is intentionally NOT sent to OpenAI-compatible chat APIs; the fallback receives the
+      // user's text/image plus the official source text already retrieved above, and must disclose limitations.
+      if (!answer) {
+        const fallbackText = (question || "Analiza la imagen adjunta.") +
+          "\n\nAVISO DE CONTEXTO: Este proveedor alternativo no recibió los PDF adjuntos al proveedor Gemini. " +
+          "Usa únicamente el texto oficial recuperado en el contexto del sistema y no afirmes haber revisado el PDF si no puedes verificarlo.";
+        const userContent: Array<Record<string, unknown>> = [{ type: "text", text: fallbackText }];
+        if (image) userContent.push({
+          type: "image_url",
+          image_url: { url: "data:" + mimeType + ";base64," + image, detail: "high" }
+        });
+        const alternateProviders: Array<{ name: string; url: string; key: string; body: Record<string, unknown>; headers?: Record<string, string> }> = [];
+        if (env.OPENAI_API_KEY) {
+          alternateProviders.push({
+            name: "OpenAI",
+            url: "https://api.openai.com/v1/chat/completions",
+            key: env.OPENAI_API_KEY,
+            body: {
+              model: env.SP_EXAMENES_OPENAI_MODEL || "gpt-4.1-mini",
+              messages: [{ role: "system", content: system }, { role: "user", content: userContent }],
+              max_tokens: 1100
+            }
+          });
+        }
+        if (env.AZURE_OPENAI_API_KEY && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_DEPLOYMENT) {
+          const endpoint = env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, "");
+          const deployment = encodeURIComponent(env.AZURE_OPENAI_DEPLOYMENT);
+          const apiVersion = env.AZURE_OPENAI_API_VERSION || "2024-10-21";
+          alternateProviders.push({
+            name: "Azure OpenAI",
+            url: endpoint + "/openai/deployments/" + deployment + "/chat/completions?api-version=" + encodeURIComponent(apiVersion),
+            key: env.AZURE_OPENAI_API_KEY,
+            headers: { "api-key": env.AZURE_OPENAI_API_KEY },
+            body: {
+              messages: [{ role: "system", content: system }, { role: "user", content: userContent }],
+              max_tokens: 1100
+            }
+          });
+        }
+        for (const provider of alternateProviders) {
+          try {
+            const headers: Record<string, string> = { "content-type": "application/json" };
+            if (provider.name === "OpenAI") headers.authorization = "Bearer " + provider.key;
+            else Object.assign(headers, provider.headers || {});
+            const response = await fetch(provider.url, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(provider.body),
+              signal: AbortSignal.timeout(25000)
+            });
+            const data = await response.json() as {
+              choices?: Array<{ message?: { content?: string | Array<{ text?: string }> } }>;
+              error?: { message?: string };
+            };
+            if (response.ok) {
+              const content = data.choices?.[0]?.message?.content;
+              answer = typeof content === "string"
+                ? content.trim()
+                : Array.isArray(content) ? content.map(part => part.text || "").join("\n").trim() : "";
+              if (answer) {
+                return Response.json({
+                  answer,
+                  sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
+                  sourceStatus,
+                  provider: provider.name,
+                  latencyMs: Date.now() - requestStartedAt
+                }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+              }
+              lastStatus = 502;
+              lastDetail = provider.name + " respondió sin texto verificable.";
+            } else {
+              lastStatus = response.status;
+              lastDetail = provider.name + " devolvió HTTP " + response.status + ": " + String(data.error?.message || "sin detalle").slice(0, 300);
+            }
+          } catch (error) {
+            lastStatus = 504;
+            lastDetail = provider.name + " no respondió dentro del tiempo esperado.";
+          }
+        }
+      }
+
       if (!answer) {
         const overload = lastStatus === 429 || lastStatus === 500 || lastStatus === 502 || lastStatus === 503 || lastStatus === 504;
         return Response.json({
-          error: "Gemini no pudo responder después de probar los modelos disponibles (" + lastStatus + "): " + lastDetail,
+          error: "Ningún proveedor de IA configurado pudo responder (" + lastStatus + "): " + lastDetail,
           detail: lastDetail
         }, { status: overload ? 503 : 502 });
       }
