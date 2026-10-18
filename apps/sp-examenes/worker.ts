@@ -5,15 +5,9 @@ interface Env {
   SP_EXAMENES_MODEL?: string;
 }
 
-const SOURCES = [
+const CORE_SOURCES = [
   { title: "SERCOP — LOSNCP", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/losncp" },
-  { title: "SERCOP — Reglamento", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/reglamento" },
-  { title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" },
-  { title: "SERCOP — Circulares 2026", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" },
-  { title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" },
-  { title: "SERCOP — comunicado oficial sobre reformas y transición", url: "https://portal.compraspublicas.gob.ec/sercop/comunicado-oficial-reformas-al-reglamento-de-contratacion-publica-mantienen-una-transicion-ordenada-para-garantizar-la-continuidad-de-los-procedimientos/" },
-  { title: "SERCOP — Decreto Ejecutivo 356", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/decreto-no-356" },
-  { title: "Registro Oficial del Ecuador", url: "https://www.registroficial.gob.ec/" }
+  { title: "SERCOP — Reglamento", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/reglamento" }
 ] as const;
 
 // Best-effort pilot guard only: isolate memory can reset and is not a durable global quota.
@@ -47,13 +41,13 @@ function cleanHtml(html: string): string {
     .replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
 }
 
-async function readOfficialSources() {
+async function readOfficialSources(sources: ReadonlyArray<{ title: string; url: string }>) {
   const checkedAt = new Date().toISOString();
-  const results = await Promise.all(SOURCES.map(async source => {
+  const results = await Promise.all(sources.map(async source => {
     try {
       const response = await fetch(source.url, {
         headers: { "user-agent": "SP-Examenes-Pilot/0.1 (official-source-check)" },
-        signal: AbortSignal.timeout(7000)
+        signal: AbortSignal.timeout(4000)
       });
       if (!response.ok) return { title: source.title, url: source.url, checkedAt, ok: false, text: "" };
       const html = await response.text();
@@ -98,7 +92,15 @@ export default {
     }
     if (!env.GEMINI_API_KEY) return Response.json({ error: "El motor Gemini aún no está configurado. El administrador debe añadir el secreto GEMINI_API_KEY al entorno de despliegue." }, { status: 503 });
 
-    const official = await readOfficialSources();
+    const liveSources: Array<{ title: string; url: string }> = [...CORE_SOURCES];
+    if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(question)) {
+      liveSources.push({ title: "SERCOP — Circulares 2026", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" });
+    }
+    if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28|feria inclusiva|subasta|cat[aá]logo/i.test(question)) {
+      liveSources.push({ title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" });
+      liveSources.push({ title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" });
+    }
+    const official = await readOfficialSources(liveSources);
     const goodSources = official.results.filter(s => s.ok);
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
     const qLower = question.toLowerCase();
@@ -133,22 +135,23 @@ export default {
 
     const userParts: Array<Record<string, unknown>> = [];
     // Use Gemini's documented generateContent Part schema (inlineData + text).
-    for (const doc of selectedDocs) {
+    const pdfParts = await Promise.all(selectedDocs.map(async doc => {
       try {
-        const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(12000) });
-        if (!pdfResponse.ok) continue;
+        const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(8000) });
+        if (!pdfResponse.ok) return null;
         const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        if (!bytes.length || bytes.length > 15_000_000) continue;
-        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") continue;
+        if (!bytes.length || bytes.length > 15_000_000) return null;
+        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") return null;
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
         }
-        userParts.push({ inlineData: { mimeType: "application/pdf", data: btoa(binary) } });
+        return { inlineData: { mimeType: "application/pdf", data: btoa(binary) } };
       } catch {
-        // Keep operating with live official-page context; disclose source limitations.
+        return null;
       }
-    }
+    }));
+    userParts.push(...pdfParts.filter((part): part is { inlineData: { mimeType: string; data: string } } => part !== null));
     if (question) userParts.push({ text: "PREGUNTA:\n" + question });
     if (image) userParts.push({ inlineData: { mimeType, data: image } });
     userParts.push({ text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
