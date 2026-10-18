@@ -41,8 +41,10 @@ function renderAnswer(text){
 function readBlobAsDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se pudo leer la imagen.'));reader.readAsDataURL(blob);});}
 async function loadImage(file){
   if(!file)return;
-  if(!file.type.startsWith('image/')){status.textContent='El archivo no es una imagen. Usa JPG, PNG o WebP.';return;}
-  if(file.size>15*1024*1024){status.textContent='La imagen original supera 15 MB. Recórtala o reduce su tamaño e inténtalo otra vez.';return;}
+  // Clear any previous image first, so a rejected replacement can never send stale content.
+  imageData=null;imageMime=null;preview.removeAttribute('src');preview.style.display='none';
+  if(!file.type.startsWith('image/')){photo.value='';status.textContent='El archivo no es una imagen. Usa JPG, PNG o WebP.';return;}
+  if(file.size>15*1024*1024){photo.value='';status.textContent='La imagen original supera 15 MB. Recórtala o reduce su tamaño e inténtalo otra vez.';return;}
   processingImage=true;send.disabled=true;status.textContent='Preparando imagen para enviarla…';
   try{
     const bitmap=await createImageBitmap(file);
