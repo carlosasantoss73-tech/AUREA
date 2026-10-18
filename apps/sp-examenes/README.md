@@ -48,3 +48,10 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - Incorporar preguntas reales de prueba, comparar la respuesta con la fuente oficial exacta y registrar falsos positivos/negativos.
 - Conectar recuperación institucional autorizada de Bibliotecario cuando el registro ECP/SP esté aprobado y el conector concreto esté implementado.
 - Añadir acceso individual, expiración de suscripción y control de consumo antes de cobrar o abrir a público general.
+
+## Registro de continuidad — 2026-10-18
+
+- Estado: aplicación y Worker presentes en `main`; piloto todavía no declarado operativo.
+- Criterio de cierre: despliegue Cloudflare confirmado, comprobación `/health`, pregunta real respondida con evidencia oficial verificable, prueba de fotografía y verificación de fallo seguro cuando falte evidencia o configuración.
+- El workflow de despliegue debe validar `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` y `GEMINI_API_KEY`. No se almacena ninguna clave en el repositorio.
+- Este registro no certifica que el despliegue haya ocurrido; la evidencia debe provenir de la ejecución real del workflow y de la prueba del endpoint.
