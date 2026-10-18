@@ -155,7 +155,7 @@ export default {
         // Keep operating with live official-page context; disclose source limitations.
       }
     }
-    if (question) userParts.push({ text: "PREGUNTA:\\n" + question });
+    if (question) userParts.push({ text: "PREGUNTA:\n" + question });
     if (image) userParts.push({ inlineData: { mimeType, data: image } });
     userParts.push({ text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
 
