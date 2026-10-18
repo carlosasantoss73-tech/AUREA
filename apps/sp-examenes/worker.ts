@@ -148,6 +148,8 @@ export default {
         if (!contentType.includes("pdf") && !doc.url.toLowerCase().includes(".pdf")) continue;
         const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
         if (!bytes.length || bytes.length > 15_000_000) continue;
+        // Avoid sending an HTML error page masquerading as a PDF.
+        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") continue;
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
@@ -178,7 +180,7 @@ export default {
         error?: { message?: string };
         status?: string;
       };
-      if (!response.ok) return Response.json({ error: "Gemini no respondió correctamente (" + response.status + ")." }, { status: 502 });
+      if (!response.ok) return Response.json({ error: "Gemini no respondió correctamente (" + response.status + ").", detail: String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500) }, { status: 502 });
       const answer = (data.steps || []).filter(s => s.type === "model_output")
         .flatMap(s => s.content || []).filter(x => x.type === "text")
         .map(x => x.text || "").join("\n").trim();
