@@ -103,16 +103,11 @@ export default {
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
     const qLower = question.toLowerCase();
     const regulationQuestion = /reglamento|fase|procedimiento|plazo|convalid|subasta|menor cuant[ií]a|cat[aá]logo|[ií]nfima|requisito|oferta|adjudicaci[oó]n|garant[ií]a|presupuesto referencial|contrato/i.test(qLower);
-    const selectedDocs: Array<{ title: string; url: string }> = [];
-    if (regulationQuestion) {
-      selectedDocs.push({ title: "Reglamento General de la LOSNCP (Decreto Ejecutivo 193; versión oficial alojada por SERCOP, 30-oct-2025; comprobar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/Reglamento-LOSNCP-20251030.pdf" });
-    } else if (question) {
-      selectedDocs.push({ title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; última reforma visible en el PDF: 7-oct-2025)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" });
-    } else {
-      // Photo-only questions cannot be classified before OCR; include both core texts for this limited pilot.
-      selectedDocs.push({ title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; última reforma visible en el PDF: 7-oct-2025)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" });
-      selectedDocs.push({ title: "Reglamento General de la LOSNCP (Decreto Ejecutivo 193; versión oficial alojada por SERCOP, 30-oct-2025; comprobar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/Reglamento-LOSNCP-20251030.pdf" });
-    }
+    // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
+    const selectedDocs: Array<{ title: string; url: string }> = [
+      { title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; PDF oficial con reforma visible al 7-oct-2025; verificar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" },
+      { title: "Reglamento General de la LOSNCP (PDF oficial alojado por SERCOP; verificar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/Reglamento-LOSNCP-20251030.pdf" }
+    ];
     if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(qLower)) {
       selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0005-C (25-sep-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/09/SERCOP-SERCOP-2026-0005-C.pdf" });
     }
