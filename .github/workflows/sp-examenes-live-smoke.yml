@@ -1,0 +1,52 @@
+name: SP Examenes Live Smoke Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sp-examenes-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check live health endpoint
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 \
+            https://sp-examenes-pilot.carlosasantoss73.workers.dev/health \
+            -o /tmp/health.json
+          cat /tmp/health.json
+          jq -e '.status == "ok" and .app == "SP-EXAMENES"' /tmp/health.json >/dev/null
+      - name: Submit one controlled real question and capture diagnostics
+        id: ask
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          payload='{"question":"Un oferente olvidó incluir o referenciar el manual de fábrica en su oferta para un proceso de adquisición de equipos de sonido. ¿Cómo se clasifica esta omisión?","image":null,"mimeType":null}'
+          code="$(curl --silent --show-error --max-time 110 \
+            -H 'content-type: application/json' \
+            -X POST \
+            --data "$payload" \
+            -o /tmp/answer.json \
+            -w '%{http_code}' \
+            https://sp-examenes-pilot.carlosasantoss73.workers.dev/api/answer)" || code="000"
+          echo "HTTP status: $code"
+          echo "Response body (secrets must never be included):"
+          jq -c '{error,detail,sourceStatus,answer:(.answer // null),sourcesCount:(.sources | length)}' /tmp/answer.json 2>/dev/null || cat /tmp/answer.json
+          if [ "$code" -lt 200 ] 2>/dev/null || [ "$code" -ge 300 ] 2>/dev/null; then
+            echo "::error::Live answer request failed with HTTP $code. Inspect the response above."
+            exit 1
+          fi
+          jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/answer.json >/dev/null || {
+            echo "::error::The endpoint returned success without a non-empty answer."
+            exit 1
+          }
+      - name: Fail if the live answer request failed
+        if: steps.ask.outcome == 'failure'
+        run: exit 1
