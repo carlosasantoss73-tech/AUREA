@@ -217,7 +217,7 @@ export default {
       // user's text/image plus the official source text already retrieved above, and must disclose limitations.
       if (!answer) {
         const fallbackText = (question || "Analiza la imagen adjunta.") +
-          "\\n\\nAVISO DE CONTEXTO: Este proveedor alternativo no recibió los PDF adjuntos al proveedor Gemini. " +
+          "\n\nAVISO DE CONTEXTO: Este proveedor alternativo no recibió los PDF adjuntos al proveedor Gemini. " +
           "Usa únicamente el texto oficial recuperado en el contexto del sistema y no afirmes haber revisado el PDF si no puedes verificarlo.";
         const userContent: Array<Record<string, unknown>> = [{ type: "text", text: fallbackText }];
         if (image) userContent.push({
@@ -271,7 +271,7 @@ export default {
               const content = data.choices?.[0]?.message?.content;
               answer = typeof content === "string"
                 ? content.trim()
-                : Array.isArray(content) ? content.map(part => part.text || "").join("\\n").trim() : "";
+                : Array.isArray(content) ? content.map(part => part.text || "").join("\n").trim() : "";
               if (answer) {
                 return Response.json({
                   answer,
