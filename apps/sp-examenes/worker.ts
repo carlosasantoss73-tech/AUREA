@@ -297,7 +297,7 @@ export default {
       if (!answer) {
         const overload = lastStatus === 429 || lastStatus === 500 || lastStatus === 502 || lastStatus === 503 || lastStatus === 504;
         return Response.json({
-          error: "Gemini no pudo responder después de probar los modelos disponibles (" + lastStatus + "): " + lastDetail,
+          error: "Ningún proveedor de IA configurado pudo responder (" + lastStatus + "): " + lastDetail,
           detail: lastDetail
         }, { status: overload ? 503 : 502 });
       }
