@@ -160,24 +160,51 @@ export default {
     userParts.push({ text: "Analiza la pregunta y sus opciones visibles. Si no puedes leerlas, dilo." });
 
     try {
-      const model = env.SP_EXAMENES_MODEL || "gemini-3.8-flash";
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: userParts }],
-          generationConfig: { maxOutputTokens: 1400 }
-        })
-      });
-      const data = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-        error?: { message?: string };
-      };
-      if (!response.ok) { const detail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500); return Response.json({ error: "Gemini no respondió correctamente (" + response.status + "): " + detail, detail }, { status: 502 }); }
-      const answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
-        .map(x => x.text || "").join("\\n").trim();
-      if (!answer) return Response.json({ error: "Gemini no devolvió texto verificable." }, { status: 502 });
+      // Primary + documented stable fallback. Retry only transient overload/rate-limit/server errors.
+      const primaryModel = env.SP_EXAMENES_MODEL || "gemini-3.8-flash";
+      const models = [primaryModel, ...(primaryModel === "gemini-3.6-flash" ? [] : ["gemini-3.6-flash"])];
+      let lastStatus = 502;
+      let lastDetail = "Sin detalle devuelto por la API.";
+      let answer = "";
+
+      for (let attempt = 0; attempt < models.length; attempt++) {
+        const model = models[attempt];
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: userParts }],
+            generationConfig: { maxOutputTokens: 1400 }
+          }),
+          signal: AbortSignal.timeout(45000)
+        });
+        const data = await response.json() as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          error?: { message?: string };
+        };
+        if (response.ok) {
+          answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
+            .map(x => x.text || "").join("\n").trim();
+          if (answer) break;
+          lastStatus = 502;
+          lastDetail = "Gemini respondió sin texto verificable.";
+          break;
+        }
+
+        lastStatus = response.status;
+        lastDetail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500);
+        const transient = response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
+        if (!transient || attempt === models.length - 1) break;
+      }
+
+      if (!answer) {
+        const overload = lastStatus === 429 || lastStatus === 500 || lastStatus === 502 || lastStatus === 503 || lastStatus === 504;
+        return Response.json({
+          error: "Gemini no pudo responder después de probar los modelos disponibles (" + lastStatus + "): " + lastDetail,
+          detail: lastDetail
+        }, { status: overload ? 503 : 502 });
+      }
       return Response.json({
         answer: answer,
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })).concat(selectedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt }))),
