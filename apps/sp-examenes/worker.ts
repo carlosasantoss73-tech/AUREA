@@ -138,8 +138,24 @@ export default {
       "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext + "\nPDF NORMATIVOS ADJUNTOS A ESTA SOLICITUD:\n" + selectedDocs.map(d => d.title + " — " + d.url).join("\n");
 
     const userContent: Array<Record<string, unknown>> = [];
+    // Interactions API accepts document data/file references, not arbitrary HTTPS "uri" fields.
+    // Fetch the official PDFs and pass their bytes as base64 document content.
     for (const doc of selectedDocs) {
-      userContent.push({ type: "document", uri: doc.url, mime_type: "application/pdf" });
+      try {
+        const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(12000) });
+        if (!pdfResponse.ok) continue;
+        const contentType = (pdfResponse.headers.get("content-type") || "").toLowerCase();
+        if (!contentType.includes("pdf") && !doc.url.toLowerCase().includes(".pdf")) continue;
+        const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
+        if (!bytes.length || bytes.length > 15_000_000) continue;
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+        }
+        userContent.push({ type: "document", data: btoa(binary), mime_type: "application/pdf" });
+      } catch {
+        // Keep operating with the live official-page context; the answer must disclose limitations.
+      }
     }
     if (question) userContent.push({ type: "text", text: "PREGUNTA:\n" + question });
     if (image) userContent.push({ type: "image", data: image, mime_type: mimeType });
