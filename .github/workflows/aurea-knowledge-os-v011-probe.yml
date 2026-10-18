@@ -3,7 +3,12 @@ name: AUREA Knowledge OS v011 Live Reader Probe
 on:
   push:
     branches:
+      - main
       - feat/browser-use-runtime-integration-v1
+    paths:
+      - '.github/workflows/aurea-knowledge-os-v011-probe.yml'
+      - 'src/context/**'
+      - 'apps/tool_expert_factory/**'
   pull_request:
     branches:
       - main
