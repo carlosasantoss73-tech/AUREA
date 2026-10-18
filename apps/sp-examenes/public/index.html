@@ -21,9 +21,63 @@ label{display:block;font-weight:650;margin-bottom:8px}textarea{width:100%;min-he
 </main>
 <script>
 const question=document.querySelector('#question'),photo=document.querySelector('#photo'),preview=document.querySelector('#preview'),send=document.querySelector('#send'),status=document.querySelector('#status'),panel=document.querySelector('#result-panel'),answer=document.querySelector('#answer'),sources=document.querySelector('#sources');
-let imageData=null,imageMime=null;
-function appendInline(parent,text){const re=/\\*\\*([^*]+)\\*\\*/g;let last=0,m;while((m=re.exec(text))){if(m.index>last)parent.append(document.createTextNode(text.slice(last,m.index)));const strong=document.createElement('strong');strong.textContent=m[1];parent.append(strong);last=re.lastIndex;}if(last<text.length)parent.append(document.createTextNode(text.slice(last)));}
-function renderAnswer(text){answer.replaceChildren();let list=null,listType=null;for(const raw of String(text||'').split(/\\r?\\n/)){const line=raw.trim();if(!line){list=null;listType=null;continue;}const heading=line.match(/^#{1,3}\\s+(.+)$/);const ordered=line.match(/^\\d+[.)]\\s+(.+)$/);const bullet=line.match(/^[-*]\\s+(.+)$/);if(heading){list=null;listType=null;const h=document.createElement('h3');appendInline(h,heading[1]);answer.append(h);}else if(ordered||bullet){const type=ordered?'ol':'ul';if(!list||listType!==type){list=document.createElement(type);answer.append(list);listType=type;}const li=document.createElement('li');appendInline(li,(ordered||bullet)[1]);list.append(li);}else{list=null;listType=null;const p=document.createElement('p');appendInline(p,line);answer.append(p);}}}
-photo.addEventListener('change',()=>{const f=photo.files&&photo.files[0];imageData=null;imageMime=null;preview.style.display='none';if(!f){status.textContent='';return;}if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>4*1024*1024){status.textContent='La imagen debe ser JPG, PNG o WebP y pesar como máximo 4 MB.';photo.value='';return;}status.textContent='';imageMime=f.type;const reader=new FileReader();reader.onload=()=>{imageData=String(reader.result).split(',')[1]||null;preview.src=String(reader.result);preview.style.display='block';};reader.readAsDataURL(f);});
-send.addEventListener('click',async()=>{const q=question.value.trim();if(!q&&!imageData){status.textContent='Escribe una pregunta o adjunta una fotografía.';return;}send.disabled=true;status.textContent='Consultando fuentes oficiales y analizando la pregunta…';panel.hidden=true;try{const res=await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q,image:imageData,mimeType:imageMime})});const data=await res.json();if(!res.ok)throw new Error(data.error||'No fue posible procesar la pregunta.');renderAnswer(data.answer||'No se recibió una respuesta verificable.');sources.replaceChildren();for(const s of (data.sources||[])){const a=document.createElement('a');a.href=s.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=s.title+' · consultada '+s.checkedAt;sources.appendChild(a);}panel.hidden=false;status.textContent=data.sourceStatus==='partial'?'Atención: algunas fuentes oficiales no estuvieron disponibles. Revisa la respuesta y los enlaces.':'Consulta terminada. Verifica siempre la fuente oficial citada.';}catch(e){status.textContent='No se pudo completar: '+(e instanceof Error?e.message:'error desconocido');}finally{send.disabled=false;}});
+const uploadArea=document.querySelector('main .panel');
+let imageData=null,imageMime=null,processingImage=false;
+function appendInline(parent,text){
+  const re=/\*\*([^*]+)\*\*/g;let last=0,m;
+  while((m=re.exec(text))){if(m.index>last)parent.append(document.createTextNode(text.slice(last,m.index)));const strong=document.createElement('strong');strong.textContent=m[1];parent.append(strong);last=re.lastIndex;}
+  if(last<text.length)parent.append(document.createTextNode(text.slice(last)));
+}
+function renderAnswer(text){
+  answer.replaceChildren();let list=null,listType=null;
+  for(const raw of String(text||'').split(/\r?\n/)){
+    const line=raw.trim();if(!line){list=null;listType=null;continue;}
+    const heading=line.match(/^#{1,3}\s+(.+)$/),ordered=line.match(/^\d+[.)]\s+(.+)$/),bullet=line.match(/^[-*]\s+(.+)$/);
+    if(heading){list=null;listType=null;const h=document.createElement('h3');appendInline(h,heading[1]);answer.append(h);}
+    else if(ordered||bullet){const type=ordered?'ol':'ul';if(!list||listType!==type){list=document.createElement(type);answer.append(list);listType=type;}const li=document.createElement('li');appendInline(li,(ordered||bullet)[1]);list.append(li);}
+    else{list=null;listType=null;const p=document.createElement('p');appendInline(p,line);answer.append(p);}
+  }
+}
+function readBlobAsDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se pudo leer la imagen.'));reader.readAsDataURL(blob);});}
+async function loadImage(file){
+  if(!file)return;
+  if(!file.type.startsWith('image/')){status.textContent='El archivo no es una imagen. Usa JPG, PNG o WebP.';return;}
+  if(file.size>15*1024*1024){status.textContent='La imagen original supera 15 MB. Recórtala o reduce su tamaño e inténtalo otra vez.';return;}
+  processingImage=true;send.disabled=true;status.textContent='Preparando imagen para enviarla…';
+  try{
+    const bitmap=await createImageBitmap(file);
+    const maxSide=2000,scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('El navegador no pudo procesar la imagen.');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+    let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.82));
+    if(!blob)throw new Error('No se pudo convertir la imagen.');
+    if(blob.size>3*1024*1024)blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.65));
+    if(!blob||blob.size>4*1024*1024)throw new Error('La imagen sigue siendo demasiado grande. Recórtala e inténtalo otra vez.');
+    const dataUrl=await readBlobAsDataUrl(blob);imageData=dataUrl.split(',')[1]||null;imageMime='image/jpeg';
+    preview.src=dataUrl;preview.style.display='block';status.textContent='Imagen lista para analizar ('+Math.round(blob.size/1024)+' KB).';
+  }catch(e){imageData=null;imageMime=null;preview.style.display='none';status.textContent=e instanceof Error?e.message:'No se pudo preparar la imagen.';}
+  finally{processingImage=false;send.disabled=false;}
+}
+photo.addEventListener('change',()=>{const f=photo.files&&photo.files[0];if(f)loadImage(f);else{imageData=null;imageMime=null;preview.style.display='none';}});
+question.addEventListener('paste',e=>{const items=Array.from(e.clipboardData?.items||[]);const item=items.find(x=>x.type.startsWith('image/'));if(item){e.preventDefault();const file=item.getAsFile();if(file)loadImage(file);}});
+uploadArea.addEventListener('dragover',e=>{if(Array.from(e.dataTransfer?.items||[]).some(x=>x.type.startsWith('image/'))){e.preventDefault();status.textContent='Suelta la imagen para adjuntarla.';}});
+uploadArea.addEventListener('drop',e=>{const file=Array.from(e.dataTransfer?.files||[]).find(x=>x.type.startsWith('image/'));if(file){e.preventDefault();loadImage(file);}});
+send.addEventListener('click',async()=>{
+  const q=question.value.trim();if(processingImage){status.textContent='Espera a que termine de prepararse la imagen.';return;}
+  if(!q&&!imageData){status.textContent='Escribe una pregunta, adjunta una fotografía o pega una captura con Ctrl+V.';return;}
+  send.disabled=true;status.textContent='Consultando fuentes oficiales y analizando la pregunta…';panel.hidden=true;
+  const started=Date.now();
+  try{
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),95000);
+    let res,data;
+    try{res=await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q,image:imageData,mimeType:imageMime}),signal:controller.signal});data=await res.json();}
+    finally{clearTimeout(timeout);}
+    if(!res.ok)throw new Error(data.error||'El servidor respondió HTTP '+res.status+'.');
+    renderAnswer(data.answer||'No se recibió una respuesta verificable.');sources.replaceChildren();
+    for(const s of (data.sources||[])){const a=document.createElement('a');a.href=s.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=s.title+' · consultada '+s.checkedAt;sources.appendChild(a);}
+    panel.hidden=false;status.textContent=(data.sourceStatus==='partial'?'Atención: algunas fuentes oficiales no estuvieron disponibles. ':'Consulta terminada. ')+(data.latencyMs?'Tiempo del servidor: '+(data.latencyMs/1000).toFixed(1)+' s. ':'Tiempo total: '+((Date.now()-started)/1000).toFixed(1)+' s. ')+'Verifica siempre la fuente oficial citada.';
+  }catch(e){status.textContent=e instanceof Error&&e.name==='AbortError'?'La consulta superó 95 segundos. El servidor puede seguir procesándola; intenta de nuevo más tarde.':'No se pudo completar: '+(e instanceof Error?e.message:'error desconocido');}
+  finally{send.disabled=false;}
+});
 </script></body></html>
