@@ -102,7 +102,6 @@ export default {
     const goodSources = official.results.filter(s => s.ok);
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
     const qLower = question.toLowerCase();
-    const regulationQuestion = /reglamento|fase|procedimiento|plazo|convalid|subasta|menor cuant[ií]a|cat[aá]logo|[ií]nfima|requisito|oferta|adjudicaci[oó]n|garant[ií]a|presupuesto referencial|contrato/i.test(qLower);
     // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
     const selectedDocs: Array<{ title: string; url: string }> = [
       { title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; PDF oficial con reforma visible al 7-oct-2025; verificar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" },
