@@ -108,8 +108,6 @@ export default {
       liveSources.push({ title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" });
     }
     const officialPromise = readOfficialSources(liveSources);
-    const goodSources = official.results.filter(s => s.ok);
-    const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
     const qLower = question.toLowerCase();
     // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
     const selectedDocs: Array<{ title: string; url: string }> = [
