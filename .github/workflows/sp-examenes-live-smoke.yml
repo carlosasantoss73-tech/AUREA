@@ -41,8 +41,18 @@ jobs:
       - name: Submit image input smoke test
         run: |
           set -euo pipefail
-          # Tiny valid PNG verifies image payload handling end-to-end; OCR quality needs a separate visual fixture.
-          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII=","mimeType":"image/png"}'
+          # Fixture RGB PNG 2×2: checks payload handling only; OCR needs a separate visual fixture.
+          image_b64='iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNUSDjAwMDAxMDAwMDAAAAOigFEqspbYAAAAABJRU5ErkJggg=='
+          printf '%s' "$image_b64" | base64 --decode > /tmp/sp-examenes-smoke.png
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          data = Path("/tmp/sp-examenes-smoke.png").read_bytes()
+          assert data[:8] == b"\x89PNG\r\n\x1a\n", "fixture is not PNG"
+          width, height, bit_depth, color_type = struct.unpack(">IIBB", data[16:26])
+          assert (width, height, bit_depth, color_type) == (2, 2, 8, 2), "unexpected smoke-image format"
+          PY
+          payload="$(jq -cn --arg question "Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?" --arg image "$image_b64" '{question:$question,image:$image,mimeType:"image/png}')"
           code="$(curl --silent --show-error --max-time 110 \
             -H 'content-type: application/json' \
             -X POST --data "$payload" -o /tmp/image-answer.json \
