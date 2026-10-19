@@ -107,9 +107,7 @@ export default {
       liveSources.push({ title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" });
       liveSources.push({ title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" });
     }
-    const official = await readOfficialSources(liveSources);
-    const goodSources = official.results.filter(s => s.ok);
-    const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
+    const officialPromise = readOfficialSources(liveSources);
     const qLower = question.toLowerCase();
     // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
     const selectedDocs: Array<{ title: string; url: string }> = [
@@ -122,6 +120,25 @@ export default {
     if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28/i.test(qLower)) {
       selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0006 (27-ago-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/RESOLUCIO%CC%81N-Nro.-R.E-SERCOP-2026-0006.pdf" });
     }
+    const pdfPartsPromise = Promise.all(selectedDocs.map(async doc => {
+      try {
+        const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(6000) });
+        if (!pdfResponse.ok) return null;
+        const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
+        if (!bytes.length || bytes.length > 15_000_000) return null;
+        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") return null;
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+        }
+        return { inlineData: { mimeType: "application/pdf", data: btoa(binary) } };
+      } catch {
+        return null;
+      }
+    }));
+    const [official, pdfParts] = await Promise.all([officialPromise, pdfPartsPromise]);
+    const goodSources = official.results.filter(s => s.ok);
+    const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
     const sourceContext = official.results.map(s =>
       "FUENTE: " + s.title + "\nURL: " + s.url + "\nCONSULTADA: " + s.checkedAt +
       "\nESTADO: " + (s.ok ? "consultada" : "no disponible") + "\nCONTENIDO EXTRAÍDO:\n" +
@@ -142,22 +159,6 @@ export default {
 
     const userParts: Array<Record<string, unknown>> = [];
     // Use Gemini's documented generateContent Part schema (inlineData + text).
-    const pdfParts = await Promise.all(selectedDocs.map(async doc => {
-      try {
-        const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(8000) });
-        if (!pdfResponse.ok) return null;
-        const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        if (!bytes.length || bytes.length > 15_000_000) return null;
-        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") return null;
-        let binary = "";
-        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-          binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
-        }
-        return { inlineData: { mimeType: "application/pdf", data: btoa(binary) } };
-      } catch {
-        return null;
-      }
-    }));
     userParts.push(...pdfParts.filter((part): part is { inlineData: { mimeType: string; data: string } } => part !== null));
     if (question) userParts.push({ text: "PREGUNTA:\n" + question });
     if (image) userParts.push({ inlineData: { mimeType, data: image } });
