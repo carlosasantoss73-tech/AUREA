@@ -62,10 +62,12 @@ describe('Conchita Cloudflare pilot worker', () => {
   it('keeps health blocked while institutional context is unavailable', async () => {
     const response = await worker.fetch(new Request('https://worker.example/health'), env(new FakeKv()));
     expect(response.status).toBe(503);
-    const body = await response.json() as { status: string; checks: { institutionalContext: boolean }; blockers: string[] };
+    const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
     expect(body.status).toBe('BLOCKED');
-    expect(body.checks.institutionalContext).toBe(false);
-    expect(body.blockers).toContain('CONFIG_INSTITUTIONALCONTEXT_MISSING');
+    expect(body.checks.institutionalContextConfigured).toBe(false);
+    expect(body.checks.institutionalContextVerified).toBe(false);
+    expect(body.blockers).toContain('CONFIG_INSTITUTIONALCONTEXTCONFIGURED_MISSING');
+    expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
   });
 
   it('creates a durable pilot session without exposing the bootstrap token', async () => {
