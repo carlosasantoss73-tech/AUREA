@@ -248,6 +248,37 @@ describe("Google Drive institutional reader", () => {
   });
 
 
+  it("reuses the current index read within one retrieval operation", async () => {
+    const calls = new Map<string, number>();
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const key = url.includes("alt=media") ? "content" : "metadata";
+        calls.set(key, (calls.get(key) ?? 0) + 1);
+        if (key === "content") return new Response(JSON.stringify(index("current")), { status: 200 });
+        return new Response(JSON.stringify({
+          id: "current",
+          name: "INDICE_MAESTRO_v011.json",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: true },
+        }), { status: 200 });
+      },
+    });
+
+    await reader.readCurrentIndex("trace-cache");
+    const records = await reader.readRecords("current", {
+      projectId: "aurea",
+      query: "",
+      traceId: "trace-cache",
+    });
+
+    expect(records).toHaveLength(1);
+    expect(calls.get("metadata")).toBe(1);
+    expect(calls.get("content")).toBe(1);
+  });
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
