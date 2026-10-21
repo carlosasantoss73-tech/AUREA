@@ -248,7 +248,7 @@ describe("Google Drive institutional reader", () => {
   });
 
 
-  it("reuses the current index read within one retrieval operation", async () => {
+  it("coalesces concurrent index reads without caching stale state across requests", async () => {
     const calls = new Map<string, number>();
     const reader = new GoogleDriveInstitutionalReader({
       indexFileId: "current",
@@ -257,6 +257,7 @@ describe("Google Drive institutional reader", () => {
         const url = String(input);
         const key = url.includes("alt=media") ? "content" : "metadata";
         calls.set(key, (calls.get(key) ?? 0) + 1);
+        await Promise.resolve();
         if (key === "content") return new Response(JSON.stringify(index("current")), { status: 200 });
         return new Response(JSON.stringify({
           id: "current",
@@ -267,16 +268,16 @@ describe("Google Drive institutional reader", () => {
       },
     });
 
-    await reader.readCurrentIndex("trace-cache");
-    const records = await reader.readRecords("current", {
-      projectId: "aurea",
-      query: "",
-      traceId: "trace-cache",
-    });
-
-    expect(records).toHaveLength(1);
+    await Promise.all([
+      reader.readCurrentIndex("trace-cache-a"),
+      reader.readCurrentIndex("trace-cache-b"),
+    ]);
     expect(calls.get("metadata")).toBe(1);
     expect(calls.get("content")).toBe(1);
+
+    await reader.readCurrentIndex("trace-fresh");
+    expect(calls.get("metadata")).toBe(2);
+    expect(calls.get("content")).toBe(2);
   });
 
   it("does not confuse write capability with read authorization", async () => {
