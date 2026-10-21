@@ -97,7 +97,23 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return records.filter((record) => queryMatches(record, input.query));
   }
 
+  private readonly indexDocumentCache = new Map<string, Promise<IndexDocument>>();
+
   private async loadIndexDocument(fileId: string, traceId: string): Promise<IndexDocument> {
+    const cached = this.indexDocumentCache.get(fileId);
+    if (cached) return cached;
+
+    const pending = this.fetchIndexDocument(fileId, traceId);
+    this.indexDocumentCache.set(fileId, pending);
+    try {
+      return await pending;
+    } catch (error) {
+      this.indexDocumentCache.delete(fileId);
+      throw error;
+    }
+  }
+
+  private async fetchIndexDocument(fileId: string, traceId: string): Promise<IndexDocument> {
     const token = typeof this.options.accessToken === "function"
       ? await this.options.accessToken()
       : this.options.accessToken;
