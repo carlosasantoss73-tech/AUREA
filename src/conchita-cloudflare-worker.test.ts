@@ -71,7 +71,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     expect(JSON.stringify(kv.dump())).not.toContain('pilot-token');
   });
 
-  it('runs phone-shaped message through gate, admission, provider and execution', async () => {
+  it('fails closed before provider execution when institutional context is unavailable', async () => {
     const kv = new FakeKv();
     const runtimeEnv = env(kv);
     const sessionResponse = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
@@ -79,33 +79,19 @@ describe('Conchita Cloudflare pilot worker', () => {
     }), runtimeEnv);
     const session = await sessionResponse.json() as { sessionId: string };
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hola desde Claude' }] }), { status: 200, headers: { 'Content-Type': 'application/json', 'request-id': 'req_test_123' } })));
-    const clientRequestId = crypto.randomUUID();
-    const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
-      method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), runtimeEnv);
+    const providerFetch = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'This must not execute' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', providerFetch);
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
+        method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId: crypto.randomUUID(), mode: 'PERSONAL' }),
+      }), runtimeEnv);
 
-    expect(response.status).toBe(200);
-    const body = await response.json() as { status: string; response: string; evidence: string[]; traceId: string };
-    expect(body.status).toBe('COMPLETED');
-    expect(body.response).toBe('Hola desde Claude');
-    expect(body.evidence).toContain('PROVIDER_HTTP:anthropic');
-    expect(body.evidence).toContain('PROVIDER_REQUEST_ID:req_test_123');
-
-    const second = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
-      method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), runtimeEnv);
-    const replay = await second.json() as { status: string; traceId: string; response: string; evidence: string[] };
-    expect(second.status).toBe(200);
-    expect(replay.status).toBe('COMPLETED');
-    expect(replay.traceId).toBe(body.traceId);
-    expect(replay.response).toBe('Hola desde Claude');
-    expect(replay.evidence).toContain(`IDEMPOTENT_REPLAY:${body.traceId}`);
-
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
+      expect(response.status).toBe(403);
+      expect(providerFetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('fails closed when the bootstrap token is wrong', async () => {
