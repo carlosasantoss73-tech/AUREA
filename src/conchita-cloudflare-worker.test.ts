@@ -59,6 +59,15 @@ describe('Conchita Cloudflare pilot worker', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'BLOCKED' });
   });
 
+  it('keeps health blocked while institutional context is unavailable', async () => {
+    const response = await worker.fetch(new Request('https://worker.example/health'), env(new FakeKv()));
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; checks: { institutionalContext: boolean }; blockers: string[] };
+    expect(body.status).toBe('BLOCKED');
+    expect(body.checks.institutionalContext).toBe(false);
+    expect(body.blockers).toContain('CONFIG_INSTITUTIONALCONTEXT_MISSING');
+  });
+
   it('creates a durable pilot session without exposing the bootstrap token', async () => {
     const kv = new FakeKv();
     const response = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
