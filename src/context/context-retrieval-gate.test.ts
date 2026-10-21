@@ -50,4 +50,12 @@ describe("AUREA B14 Context Retrieval Gate", () => {
     expect(result.status).toBe("BLOCKED");
     expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
   });
+  it("blocks facts without citations when institutional context is mandatory", async () => {
+    const result = await new ContextRetrievalGate(provider(["uncited fact"], [])).retrieve({
+      ...req("¿qué hicimos esta semana?"),
+      institutionalOnly: true,
+    });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.reason).toBe("INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+  });
 });
