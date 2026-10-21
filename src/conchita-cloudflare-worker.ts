@@ -13,6 +13,7 @@ import { AureaPlatformIntegration } from './aurea-platform-integration.js';
 import { AureaSentinel } from './sentinel.js';
 import { HealthLedger } from './health-ledger.js';
 import { ContextRetrievalGate, type ContextProvider } from './context/context-retrieval-gate.js';
+import { createConchitaInstitutionalContextProvider } from './conchita-institutional-context.js';
 import { createConchitaSessionRecord } from './conchita-cloud-session-store.js';
 import { conchitaExecutionTraceId } from './conchita-personal-v0-gateway.js';
 import type { ConchitaMode, ConchitaSession } from './conchita-personal-v0-contract.js';
@@ -21,13 +22,18 @@ interface DurableObjectNamespaceBinding {
   idFromName(name: string): unknown;
   get(id: unknown): ConchitaExecutionStateStub;
 }
-interface Env { CONCHITA_SESSIONS: ConchitaKvNamespace; CONCHITA_EXECUTION_STATE: DurableObjectNamespaceBinding; CONCHITA_ANTHROPIC_MODEL: string; ANTHROPIC_API_KEY: string; CONCHITA_PILOT_USER_ID: string; CONCHITA_PILOT_BOOTSTRAP_TOKEN: string; CONCHITA_ALLOWED_ORIGIN: string; }
+interface Env { CONCHITA_SESSIONS: ConchitaKvNamespace; CONCHITA_EXECUTION_STATE: DurableObjectNamespaceBinding; CONCHITA_ANTHROPIC_MODEL: string; ANTHROPIC_API_KEY: string; CONCHITA_PILOT_USER_ID: string; CONCHITA_PILOT_BOOTSTRAP_TOKEN: string; CONCHITA_ALLOWED_ORIGIN: string; CONCHITA_PROJECT_ID?: string; BIBLIOTECARIO_INDEX_FILE_ID?: string; BIBLIOTECARIO_ACCESS_TOKEN?: string; }
 
-const contextProvider: ContextProvider = { async retrieve(input) { return { query: input.query, projectId: input.projectId, citations: [], facts: [] }; } };
+function createContextProvider(env: Env): ContextProvider {
+  if (env.CONCHITA_PROJECT_ID && env.BIBLIOTECARIO_INDEX_FILE_ID && env.BIBLIOTECARIO_ACCESS_TOKEN) {
+    return createConchitaInstitutionalContextProvider({ indexFileId: env.BIBLIOTECARIO_INDEX_FILE_ID, accessToken: env.BIBLIOTECARIO_ACCESS_TOKEN });
+  }
+  return { async retrieve(input) { return { query: input.query, projectId: input.projectId, citations: [], facts: [] }; } };
+}
 function cors(origin: string | null, allowed: string): Record<string, string> { if (!origin || origin !== allowed) return {}; return { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }; }
 function json(body: unknown, status: number, headers: Record<string, string> = {}): Response { return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } }); }
 function runtimeHealth(env: Env): { status: 'HEALTHY' | 'BLOCKED'; checks: Record<string, boolean>; blockers: string[] } {
-  const checks = { kv: Boolean(env.CONCHITA_SESSIONS), executionState: Boolean(env.CONCHITA_EXECUTION_STATE), providerCredentials: Boolean(env.ANTHROPIC_API_KEY), providerModel: Boolean(env.CONCHITA_ANTHROPIC_MODEL), pilotUser: Boolean(env.CONCHITA_PILOT_USER_ID), bootstrapAuth: Boolean(env.CONCHITA_PILOT_BOOTSTRAP_TOKEN), allowedOrigin: Boolean(env.CONCHITA_ALLOWED_ORIGIN), institutionalContext: false };
+  const checks = { kv: Boolean(env.CONCHITA_SESSIONS), executionState: Boolean(env.CONCHITA_EXECUTION_STATE), providerCredentials: Boolean(env.ANTHROPIC_API_KEY), providerModel: Boolean(env.CONCHITA_ANTHROPIC_MODEL), pilotUser: Boolean(env.CONCHITA_PILOT_USER_ID), bootstrapAuth: Boolean(env.CONCHITA_PILOT_BOOTSTRAP_TOKEN), allowedOrigin: Boolean(env.CONCHITA_ALLOWED_ORIGIN), projectId: Boolean(env.CONCHITA_PROJECT_ID), institutionalIndex: Boolean(env.BIBLIOTECARIO_INDEX_FILE_ID), institutionalCredential: Boolean(env.BIBLIOTECARIO_ACCESS_TOKEN), institutionalContext: Boolean(env.CONCHITA_PROJECT_ID && env.BIBLIOTECARIO_INDEX_FILE_ID && env.BIBLIOTECARIO_ACCESS_TOKEN) };
   const blockers = Object.entries(checks).filter(([, healthy]) => !healthy).map(([name]) => `CONFIG_${name.toUpperCase()}_MISSING`);
   return { status: blockers.length === 0 ? 'HEALTHY' : 'BLOCKED', checks, blockers };
 }
@@ -44,8 +50,8 @@ function makePilotMessageHandler(env: Env): (request: Request) => Promise<Respon
   const sentinel = new AureaSentinel(new HealthLedger());
   const platform = new AureaPlatformIntegration();
   platform.register({ manifest: { integrationId: 'conchita-cloudflare-edge', componentId: 'conchita-cloudflare-worker', version: '1', boundaries: ['OPERATIONS', 'EXECUTION', 'PERMISSION', 'WORK_CELL'], requiredCapabilities: ['conchita.chat'], requiredConfiguration: ['CONCHITA_SESSIONS', 'CONCHITA_EXECUTION_STATE', 'ANTHROPIC_API_KEY', 'CONCHITA_PILOT_USER_ID'], healthChecks: ['https', 'kv', 'durable-object', 'provider'], rollbackPlan: 'Disable the Worker deployment and preserve durable execution state.' }, inspect: () => ({ integrationId: 'conchita-cloudflare-edge', status: env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE ? 'HEALTHY' : 'BLOCKED', checkedAt: new Date().toISOString(), checks: { healthy: Boolean(env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE) }, evidence: ['CLOUDFLARE_WORKER', 'KV_SESSION_BOUNDARY', 'DURABLE_OBJECT_EXECUTION_STATE', 'SECRET_PROVIDER_BOUNDARY'], blockers: env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE ? [] : ['CLOUD_CONFIGURATION_INCOMPLETE'] }) });
-  const admission = new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, new AureaExecutionGate(sentinel));
-  const admissionFactory = { build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) { return { traceId: request.traceId, integrationId: 'conchita-cloudflare-edge', workCell: { workCellId: `CONCHITA-${request.traceId}`, projectId: 'CONCHITA-PILOT', companyId: 'AUREA', objective: request.message, owner: request.session.userId, planner: 'conchita-cloud', agents: ['conchita'], dependencies: [], restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'], state: 'READY' as const, deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const }, contextQuery: request.message, institutionalOnly: true, actorId: request.session.userId, actorRole: 'USER', capabilityId: 'conchita.chat', toolId: 'conchita.message', action: 'respond_to_user', effectClass: 'EXTERNAL' as const, providerCapability: 'conchita.chat', allowedProjects: ['CONCHITA-PILOT'], allowedCapabilities: ['conchita.chat'], allowedTools: ['conchita.message'] }; } };
+  const admission = new RuntimeAdmission(platform, new ContextRetrievalGate(createContextProvider(env)), providers, new AureaExecutionGate(sentinel));
+  const admissionFactory = { build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) { return { traceId: request.traceId, integrationId: 'conchita-cloudflare-edge', workCell: { workCellId: `CONCHITA-${request.traceId}`, projectId: env.CONCHITA_PROJECT_ID ?? '', companyId: 'AUREA', objective: request.message, owner: request.session.userId, planner: 'conchita-cloud', agents: ['conchita'], dependencies: [], restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'], state: 'READY' as const, deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const }, contextQuery: request.message, institutionalOnly: true, actorId: request.session.userId, actorRole: 'USER', capabilityId: 'conchita.chat', toolId: 'conchita.message', action: 'respond_to_user', effectClass: 'EXTERNAL' as const, providerCapability: 'conchita.chat', allowedProjects: env.CONCHITA_PROJECT_ID ? [env.CONCHITA_PROJECT_ID] : [], allowedCapabilities: ['conchita.chat'], allowedTools: ['conchita.message'] }; } };
   const bridge = new ConchitaRuntimeBridge(admission, providers, execution, admissionFactory);
   const gateway = new ConchitaPersonalV0Gateway(bridge, sessions, undefined, undefined, conchitaExecutionTraceId);
   return createConchitaHttpEdgeHandler({ gate: new ConchitaCloudMessageGate(authenticator, gateway) }, { allowedOrigins: [env.CONCHITA_ALLOWED_ORIGIN] });
