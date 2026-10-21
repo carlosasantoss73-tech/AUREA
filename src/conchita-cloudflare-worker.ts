@@ -33,8 +33,12 @@ function createContextProvider(env: Env): ContextProvider {
 function cors(origin: string | null, allowed: string): Record<string, string> { if (!origin || origin !== allowed) return {}; return { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }; }
 function json(body: unknown, status: number, headers: Record<string, string> = {}): Response { return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } }); }
 function runtimeHealth(env: Env): { status: 'HEALTHY' | 'BLOCKED'; checks: Record<string, boolean>; blockers: string[] } {
-  const checks = { kv: Boolean(env.CONCHITA_SESSIONS), executionState: Boolean(env.CONCHITA_EXECUTION_STATE), providerCredentials: Boolean(env.ANTHROPIC_API_KEY), providerModel: Boolean(env.CONCHITA_ANTHROPIC_MODEL), pilotUser: Boolean(env.CONCHITA_PILOT_USER_ID), bootstrapAuth: Boolean(env.CONCHITA_PILOT_BOOTSTRAP_TOKEN), allowedOrigin: Boolean(env.CONCHITA_ALLOWED_ORIGIN), projectId: Boolean(env.CONCHITA_PROJECT_ID), institutionalIndex: Boolean(env.BIBLIOTECARIO_INDEX_FILE_ID), institutionalCredential: Boolean(env.BIBLIOTECARIO_ACCESS_TOKEN), institutionalContext: Boolean(env.CONCHITA_PROJECT_ID && env.BIBLIOTECARIO_INDEX_FILE_ID && env.BIBLIOTECARIO_ACCESS_TOKEN) };
-  const blockers = Object.entries(checks).filter(([, healthy]) => !healthy).map(([name]) => `CONFIG_${name.toUpperCase()}_MISSING`);
+  const institutionalContextConfigured = Boolean(env.CONCHITA_PROJECT_ID && env.BIBLIOTECARIO_INDEX_FILE_ID && env.BIBLIOTECARIO_ACCESS_TOKEN);
+  // Presence of bindings is not evidence that the source is reachable or returns attributable citations.
+  // Until a real read-only retrieval probe is implemented and validated, health must remain fail-closed.
+  const checks = { kv: Boolean(env.CONCHITA_SESSIONS), executionState: Boolean(env.CONCHITA_EXECUTION_STATE), providerCredentials: Boolean(env.ANTHROPIC_API_KEY), providerModel: Boolean(env.CONCHITA_ANTHROPIC_MODEL), pilotUser: Boolean(env.CONCHITA_PILOT_USER_ID), bootstrapAuth: Boolean(env.CONCHITA_PILOT_BOOTSTRAP_TOKEN), allowedOrigin: Boolean(env.CONCHITA_ALLOWED_ORIGIN), projectId: Boolean(env.CONCHITA_PROJECT_ID), institutionalIndex: Boolean(env.BIBLIOTECARIO_INDEX_FILE_ID), institutionalCredential: Boolean(env.BIBLIOTECARIO_ACCESS_TOKEN), institutionalContextConfigured, institutionalContextVerified: false };
+  const blockers = Object.entries(checks).filter(([name, healthy]) => name !== 'institutionalContextVerified' && !healthy).map(([name]) => `CONFIG_${name.toUpperCase()}_MISSING`);
+  blockers.push('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
   return { status: blockers.length === 0 ? 'HEALTHY' : 'BLOCKED', checks, blockers };
 }
 
