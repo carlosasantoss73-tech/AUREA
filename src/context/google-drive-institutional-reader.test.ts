@@ -230,6 +230,24 @@ describe("Google Drive institutional reader", () => {
     expect(records.some((record) => record.projectId === "XOLAR")).toBe(false);
   });
 
+  it("fails closed when the institutional index chain contains a cycle", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        current: index("current", "previous"),
+        previous: index("previous", "current"),
+      }),
+    });
+
+    await expect(reader.readRecords("current", {
+      projectId: "aurea",
+      query: "",
+      traceId: "trace-index-cycle",
+    })).rejects.toThrow("BIBLIOTECARIO_INDEX_CHAIN_CYCLE");
+  });
+
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
