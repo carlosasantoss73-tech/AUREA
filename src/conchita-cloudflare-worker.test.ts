@@ -70,6 +70,22 @@ describe('Conchita Cloudflare pilot worker', () => {
     expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
   });
 
+  it('keeps health blocked when institutional bindings exist but retrieval is not verified', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+    expect(body.status).toBe('BLOCKED');
+    expect(body.checks.institutionalContextConfigured).toBe(true);
+    expect(body.checks.institutionalContextVerified).toBe(false);
+    expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+  });
+
   it('creates a durable pilot session without exposing the bootstrap token', async () => {
     const kv = new FakeKv();
     const response = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
