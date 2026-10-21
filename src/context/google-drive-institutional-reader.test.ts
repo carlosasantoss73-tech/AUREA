@@ -148,6 +148,43 @@ describe("Google Drive institutional reader", () => {
     expect(records).toHaveLength(0);
   });
 
+  it("fails closed when Drive denies metadata access", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "restricted",
+      accessToken: "test-token",
+      fetchImpl: async () => new Response("forbidden", { status: 403 }),
+    });
+    await expect(reader.readCurrentIndex("trace-denied")).rejects.toThrow("BIBLIOTECARIO_DRIVE_METADATA_HTTP_403");
+  });
+
+  it("fails closed when Drive denies index content access", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "restricted",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("alt=media")) return new Response("forbidden", { status: 403 });
+        return new Response(JSON.stringify({
+          id: "restricted",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: false },
+        }), { status: 200 });
+      },
+    });
+    await expect(reader.readCurrentIndex("trace-content-denied")).rejects.toThrow("BIBLIOTECARIO_DRIVE_CONTENT_HTTP_403");
+  });
+
+  it("rejects an index whose declared state is not recognized", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "unknown-state",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        "unknown-state": { estado_indice: "PROPUESTA", version_indice: "12", registros_nuevos_v011: [] },
+      }),
+    });
+    await expect(reader.readCurrentIndex("trace-unknown-state")).rejects.toThrow("BIBLIOTECARIO_UNKNOWN_INDEX_STATE:PROPUESTA");
+  });
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
