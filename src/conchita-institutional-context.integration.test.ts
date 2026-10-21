@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createConchitaInstitutionalContextProvider } from "./conchita-institutional-context";
-import { ContextRetrievalGate } from "./context/context-retrieval-gate";
 
 function driveFetch(payload: unknown) {
   return async (input: RequestInfo | URL) => {
