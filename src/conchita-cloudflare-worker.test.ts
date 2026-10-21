@@ -194,4 +194,50 @@ describe('Conchita Cloudflare pilot worker', () => {
     }), env(new FakeKv()));
     expect(response.status).toBe(401);
   });
+
+  it('keeps health blocked when the institutional index has no retrievable approved records', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    const index = {
+      estado_indice: 'VIGENTE',
+      version_indice: '11',
+      registros_nuevos_v011: [{
+        id: 'proposal-only',
+        proyecto: 'test-project',
+        nombre: 'Proposal only',
+        descripcion: 'Must not qualify as institutional evidence.',
+        fuente: 'KNOWLEDGE_OS',
+        estado: 'PROPUESTA',
+        version: '1',
+        ubicacion: { fileId: 'proposal-source' },
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('alt=media')) return new Response(JSON.stringify(index), { status: 200 });
+      const id = decodeURIComponent(url.match(/files\\/([^?]+)/)?.[1] ?? '');
+      return new Response(JSON.stringify({
+        id,
+        name: 'INDICE_MAESTRO_v011.json',
+        mimeType: 'application/json',
+        capabilities: { canEdit: false, canDownload: true, canCopy: true },
+      }), { status: 200 });
+    }));
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+      expect(response.status).toBe(503);
+      const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+      expect(body.status).toBe('BLOCKED');
+      expect(body.checks.institutionalContextConfigured).toBe(true);
+      expect(body.checks.institutionalContextVerified).toBe(false);
+      expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
 });
