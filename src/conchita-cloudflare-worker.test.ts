@@ -115,7 +115,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('alt=media')) return new Response(JSON.stringify(index), { status: 200 });
-      const id = decodeURIComponent(url.match(/files\\/([^?]+)/)?.[1] ?? '');
+      const id = decodeURIComponent(url.match(/files\/([^?]+)/)?.[1] ?? '');
       return new Response(JSON.stringify({
         id,
         name: 'INDICE_MAESTRO_v011.json',
