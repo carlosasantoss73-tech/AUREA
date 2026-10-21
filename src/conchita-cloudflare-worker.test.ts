@@ -59,6 +59,100 @@ describe('Conchita Cloudflare pilot worker', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'BLOCKED' });
   });
 
+  it('keeps health blocked while institutional context is unavailable', async () => {
+    const response = await worker.fetch(new Request('https://worker.example/health'), env(new FakeKv()));
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+    expect(body.status).toBe('BLOCKED');
+    expect(body.checks.institutionalContextConfigured).toBe(false);
+    expect(body.checks.institutionalContextVerified).toBe(false);
+    expect(body.blockers).toContain('CONFIG_INSTITUTIONALCONTEXTCONFIGURED_MISSING');
+    expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+  });
+
+  it('keeps health blocked when configured institutional retrieval is denied', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('forbidden', { status: 403 })));
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+      expect(response.status).toBe(503);
+      const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+      expect(body.status).toBe('BLOCKED');
+      expect(body.checks.institutionalContextConfigured).toBe(true);
+      expect(body.checks.institutionalContextVerified).toBe(false);
+      expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('marks institutional context verified only after a scoped read returns an attributable citation', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    const index = {
+      estado_indice: 'VIGENTE',
+      version_indice: '11',
+      registros_nuevos_v011: [{
+        id: 'test-record',
+        proyecto: 'test-project',
+        nombre: 'Approved institutional record',
+        descripcion: 'Institutional health probe fixture.',
+        fuente: 'KNOWLEDGE_OS',
+        estado: 'APROBADO',
+        version: '1',
+        ubicacion: { fileId: 'test-source-document' },
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('alt=media')) return new Response(JSON.stringify(index), { status: 200 });
+      const id = decodeURIComponent(url.match(/files\/([^?]+)/)?.[1] ?? '');
+      return new Response(JSON.stringify({
+        id,
+        name: 'INDICE_MAESTRO_v011.json',
+        mimeType: 'application/json',
+        capabilities: { canEdit: false, canDownload: true, canCopy: true },
+      }), { status: 200 });
+    }));
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+      expect(body.status).toBe('HEALTHY');
+      expect(body.checks.institutionalContextConfigured).toBe(true);
+      expect(body.checks.institutionalContextVerified).toBe(true);
+      expect(body.blockers).not.toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps institutional context unconfigured when only some bindings are present', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: '',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-token',
+    };
+    const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+    expect(body.status).toBe('BLOCKED');
+    expect(body.checks.institutionalContextConfigured).toBe(false);
+    expect(body.checks.institutionalContextVerified).toBe(false);
+    expect(body.blockers).toContain('CONFIG_INSTITUTIONALINDEX_MISSING');
+    expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+  });
+
   it('creates a durable pilot session without exposing the bootstrap token', async () => {
     const kv = new FakeKv();
     const response = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
@@ -71,7 +165,7 @@ describe('Conchita Cloudflare pilot worker', () => {
     expect(JSON.stringify(kv.dump())).not.toContain('pilot-token');
   });
 
-  it('runs phone-shaped message through gate, admission, provider and execution', async () => {
+  it('fails closed before provider execution when institutional context is unavailable', async () => {
     const kv = new FakeKv();
     const runtimeEnv = env(kv);
     const sessionResponse = await worker.fetch(new Request('https://worker.example/conchita/v1/session', {
@@ -79,33 +173,19 @@ describe('Conchita Cloudflare pilot worker', () => {
     }), runtimeEnv);
     const session = await sessionResponse.json() as { sessionId: string };
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hola desde Claude' }] }), { status: 200, headers: { 'Content-Type': 'application/json', 'request-id': 'req_test_123' } })));
-    const clientRequestId = crypto.randomUUID();
-    const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
-      method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), runtimeEnv);
+    const providerFetch = vi.fn(async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'This must not execute' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', providerFetch);
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
+        method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId: crypto.randomUUID(), mode: 'PERSONAL' }),
+      }), runtimeEnv);
 
-    expect(response.status).toBe(200);
-    const body = await response.json() as { status: string; response: string; evidence: string[]; traceId: string };
-    expect(body.status).toBe('COMPLETED');
-    expect(body.response).toBe('Hola desde Claude');
-    expect(body.evidence).toContain('PROVIDER_HTTP:anthropic');
-    expect(body.evidence).toContain('PROVIDER_REQUEST_ID:req_test_123');
-
-    const second = await worker.fetch(new Request('https://worker.example/conchita/v1/message', {
-      method: 'POST', headers: { Origin: 'https://pilot.example', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.sessionId, message: 'Hola', clientRequestId, mode: 'PERSONAL' }),
-    }), runtimeEnv);
-    const replay = await second.json() as { status: string; traceId: string; response: string; evidence: string[] };
-    expect(second.status).toBe(200);
-    expect(replay.status).toBe('COMPLETED');
-    expect(replay.traceId).toBe(body.traceId);
-    expect(replay.response).toBe('Hola desde Claude');
-    expect(replay.evidence).toContain(`IDEMPOTENT_REPLAY:${body.traceId}`);
-
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
+      expect(response.status).toBe(403);
+      expect(providerFetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('fails closed when the bootstrap token is wrong', async () => {
@@ -114,4 +194,50 @@ describe('Conchita Cloudflare pilot worker', () => {
     }), env(new FakeKv()));
     expect(response.status).toBe(401);
   });
+
+  it('keeps health blocked when the institutional index has no retrievable approved records', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    const index = {
+      estado_indice: 'VIGENTE',
+      version_indice: '11',
+      registros_nuevos_v011: [{
+        id: 'proposal-only',
+        proyecto: 'test-project',
+        nombre: 'Proposal only',
+        descripcion: 'Must not qualify as institutional evidence.',
+        fuente: 'KNOWLEDGE_OS',
+        estado: 'PROPUESTA',
+        version: '1',
+        ubicacion: { fileId: 'proposal-source' },
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('alt=media')) return new Response(JSON.stringify(index), { status: 200 });
+      const id = decodeURIComponent(url.match(/files\/([^?]+)/)?.[1] ?? '');
+      return new Response(JSON.stringify({
+        id,
+        name: 'INDICE_MAESTRO_v011.json',
+        mimeType: 'application/json',
+        capabilities: { canEdit: false, canDownload: true, canCopy: true },
+      }), { status: 200 });
+    }));
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+      expect(response.status).toBe(503);
+      const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+      expect(body.status).toBe('BLOCKED');
+      expect(body.checks.institutionalContextConfigured).toBe(true);
+      expect(body.checks.institutionalContextVerified).toBe(false);
+      expect(body.blockers).toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
 });

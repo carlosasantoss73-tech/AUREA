@@ -97,7 +97,24 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return records.filter((record) => queryMatches(record, input.query));
   }
 
+  private readonly inFlightIndexReads = new Map<string, Promise<IndexDocument>>();
+
   private async loadIndexDocument(fileId: string, traceId: string): Promise<IndexDocument> {
+    const pendingRead = this.inFlightIndexReads.get(fileId);
+    if (pendingRead) return pendingRead;
+
+    const pending = this.fetchIndexDocument(fileId, traceId);
+    this.inFlightIndexReads.set(fileId, pending);
+    try {
+      return await pending;
+    } finally {
+      // Coalesce concurrent reads only; never retain an index across requests,
+      // so a long-lived Worker cannot silently serve stale institutional state.
+      if (this.inFlightIndexReads.get(fileId) === pending) this.inFlightIndexReads.delete(fileId);
+    }
+  }
+
+  private async fetchIndexDocument(fileId: string, traceId: string): Promise<IndexDocument> {
     const token = typeof this.options.accessToken === "function"
       ? await this.options.accessToken()
       : this.options.accessToken;

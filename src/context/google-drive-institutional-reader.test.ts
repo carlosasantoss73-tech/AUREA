@@ -148,6 +148,174 @@ describe("Google Drive institutional reader", () => {
     expect(records).toHaveLength(0);
   });
 
+  it("fails closed when Drive denies metadata access", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "restricted",
+      accessToken: "test-token",
+      fetchImpl: async () => new Response("forbidden", { status: 403 }),
+    });
+    await expect(reader.readCurrentIndex("trace-denied")).rejects.toThrow("BIBLIOTECARIO_DRIVE_METADATA_HTTP_403");
+  });
+
+  it("fails closed when Drive denies index content access", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "restricted",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("alt=media")) return new Response("forbidden", { status: 403 });
+        return new Response(JSON.stringify({
+          id: "restricted",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: false },
+        }), { status: 200 });
+      },
+    });
+    await expect(reader.readCurrentIndex("trace-content-denied")).rejects.toThrow("BIBLIOTECARIO_DRIVE_CONTENT_HTTP_403");
+  });
+
+  it("rejects an index whose declared state is not recognized", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "unknown-state",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        "unknown-state": { estado_indice: "PROPUESTA", version_indice: "12", registros_nuevos_v011: [] },
+      }),
+    });
+    await expect(reader.readCurrentIndex("trace-unknown-state")).rejects.toThrow("BIBLIOTECARIO_UNKNOWN_INDEX_STATE:PROPUESTA");
+  });
+
+  it("does not return approved records belonging to a different project", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        current: {
+          estado_indice: "VIGENTE",
+          version_indice: "11",
+          registros_nuevos_v011: [
+            {
+              id: "same-project",
+              proyecto: "AUREA",
+              nombre: "Registro AUREA",
+              descripcion: "Contexto institucional AUREA.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "APROBADO",
+              version: "1",
+              ubicacion: { fileId: "source-aurea" },
+            },
+            {
+              id: "other-project",
+              proyecto: "XOLAR",
+              nombre: "Registro XOLAR",
+              descripcion: "Contexto institucional XOLAR.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "APROBADO",
+              version: "1",
+              ubicacion: { fileId: "source-xolar" },
+            },
+          ],
+        },
+      }),
+    });
+
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA",
+      query: "contexto institucional",
+      traceId: "trace-project-isolation",
+    });
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "same-project", projectId: "AUREA", sourceId: "source-aurea" });
+    expect(records.some((record) => record.projectId === "XOLAR")).toBe(false);
+  });
+
+  it("fails closed when the institutional index chain contains a cycle", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        current: index("current", "previous"),
+        previous: index("previous", "current"),
+      }),
+    });
+
+    await expect(reader.readRecords("current", {
+      projectId: "aurea",
+      query: "",
+      traceId: "trace-index-cycle",
+    })).rejects.toThrow("BIBLIOTECARIO_INDEX_CHAIN_CYCLE");
+  });
+
+
+  it("coalesces concurrent index reads without caching stale state across requests", async () => {
+    const calls = new Map<string, number>();
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const key = url.includes("alt=media") ? "content" : "metadata";
+        calls.set(key, (calls.get(key) ?? 0) + 1);
+        await Promise.resolve();
+        if (key === "content") return new Response(JSON.stringify(index("current")), { status: 200 });
+        return new Response(JSON.stringify({
+          id: "current",
+          name: "INDICE_MAESTRO_v011.json",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: true },
+        }), { status: 200 });
+      },
+    });
+
+    await Promise.all([
+      reader.readCurrentIndex("trace-cache-a"),
+      reader.readCurrentIndex("trace-cache-b"),
+    ]);
+    expect(calls.get("metadata")).toBe(1);
+    expect(calls.get("content")).toBe(1);
+
+    await reader.readCurrentIndex("trace-fresh");
+    expect(calls.get("metadata")).toBe(2);
+    expect(calls.get("content")).toBe(2);
+  });
+
+  it("retries after a failed index read instead of retaining a rejected promise", async () => {
+    const calls = new Map<string, number>();
+    let failFirstMetadataRead = true;
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const key = url.includes("alt=media") ? "content" : "metadata";
+        calls.set(key, (calls.get(key) ?? 0) + 1);
+
+        if (key === "metadata" && failFirstMetadataRead) {
+          failFirstMetadataRead = false;
+          return new Response("temporary failure", { status: 503 });
+        }
+        if (key === "content") {
+          return new Response(JSON.stringify(index("current")), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          id: "current",
+          name: "INDICE_MAESTRO_v011.json",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: true },
+        }), { status: 200 });
+      },
+    });
+
+    await expect(reader.readCurrentIndex("trace-first-fails"))
+      .rejects.toThrow("BIBLIOTECARIO_DRIVE_METADATA_HTTP_503");
+    await expect(reader.readCurrentIndex("trace-retry-succeeds"))
+      .resolves.toMatchObject({ fileId: "current", version: 11, state: "VIGENTE" });
+
+    expect(calls.get("metadata")).toBe(2);
+    expect(calls.get("content")).toBe(1);
+  });
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
