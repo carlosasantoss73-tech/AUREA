@@ -280,6 +280,42 @@ describe("Google Drive institutional reader", () => {
     expect(calls.get("content")).toBe(2);
   });
 
+  it("retries after a failed index read instead of retaining a rejected promise", async () => {
+    const calls = new Map<string, number>();
+    let failFirstMetadataRead = true;
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const key = url.includes("alt=media") ? "content" : "metadata";
+        calls.set(key, (calls.get(key) ?? 0) + 1);
+
+        if (key === "metadata" && failFirstMetadataRead) {
+          failFirstMetadataRead = false;
+          return new Response("temporary failure", { status: 503 });
+        }
+        if (key === "content") {
+          return new Response(JSON.stringify(index("current")), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          id: "current",
+          name: "INDICE_MAESTRO_v011.json",
+          mimeType: "application/json",
+          capabilities: { canEdit: false, canDownload: true, canCopy: true },
+        }), { status: 200 });
+      },
+    });
+
+    await expect(reader.readCurrentIndex("trace-first-fails"))
+      .rejects.toThrow("BIBLIOTECARIO_DRIVE_METADATA_HTTP_503");
+    await expect(reader.readCurrentIndex("trace-retry-succeeds"))
+      .resolves.toMatchObject({ fileId: "current", version: 11, state: "VIGENTE" });
+
+    expect(calls.get("metadata")).toBe(2);
+    expect(calls.get("content")).toBe(1);
+  });
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
