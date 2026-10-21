@@ -185,6 +185,51 @@ describe("Google Drive institutional reader", () => {
     await expect(reader.readCurrentIndex("trace-unknown-state")).rejects.toThrow("BIBLIOTECARIO_UNKNOWN_INDEX_STATE:PROPUESTA");
   });
 
+  it("does not return approved records belonging to a different project", async () => {
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current",
+      accessToken: "test-token",
+      fetchImpl: makeFetch({
+        current: {
+          estado_indice: "VIGENTE",
+          version_indice: "11",
+          registros_nuevos_v011: [
+            {
+              id: "same-project",
+              proyecto: "AUREA",
+              nombre: "Registro AUREA",
+              descripcion: "Contexto institucional AUREA.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "APROBADO",
+              version: "1",
+              ubicacion: { fileId: "source-aurea" },
+            },
+            {
+              id: "other-project",
+              proyecto: "XOLAR",
+              nombre: "Registro XOLAR",
+              descripcion: "Contexto institucional XOLAR.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "APROBADO",
+              version: "1",
+              ubicacion: { fileId: "source-xolar" },
+            },
+          ],
+        },
+      }),
+    });
+
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA",
+      query: "contexto institucional",
+      traceId: "trace-project-isolation",
+    });
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "same-project", projectId: "AUREA", sourceId: "source-aurea" });
+    expect(records.some((record) => record.projectId === "XOLAR")).toBe(false);
+  });
+
   it("does not confuse write capability with read authorization", async () => {
     const payload = {
       estado_indice: "VIGENTE",
