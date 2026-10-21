@@ -91,6 +91,51 @@ describe('Conchita Cloudflare pilot worker', () => {
     }
   });
 
+  it('marks institutional context verified only after a scoped read returns an attributable citation', async () => {
+    const runtimeEnv = {
+      ...env(new FakeKv()),
+      CONCHITA_PROJECT_ID: 'test-project',
+      BIBLIOTECARIO_INDEX_FILE_ID: 'test-index-id',
+      BIBLIOTECARIO_ACCESS_TOKEN: 'test-access-token',
+    };
+    const index = {
+      estado_indice: 'VIGENTE',
+      version_indice: '11',
+      registros_nuevos_v011: [{
+        id: 'test-record',
+        proyecto: 'test-project',
+        nombre: 'Approved institutional record',
+        descripcion: 'Institutional health probe fixture.',
+        fuente: 'KNOWLEDGE_OS',
+        estado: 'APROBADO',
+        version: '1',
+        ubicacion: { fileId: 'test-source-document' },
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('alt=media')) return new Response(JSON.stringify(index), { status: 200 });
+      const id = decodeURIComponent(url.match(/files\\/([^?]+)/)?.[1] ?? '');
+      return new Response(JSON.stringify({
+        id,
+        name: 'INDICE_MAESTRO_v011.json',
+        mimeType: 'application/json',
+        capabilities: { canEdit: false, canDownload: true, canCopy: true },
+      }), { status: 200 });
+    }));
+    try {
+      const response = await worker.fetch(new Request('https://worker.example/health'), runtimeEnv);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { status: string; checks: { institutionalContextConfigured: boolean; institutionalContextVerified: boolean }; blockers: string[] };
+      expect(body.status).toBe('HEALTHY');
+      expect(body.checks.institutionalContextConfigured).toBe(true);
+      expect(body.checks.institutionalContextVerified).toBe(true);
+      expect(body.blockers).not.toContain('INSTITUTIONAL_CONTEXT_NOT_VERIFIED');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('keeps institutional context unconfigured when only some bindings are present', async () => {
     const runtimeEnv = {
       ...env(new FakeKv()),
