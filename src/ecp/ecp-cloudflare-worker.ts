@@ -67,6 +67,24 @@ export default {
       });
     }
 
+    if (request.method === "GET" && url.pathname === "/ready") {
+      const runtime = runtimeReadiness(env);
+      const context = contextReadiness(env);
+      const analysisMissing = [
+        !env.ANTHROPIC_API_KEY ? "ANTHROPIC_API_KEY" : "",
+        !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "",
+        !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : "",
+      ].filter(Boolean);
+      const analysisReady = runtime.ready && context.ready && analysisMissing.length === 0;
+      return response({
+        status: analysisReady ? "READY" : "NOT_READY",
+        runtimeReady: runtime.ready,
+        institutionalContextConfigured: context.ready,
+        analysisReady,
+        missing: [...runtime.missing, ...context.missing, ...analysisMissing],
+      }, analysisReady ? 200 : 503);
+    }
+
     if (url.pathname === "/health") {
       const runtime = runtimeReadiness(env);
       const context = contextReadiness(env);
