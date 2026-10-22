@@ -1,0 +1,40 @@
+name: ECP Worker Safe Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branch or commit to bundle; defaults to the reviewed ECP readiness PR branch"
+        type: string
+        required: true
+        default: "fix/ecp-analysis-readiness-endpoint"
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source reference
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          test -n "$SOURCE_REF" || { echo "::error::source_ref is required"; exit 1; }
+          if printf '%s' "$SOURCE_REF" | grep -Eq '(^-|\.\.|[[:space:]])'; then
+            echo "::error::Invalid source_ref format"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Bundle ECP Worker without deploying
+        run: npx wrangler deploy --dry-run --config wrangler.ecp.jsonc
