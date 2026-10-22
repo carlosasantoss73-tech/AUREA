@@ -70,4 +70,22 @@ describe("ECP expediente intake batches", () => {
       document("PLIEGO-001", "OFFER", "Otra oferta", "Proveedor A"),
     ])).rejects.toThrow("ECP_INTAKE_DUPLICATE_DOCUMENT_ID");
   });
+  it("preserves four distinct offerors for the four-bidder pilot acceptance case", async () => {
+    const result = await intakeEcpExpedient({
+      metadata,
+      documents: [
+        document("PLIEGO-FOUR-001", "PROCEDURE", "Condiciones del procedimiento"),
+        document("OFFER-FOUR-A", "OFFER", "Oferta original A", "Proveedor A"),
+        document("OFFER-FOUR-B", "OFFER", "Oferta original B", "Proveedor B"),
+        document("OFFER-FOUR-C", "OFFER", "Oferta original C", "Proveedor C"),
+        document("OFFER-FOUR-D", "OFFER", "Oferta original D", "Proveedor D"),
+      ],
+    });
+
+    expect(result.readiness).toBe("READY_FOR_EVIDENCE_REVIEW");
+    expect(result.offerors).toEqual(["Proveedor A", "Proveedor B", "Proveedor C", "Proveedor D"]);
+    expect(result.documents.filter((item) => item.role === "OFFER")).toHaveLength(4);
+    expect(new Set(result.documents.filter((item) => item.role === "OFFER").map((item) => item.offeror)).size).toBe(4);
+  });
+
 });
