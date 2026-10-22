@@ -1,6 +1,12 @@
 name: ECP Worker Safe Dry Run
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/ecp-worker-safe-dry-run.yml"
+      - "wrangler.ecp.jsonc"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
     inputs:
       source_ref:
@@ -17,18 +23,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Validate source reference
+      - name: Resolve source reference
+        id: source
         env:
-          SOURCE_REF: ${{ inputs.source_ref }}
+          INPUT_SOURCE_REF: ${{ inputs.source_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          SOURCE_REF="$INPUT_SOURCE_REF"
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="$PR_HEAD_SHA"
+          fi
           test -n "$SOURCE_REF" || { echo "::error::source_ref is required"; exit 1; }
           if printf '%s' "$SOURCE_REF" | grep -Eq '(^-|\.\.|[[:space:]])'; then
             echo "::error::Invalid source_ref format"
             exit 1
           fi
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ steps.source.outputs.source_ref }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
