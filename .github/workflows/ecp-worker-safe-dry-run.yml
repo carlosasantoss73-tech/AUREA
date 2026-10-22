@@ -28,10 +28,14 @@ jobs:
         env:
           INPUT_SOURCE_REF: ${{ inputs.source_ref }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           SOURCE_REF="$INPUT_SOURCE_REF"
           if [ -z "$SOURCE_REF" ]; then
             SOURCE_REF="$PR_HEAD_SHA"
+          fi
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="$REPOSITORY_DEFAULT_BRANCH"
           fi
           test -n "$SOURCE_REF" || { echo "::error::source_ref is required"; exit 1; }
           if printf '%s' "$SOURCE_REF" | grep -Eq '(^-|\.\.|[[:space:]])'; then
