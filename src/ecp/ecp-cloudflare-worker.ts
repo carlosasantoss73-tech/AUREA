@@ -37,7 +37,7 @@ function runtimeReadiness(env: Env) {
 function contextReadiness(env: Env) {
   const missing: string[] = [];
   if (!env.ECP_INSTITUTIONAL_INDEX_FILE_ID || env.ECP_INSTITUTIONAL_INDEX_FILE_ID.startsWith("REPLACE_")) missing.push("ECP_INSTITUTIONAL_INDEX_FILE_ID");
-  if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
+  if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN || env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN.startsWith("REPLACE_")) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
   return { missing, ready: missing.length === 0 };
 }
 
