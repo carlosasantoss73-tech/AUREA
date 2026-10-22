@@ -71,7 +71,7 @@ export default {
       const runtime = runtimeReadiness(env);
       const context = contextReadiness(env);
       const analysisMissing = [
-        !env.ANTHROPIC_API_KEY ? "ANTHROPIC_API_KEY" : "",
+        !env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY.startsWith("REPLACE_") ? "ANTHROPIC_API_KEY" : "",
         !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "",
         !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : "",
       ].filter(Boolean);
