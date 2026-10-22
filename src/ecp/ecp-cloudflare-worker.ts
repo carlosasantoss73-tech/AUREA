@@ -88,7 +88,7 @@ export default {
     if (url.pathname === "/health") {
       const runtime = runtimeReadiness(env);
       const context = contextReadiness(env);
-      const providerMissing = [!env.ANTHROPIC_API_KEY ? "ANTHROPIC_API_KEY" : "", !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "", !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : ""].filter(Boolean);
+      const providerMissing = [!env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY.startsWith("REPLACE_") ? "ANTHROPIC_API_KEY" : "", !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "", !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : ""].filter(Boolean);
       const ready = runtime.ready;
       return response({
         status: !runtime.ready ? "BLOCKED" : !context.ready ? "INTAKE_READY_CONTEXT_BLOCKED" : providerMissing.length ? "INTAKE_READY_ANALYSIS_BLOCKED" : "HEALTHY",
