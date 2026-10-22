@@ -2,6 +2,47 @@ import { describe, expect, it } from "vitest";
 import worker from "./ecp-cloudflare-worker.js";
 
 describe("ECP Cloudflare Worker readiness", () => {
+  it("returns 503 from /ready when intake is available but institutional context is blocked", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "REPLACE_WITH_VERIFIED_CURRENT_INDEX_ID",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "",
+      ANTHROPIC_API_KEY: "configured-key-placeholder",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: "NOT_READY",
+      runtimeReady: true,
+      institutionalContextConfigured: false,
+      analysisReady: false,
+    });
+  });
+
+  it("returns 200 from /ready only when runtime, context and provider configuration are present", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_EXECUTION_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "verified-index-id",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "configured-token-placeholder",
+      ANTHROPIC_API_KEY: "configured-key-placeholder",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: "READY",
+      runtimeReady: true,
+      institutionalContextConfigured: true,
+      analysisReady: true,
+    });
+  });
+
   it("fails closed and does not serve the pilot UI without a valid Access assertion", async () => {
     const response = await worker.fetch(new Request("https://ecp.example.test/"), {
       ECP_EXPEDIENT_STATE: {} as never,
