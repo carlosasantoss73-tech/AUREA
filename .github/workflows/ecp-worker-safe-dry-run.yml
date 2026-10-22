@@ -1,0 +1,56 @@
+name: ECP Worker Safe Dry Run
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ecp-worker-safe-dry-run.yml"
+      - "wrangler.ecp.jsonc"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branch or commit to bundle; defaults to the reviewed ECP readiness PR branch"
+        type: string
+        required: true
+        default: "fix/ecp-analysis-readiness-endpoint"
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve source reference
+        id: source
+        env:
+          INPUT_SOURCE_REF: ${{ inputs.source_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          SOURCE_REF="$INPUT_SOURCE_REF"
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="$PR_HEAD_SHA"
+          fi
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="$REPOSITORY_DEFAULT_BRANCH"
+          fi
+          test -n "$SOURCE_REF" || { echo "::error::source_ref is required"; exit 1; }
+          if printf '%s' "$SOURCE_REF" | grep -Eq '(^-|\.\.|[[:space:]])'; then
+            echo "::error::Invalid source_ref format"
+            exit 1
+          fi
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Bundle ECP Worker without deploying
+        run: npx wrangler deploy --dry-run --config wrangler.ecp.jsonc
