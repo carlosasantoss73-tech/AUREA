@@ -75,14 +75,19 @@ export default {
         !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "",
         !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : "",
       ].filter(Boolean);
-      const analysisReady = runtime.ready && context.ready && analysisMissing.length === 0;
+      const configurationReady = runtime.ready && context.ready && analysisMissing.length === 0;
+      // Configuration presence is not proof of live Google Drive access, current
+      // index validity, or approved ECP evidence. Keep this endpoint explicit.
       return response({
-        status: analysisReady ? "READY" : "NOT_READY",
+        status: configurationReady ? "CONFIGURED_UNVERIFIED" : "NOT_READY",
         runtimeReady: runtime.ready,
         institutionalContextConfigured: context.ready,
-        analysisReady,
+        configurationReady,
+        liveInstitutionalReadVerified: false,
+        approvedEcpEvidenceVerified: false,
+        analysisReady: false,
         missing: [...runtime.missing, ...context.missing, ...analysisMissing],
-      }, analysisReady ? 200 : 503);
+      }, configurationReady ? 200 : 503);
     }
 
     if (url.pathname === "/health") {
