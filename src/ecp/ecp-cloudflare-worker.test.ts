@@ -77,10 +77,13 @@ describe("ECP Cloudflare Worker readiness", () => {
     } as never);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      status: "READY",
+      status: "CONFIGURED_UNVERIFIED",
       runtimeReady: true,
       institutionalContextConfigured: true,
-      analysisReady: true,
+      configurationReady: true,
+      liveInstitutionalReadVerified: false,
+      approvedEcpEvidenceVerified: false,
+      analysisReady: false,
     });
   });
 
