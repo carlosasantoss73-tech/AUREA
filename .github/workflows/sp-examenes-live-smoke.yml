@@ -35,7 +35,7 @@ jobs:
             -w '%{http_code}' \
             https://sp-examenes-pilot.carlosasantoss73.workers.dev/api/answer)"
           echo "Text HTTP status: $code"
-          jq -c '{error,sourceStatus,answer:(.answer // null),sourcesCount:(.sources | length),latencyMs}' /tmp/text-answer.json
+          jq -c '{error,sourceStatus,pdfStatus,retrievalMs,inferenceMs,answer:(.answer // null),sourcesCount:(.sources | length),pdfSourcesCount:(.pdfSources | length),unavailablePdfsCount:(.unavailablePdfs | length),latencyMs}' /tmp/text-answer.json
           test "$code" = "200"
           jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/text-answer.json >/dev/null
       - name: Submit image input smoke test
@@ -49,6 +49,6 @@ jobs:
             -w '%{http_code}' \
             https://sp-examenes-pilot.carlosasantoss73.workers.dev/api/answer)"
           echo "Image HTTP status: $code"
-          jq -c '{error,sourceStatus,answer:(.answer // null),sourcesCount:(.sources | length),latencyMs}' /tmp/image-answer.json
+          jq -c '{error,sourceStatus,pdfStatus,retrievalMs,inferenceMs,answer:(.answer // null),sourcesCount:(.sources | length),pdfSourcesCount:(.pdfSources | length),unavailablePdfsCount:(.unavailablePdfs | length),latencyMs}' /tmp/image-answer.json
           test "$code" = "200"
           jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/image-answer.json >/dev/null
