@@ -45,6 +45,7 @@ export function createConchitaSessionRecord(
   mode: ConchitaMode = 'PERSONAL',
   now = new Date(),
   expiresAt?: Date,
+  projectId?: string,
 ): ConchitaSessionRecord {
   return {
     sessionId,
@@ -52,6 +53,7 @@ export function createConchitaSessionRecord(
     channel: 'MOBILE_APP',
     mode,
     createdAt: now.toISOString(),
+    ...(projectId ? { projectId } : {}),
     ...(expiresAt ? { expiresAt: expiresAt.toISOString() } : {}),
   };
 }
