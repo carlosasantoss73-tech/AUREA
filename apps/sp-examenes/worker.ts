@@ -109,6 +109,7 @@ export default {
       liveSources.push({ title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" });
       liveSources.push({ title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" });
     }
+    const retrievalStartedAt = Date.now();
     const officialPromise = readOfficialSources(liveSources);
     const qLower = question.toLowerCase();
     // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
@@ -139,6 +140,8 @@ export default {
       }
     }));
     const [official, pdfResults] = await Promise.all([officialPromise, pdfPartsPromise]);
+    const retrievalMs = Date.now() - retrievalStartedAt;
+    const inferenceStartedAt = Date.now();
     const pdfParts = pdfResults.flatMap(result => result.part ? [result.part] : []);
     const pdfSummary = summarizePdfRetrieval(pdfResults.map(result => ({
       doc: result.doc,
@@ -291,6 +294,8 @@ export default {
                   answer,
                   sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
                   sourceStatus,
+                  retrievalMs,
+                  inferenceMs: Date.now() - inferenceStartedAt,
                   pdfStatus,
                   pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
                   unavailablePdfs,
@@ -322,6 +327,8 @@ export default {
         answer: answer,
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt, type: "live_page" })),
         sourceStatus: sourceStatus,
+        retrievalMs,
+        inferenceMs: Date.now() - inferenceStartedAt,
         pdfStatus: pdfStatus,
         pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
         unavailablePdfs: unavailablePdfs,
