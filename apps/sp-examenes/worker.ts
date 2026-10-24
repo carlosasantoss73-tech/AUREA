@@ -1,5 +1,18 @@
 import PAGE from "./public/index.html";
 
+export function summarizePdfRetrieval<T extends { title: string; url: string }>(
+  results: ReadonlyArray<{ doc: T; retrieved: boolean; status: string }>
+) {
+  const retrievedDocs = results.filter(result => result.retrieved).map(result => result.doc);
+  const unavailablePdfs = results
+    .filter(result => !result.retrieved)
+    .map(result => ({ title: result.doc.title, status: result.status }));
+  const pdfStatus = unavailablePdfs.length === 0
+    ? "complete"
+    : retrievedDocs.length > 0 ? "partial" : "unavailable";
+  return { retrievedDocs, unavailablePdfs, pdfStatus };
+}
+
 interface Env {
   GEMINI_API_KEY: string;
   SP_EXAMENES_MODEL?: string;
@@ -138,10 +151,14 @@ export default {
     }));
     const [official, pdfResults] = await Promise.all([officialPromise, pdfPartsPromise]);
     const pdfParts = pdfResults.flatMap(result => result.part ? [result.part] : []);
-    const retrievedDocs = pdfResults.filter(result => result.part !== null).map(result => result.doc);
+    const pdfSummary = summarizePdfRetrieval(pdfResults.map(result => ({
+      doc: result.doc,
+      retrieved: result.part !== null,
+      status: result.status
+    })));
+    const { retrievedDocs, unavailablePdfs, pdfStatus } = pdfSummary;
     const goodSources = official.results.filter(s => s.ok);
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
-    const pdfStatus = retrievedDocs.length === selectedDocs.length ? "complete" : retrievedDocs.length > 0 ? "partial" : "unavailable";
     const sourceContext = official.results.map(s =>
       "FUENTE: " + s.title + "\nURL: " + s.url + "\nCONSULTADA: " + s.checkedAt +
       "\nESTADO: " + (s.ok ? "consultada" : "no disponible") + "\nCONTENIDO EXTRAÍDO:\n" +
@@ -315,7 +332,7 @@ export default {
         sourceStatus: sourceStatus,
         pdfStatus: pdfStatus,
         pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
-        unavailablePdfs: pdfResults.filter(result => result.part === null).map(result => ({ title: result.doc.title, status: result.status })),
+        unavailablePdfs: unavailablePdfs,
         latencyMs: Date.now() - requestStartedAt
       }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
     } catch (error) {
