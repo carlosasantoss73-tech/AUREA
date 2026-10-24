@@ -24,9 +24,9 @@ describe("enforceEvidenceGate", () => {
       "Fuentes oficiales: LOSNCP — https://example.test",
       "Qué no se pudo verificar: No se encontró un artículo o numeral en los textos oficiales disponibles que cite explícitamente la clasificación de la omisión del manual de fábrica en estas circunstancias. No se halló texto literal que defina esta omisión como subsanable o insubsanable.",
       "Confianza: media"
-    ].join("\\n\\n");
+    ].join("\n\n");
     const result = enforceEvidenceGate(answer);
-    expect(result).toContain("Respuesta propuesta:\\nNO CONCLUYENTE");
+    expect(result).toContain("Respuesta propuesta:\nNO CONCLUYENTE");
     expect(result).toContain("Confianza: baja");
     expect(result).not.toContain("se clasifica generalmente como una falta insubsanable");
   });
