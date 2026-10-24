@@ -291,6 +291,9 @@ export default {
                   answer,
                   sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
                   sourceStatus,
+                  pdfStatus,
+                  pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
+                  unavailablePdfs,
                   provider: provider.name,
                   latencyMs: Date.now() - requestStartedAt
                 }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
