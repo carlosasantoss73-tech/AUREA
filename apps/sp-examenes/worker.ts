@@ -187,9 +187,11 @@ export default {
       let lastStatus = 502;
       let lastDetail = "Sin detalle devuelto por la API.";
       let answer = "";
+      const modelTimings: Array<{ model: string; elapsedMs: number; outcome: string }> = [];
 
       for (let attempt = 0; attempt < models.length; attempt++) {
         const model = models[attempt];
+        const modelStartedAt = Date.now();
         try {
           const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
             method: "POST",
@@ -208,18 +210,24 @@ export default {
           if (response.ok) {
             answer = (data.candidates || []).flatMap(c => c.content?.parts || [])
               .map(x => x.text || "").join("\n").trim();
-            if (answer) break;
+            if (answer) {
+              modelTimings.push({ model, elapsedMs: Date.now() - modelStartedAt, outcome: "success" });
+              break;
+            }
+            modelTimings.push({ model, elapsedMs: Date.now() - modelStartedAt, outcome: "empty_response" });
             lastStatus = 502;
             lastDetail = "Gemini respondió sin texto verificable.";
             // An empty candidate can be transient; try fallback model.
             continue;
           }
 
+          modelTimings.push({ model, elapsedMs: Date.now() - modelStartedAt, outcome: "http_" + response.status });
           lastStatus = response.status;
           lastDetail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500);
           const transient = response.status === 408 || response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
           if (!transient || attempt === models.length - 1) break;
         } catch (error) {
+          modelTimings.push({ model, elapsedMs: Date.now() - modelStartedAt, outcome: error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network_error" });
           lastStatus = 504;
           lastDetail = error instanceof Error && error.name === "TimeoutError"
             ? "Tiempo de espera agotado al consultar " + model + "."
@@ -294,6 +302,8 @@ export default {
                   answer,
                   sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
                   sourceStatus,
+                  modelAttempts: modelTimings.length,
+                  modelTimings,
                   retrievalMs,
                   inferenceMs: Date.now() - inferenceStartedAt,
                   pdfStatus,
@@ -327,6 +337,8 @@ export default {
         answer: answer,
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt, type: "live_page" })),
         sourceStatus: sourceStatus,
+        modelAttempts: modelTimings.length,
+        modelTimings,
         retrievalMs,
         inferenceMs: Date.now() - inferenceStartedAt,
         pdfStatus: pdfStatus,
