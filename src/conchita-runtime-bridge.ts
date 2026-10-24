@@ -3,6 +3,7 @@ import type { ConchitaPersonalRequestHandler } from "./conchita-personal-v0-gate
 import type { ExecutionRuntime, ExecutionRuntimeResult } from "./execution-runtime.js";
 import type { RuntimeAdmission, RuntimeAdmissionRequest } from "./runtime-admission.js";
 import type { ProviderRuntime } from "./provider-runtime.js";
+import type { ProjectCheckpoint } from "./context/durable-context-store.js";
 
 export interface ConchitaRuntimeAdmissionFactory {
   build(request: {
@@ -26,7 +27,11 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
     message: string;
     mode: ConchitaMode;
     traceId: string;
+    checkpoint?: ProjectCheckpoint;
   }): Promise<Pick<ConchitaMessageResponse, "status" | "response" | "evidence" | "blockers">> {
+    if (request.checkpoint && request.checkpoint.projectId !== request.session.projectId) {
+      return { status: "BLOCKED", response: undefined, evidence: ["CONCHITA_CHECKPOINT_SCOPE_GATE"], blockers: ["PROJECT_CHECKPOINT_SESSION_MISMATCH"] };
+    }
     const admissionRequest = this.admissionFactory.build(request);
     const admitted = await this.admission.admit(admissionRequest);
 
@@ -53,7 +58,9 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
       input: { message: request.message, mode: request.mode },
     });
 
-    return this.toConchitaResult(result);
+    const conchitaResult = this.toConchitaResult(result);
+    if (request.checkpoint) conchitaResult.evidence.push(`PROJECT_CHECKPOINT_RUNTIME_RECOVERED:${request.checkpoint.updatedAt}`);
+    return conchitaResult;
   }
 
   private toConchitaResult(
