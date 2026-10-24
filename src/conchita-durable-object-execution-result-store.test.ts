@@ -107,7 +107,15 @@ describe('Project checkpoint persistence on existing Durable Object', () => {
   });
 
   it('rejects a checkpoint whose project ID does not match the requested storage key', async () => {
-    const store = createCheckpointStore(fakeSql());
-    await expect(store.save(checkpoint('ecp', { projectId: 'aurea' }))).rejects.toThrow('PROJECT_CHECKPOINT_PROJECT_MISMATCH');
+    const sql = fakeSql();
+    const object = new ConchitaExecutionStateDurableObject({ storage: { sql } });
+    const stub = { fetch: (input: RequestInfo | URL, init?: RequestInit) => object.fetch(new Request(String(input), init)) };
+    const response = await stub.fetch('https://conchita-execution-state.internal/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operation: 'saveCheckpoint', projectId: 'ecp', checkpoint: checkpoint('aurea') }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ status: 'BLOCKED', error: 'PROJECT_CHECKPOINT_PROJECT_MISMATCH' });
   });
 });
