@@ -1,6 +1,7 @@
 import PAGE from "./public/index.html";
 
 import { summarizePdfRetrieval } from "./pdf-retrieval.js";
+import { enforceEvidenceGate } from "./evidence-gate.js";
 
 interface Env {
   GEMINI_API_KEY: string;
@@ -302,7 +303,7 @@ export default {
                 : Array.isArray(content) ? content.map(part => part.text || "").join("\n").trim() : "";
               if (answer) {
                 return Response.json({
-                  answer,
+                  answer: enforceEvidenceGate(answer),
                   sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })),
                   sourceStatus,
                   modelAttempts: modelTimings.length,
@@ -337,7 +338,7 @@ export default {
         }, { status: overload ? 503 : 502 });
       }
       return Response.json({
-        answer: answer,
+        answer: enforceEvidenceGate(answer),
         sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt, type: "live_page" })),
         sourceStatus: sourceStatus,
         modelAttempts: modelTimings.length,
