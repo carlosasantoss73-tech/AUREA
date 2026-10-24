@@ -34,7 +34,7 @@ function checkpointResumeContext(checkpoint: ProjectCheckpoint | undefined): str
     `Evidence references: ${evidenceRefs.length ? evidenceRefs.join(", ") : "none recorded"}`,
     "Treat this as bounded internal task state, not as source documents or prior conversation. Continue the task from the next action; do not infer missing facts.",
     "[END INTERNAL CONCHITA WORK STATE]",
-  ].join("\\n");
+  ].join("\n");
 }
 
 export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
@@ -55,7 +55,12 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
     if (request.checkpoint && request.checkpoint.projectId !== request.session.projectId) {
       return { status: "BLOCKED", response: undefined, evidence: ["CONCHITA_CHECKPOINT_SCOPE_GATE"], blockers: ["PROJECT_CHECKPOINT_SESSION_MISMATCH"] };
     }
-    const resumeContext = checkpointResumeContext(request.checkpoint);\n    const admissionRequest = this.admissionFactory.build(request);\n    if (resumeContext) admissionRequest.contextQuery = `${resumeContext}\\n\\nCurrent request: ${request.message}`;
+
+    const resumeContext = checkpointResumeContext(request.checkpoint);
+    const admissionRequest = this.admissionFactory.build(request);
+    if (resumeContext) {
+      admissionRequest.contextQuery = `${resumeContext}\n\nCurrent request: ${request.message}`;
+    }
     const admitted = await this.admission.admit(admissionRequest);
 
     if (admitted.status !== "ADMITTED" || !admitted.providerId) {
@@ -78,7 +83,10 @@ export class ConchitaRuntimeBridge implements ConchitaPersonalRequestHandler {
     const result = await this.execution.execute({
       admission: admitted,
       provider: selected.provider,
-      input: { message: resumeContext ? `${resumeContext}\\n\\nCurrent request: ${request.message}` : request.message, mode: request.mode },
+      input: {
+        message: resumeContext ? `${resumeContext}\n\nCurrent request: ${request.message}` : request.message,
+        mode: request.mode,
+      },
     });
 
     const conchitaResult = this.toConchitaResult(result);
