@@ -234,8 +234,9 @@ export default {
           lastDetail = error instanceof Error && error.name === "TimeoutError"
             ? "Tiempo de espera agotado al consultar " + model + "."
             : "Fallo de conexión al consultar " + model + ".";
-          // Crucial: network errors and timeouts also advance to the fallback model.
-          if (attempt === models.length - 1) break;
+          // A timeout/network failure on a large identical payload is unlikely to improve by resending it to another Gemini model.
+          // Stop Gemini retries here; use only an explicitly configured cross-provider fallback, otherwise return a clear error.
+          break;
         }
       }
 
