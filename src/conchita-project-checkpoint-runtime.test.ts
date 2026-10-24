@@ -3,6 +3,7 @@ import { ConchitaExecutionStateDurableObject } from './conchita-durable-object-e
 import { DurableObjectProjectCheckpointStore } from './context/durable-context-store.js';
 import { ConchitaProjectCheckpointRuntime, CONCHITA_PILOT_PROJECT_ID, type ConchitaCheckpointRuntimeHandler } from './conchita-project-checkpoint-runtime.js';
 import type { ConchitaSession } from './conchita-personal-v0-contract.js';
+import { createConchitaSessionRecord } from './conchita-cloud-session-store.js';
 
 function persistentSql() {
   const checkpoints = new Map<string, { checkpoint_json: string; updated_at: string }>();
@@ -94,7 +95,7 @@ describe('Conchita authenticated project checkpoint runtime', () => {
   it('assigns pilot project scope only through the server session factory contract', async () => {
     // The session-creation path supplies the project constant after bootstrap authentication;
     // the client message contract has no projectId field.
-    const session = { ...pilotSession };
+    const session = createConchitaSessionRecord('server-issued-session', 'pilot-user', 'PERSONAL', new Date('2026-10-24T12:00:00.000Z'), new Date('2026-10-25T12:00:00.000Z'), CONCHITA_PILOT_PROJECT_ID);
     expect(session.projectId).toBe(CONCHITA_PILOT_PROJECT_ID);
     expect('projectId' in { sessionId: 'client-input', message: 'hello', clientRequestId: 'req-1' }).toBe(false);
   });
