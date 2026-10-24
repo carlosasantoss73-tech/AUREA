@@ -38,6 +38,7 @@ jobs:
           jq -c '{error,sourceStatus,pdfStatus,retrievalMs,inferenceMs,answer:(.answer // null),sourcesCount:(.sources | length),pdfSourcesCount:(.pdfSources | length),unavailablePdfsCount:(.unavailablePdfs | length),modelAttempts,modelTimings,latencyMs}' /tmp/text-answer.json
           test "$code" = "200"
           jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/text-answer.json >/dev/null
+          jq -e '.answer | contains("NO CONCLUYENTE")' /tmp/text-answer.json >/dev/null
       - name: Submit image input smoke test
         run: |
           set -euo pipefail
