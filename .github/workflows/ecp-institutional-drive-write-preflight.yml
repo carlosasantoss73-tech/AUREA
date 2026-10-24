@@ -53,7 +53,12 @@ jobs:
           python - <<'PY'
           import json
           import os
+          import sys
+          from pathlib import Path
           from googleapiclient.discovery import build
+
+          sys.path.insert(0, str(Path.cwd()))
+          from scripts.ecp_drive_acl_policy import classify_folder_acl
 
           drive = build("drive", "v3")
 
@@ -103,28 +108,19 @@ jobs:
               } for p in acl]
               print(json.dumps({"target": label, "folder_id": file_id, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
 
-              direct_writer = any(
-                  p.get("type") == "user"
-                  and (p.get("emailAddress") or "").lower() == principal
-                  and p.get("role") in ("writer", "fileOrganizer", "organizer")
-                  and not any(detail.get("inherited") for detail in p.get("permissionDetails", []))
-                  for p in acl
-              )
-              # Conservative: any inherited write-capable role can widen access through a group/domain.
-              write_roles = ("owner", "writer", "fileOrganizer", "organizer")
-              unexpected_writer = any(
-                  p.get("role") in write_roles
-                  and not (
-                      p.get("type") == "user"
-                      and (p.get("emailAddress") or "").lower() == principal
-                      and p.get("role") in ("writer", "fileOrganizer", "organizer")
-                      and not any(detail.get("inherited") for detail in p.get("permissionDetails", []))
-                  )
-                  for p in acl
-              )
-              if not direct_writer:
+              decision = classify_folder_acl(acl, principal)
+              print(json.dumps({
+                  "target": label,
+                  "acl_policy": {
+                      "allowed": decision["allowed"],
+                      "direct_service_account_write_grant": decision["direct_service_account_write_grant"],
+                      "unexpected_write_capable_permissions": decision["unexpected_write_capable_permissions"],
+                      "reasons": decision["reasons"],
+                  },
+              }, ensure_ascii=False))
+              if not decision["direct_service_account_write_grant"]:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: no direct write grant for configured service account on {label}; grant must be explicit on the target folder")
-              if unexpected_writer:
+              if decision["unexpected_write_capable_permissions"]:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: another direct, inherited, group, domain, or owner write-capable permission is present on {label}; least privilege is not demonstrated")
 
           index = metadata(os.environ["INDEX_FILE_ID"])
