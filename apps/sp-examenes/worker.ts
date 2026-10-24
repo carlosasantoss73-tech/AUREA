@@ -204,7 +204,7 @@ export default {
               contents: [{ role: "user", parts: userParts }],
               generationConfig: { maxOutputTokens: 1100 }
             }),
-            signal: AbortSignal.timeout(28000)
+            signal: AbortSignal.timeout(12000)
           });
           const data = await response.json() as {
             candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -235,8 +235,8 @@ export default {
           lastDetail = error instanceof Error && error.name === "TimeoutError"
             ? "Tiempo de espera agotado al consultar " + model + "."
             : "Fallo de conexión al consultar " + model + ".";
-          // A timeout/network failure on a large identical payload is unlikely to improve by resending it to another Gemini model.
-          // Stop Gemini retries here; use only an explicitly configured cross-provider fallback, otherwise return a clear error.
+          // Keep the primary Gemini attempt bounded: live smoke tests repeatedly measured ~28s timeouts.
+          // Avoid a second long Gemini wait and use only an explicitly configured cross-provider fallback.
           break;
         }
       }
