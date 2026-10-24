@@ -31,6 +31,20 @@ describe("enforceEvidenceGate", () => {
     expect(result).not.toContain("se clasifica generalmente como una falta insubsanable");
   });
 
+  it("blocks an inferred classification stated later in the answer", () => {
+    const answer = [
+      "Respuesta propuesta: NO CONCLUYENTE — falta verificar la disposición exacta.",
+      "Fundamento verificable: La clasificación se infiere de criterios generales y podría ser insubsanable.",
+      "Fuentes oficiales: SERCOP — https://example.test",
+      "Qué no se pudo verificar: No se encontró un artículo específico que resuelva esta clasificación.",
+      "Confianza: media"
+    ].join("\\n\\n");
+    const result = enforceEvidenceGate(answer);
+    expect(result).toContain("Respuesta propuesta:\\nNO CONCLUYENTE");
+    expect(result).toContain("Confianza: baja");
+    expect(result).not.toContain("podría ser insubsanable");
+  });
+
   it("preserves a supported answer when no missing-rule warning exists", () => {
     const answer = "Respuesta propuesta: Subsanable.\n\nFuentes oficiales: norma aplicable.";
     expect(enforceEvidenceGate(answer)).toBe(answer);
