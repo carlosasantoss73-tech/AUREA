@@ -44,8 +44,8 @@ jobs:
       - name: Submit image input smoke test
         run: |
           set -euo pipefail
-          # Valid 32x32 RGBA PNG checks image payload handling; OCR quality needs a separate visual fixture.
-          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAKUlEQVR4nO3OIQEAAAACIP+f1hkWWEB6FgEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBgXdgl/rw4unIZ5cAAAAASUVORK5CYII=","mimeType":"image/png"}'
+          # Valid 1x1 PNG checks image payload handling; OCR quality needs a separate visual fixture.
+          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==","mimeType":"image/png"}'
           code="$(curl --silent --show-error --max-time 110 \
             -H 'content-type: application/json' \
             -X POST --data "$payload" -o /tmp/image-answer.json \
