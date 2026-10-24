@@ -38,9 +38,9 @@ describe("enforceEvidenceGate", () => {
       "Fuentes oficiales: SERCOP — https://example.test",
       "Qué no se pudo verificar: No se encontró un artículo específico que resuelva esta clasificación.",
       "Confianza: media"
-    ].join("\\n\\n");
+    ].join("\n\n");
     const result = enforceEvidenceGate(answer);
-    expect(result).toContain("Respuesta propuesta:\\nNO CONCLUYENTE");
+    expect(result).toContain("Respuesta propuesta:\nNO CONCLUYENTE");
     expect(result).toContain("Confianza: baja");
     expect(result).not.toContain("podría ser insubsanable");
   });
