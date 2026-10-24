@@ -115,6 +115,62 @@ describe("executeEcpExpedientAnalysis", () => {
     expect(result.evidence.some((item) => item.startsWith("ECP_CONTEXT_SOURCE:akl-046:v1"))).toBe(true);
   });
 
+  it("sends all four distinct offerors and traceable source evidence into the same analysis", async () => {
+    const offerors = ["Proveedor A", "Proveedor B", "Proveedor C", "Proveedor D"];
+    const baseDocument = record.intake.documents[0];
+    const fourOfferRecord: EcpStoredExpedient = {
+      ...record,
+      expedientId: "exp-four-offerors",
+      intake: {
+        ...record.intake,
+        offerors,
+        totalChunks: 4,
+        documents: offerors.map((offeror, index) => {
+          const suffix = String.fromCharCode(97 + index);
+          const documentId = `offer-${suffix}`;
+          const version = "sha256:" + String(index + 1).repeat(64);
+          return {
+            ...baseDocument,
+            offeror,
+            ingestion: {
+              ...baseDocument.ingestion,
+              documentId,
+              title: `oferta-${suffix}.pdf`,
+              sourceUri: `uploaded://offer-${suffix}`,
+              sourceSha256: String(index + 1).repeat(64),
+              sourceVersion: version,
+              chunks: baseDocument.ingestion.chunks.map((chunk) => ({
+                ...chunk,
+                chunkId: `chunk-${suffix}`,
+                documentId,
+                title: `oferta-${suffix}.pdf`,
+                sourceUri: `uploaded://offer-${suffix}`,
+                version,
+                text: `Evidencia original trazable de ${offeror}.`,
+              })),
+            },
+          };
+        }),
+      },
+    };
+    const providerAdapter: ExecutionAdapter & { execute: ReturnType<typeof vi.fn> } = {
+      providerId: "test-provider",
+      execute: vi.fn(async () => ({ output: "Matriz comparativa preliminar.", evidence: ["TRACE:four-offerors"] })),
+    };
+
+    const result = await executeEcpExpedientAnalysis(fourOfferRecord, principal, {
+      providerAdapter,
+      modelId: "test-model",
+      contextGate: new ContextRetrievalGate(institutionalProvider()),
+    });
+
+    expect(result.status).toBe("SUCCEEDED");
+    expect(providerAdapter.execute).toHaveBeenCalledOnce();
+    const input = providerAdapter.execute.mock.calls[0][0].input as { message: string };
+    for (const offeror of offerors) expect(input.message).toContain(`OFERENTE DECLARADO: ${offeror}`);
+    for (const suffix of ["a", "b", "c", "d"]) expect(input.message).toContain(`EVIDENCIA documento=offer-${suffix}`);
+  });
+
   it("blocks oversized evidence instead of silently truncating it", async () => {
     const providerAdapter: ExecutionAdapter & { execute: ReturnType<typeof vi.fn> } = {
       providerId: "test-provider",

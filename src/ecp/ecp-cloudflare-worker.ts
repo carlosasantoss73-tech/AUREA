@@ -37,7 +37,7 @@ function runtimeReadiness(env: Env) {
 function contextReadiness(env: Env) {
   const missing: string[] = [];
   if (!env.ECP_INSTITUTIONAL_INDEX_FILE_ID || env.ECP_INSTITUTIONAL_INDEX_FILE_ID.startsWith("REPLACE_")) missing.push("ECP_INSTITUTIONAL_INDEX_FILE_ID");
-  if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
+  if (!env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN || env.ECP_GOOGLE_DRIVE_ACCESS_TOKEN.startsWith("REPLACE_")) missing.push("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
   return { missing, ready: missing.length === 0 };
 }
 
@@ -67,10 +67,33 @@ export default {
       });
     }
 
+    if (request.method === "GET" && url.pathname === "/ready") {
+      const runtime = runtimeReadiness(env);
+      const context = contextReadiness(env);
+      const analysisMissing = [
+        !env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY.startsWith("REPLACE_") ? "ANTHROPIC_API_KEY" : "",
+        !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "",
+        !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : "",
+      ].filter(Boolean);
+      const configurationReady = runtime.ready && context.ready && analysisMissing.length === 0;
+      // Configuration presence is not proof of live Google Drive access, current
+      // index validity, or approved ECP evidence. Keep this endpoint explicit.
+      return response({
+        status: configurationReady ? "CONFIGURED_UNVERIFIED" : "NOT_READY",
+        runtimeReady: runtime.ready,
+        institutionalContextConfigured: context.ready,
+        configurationReady,
+        liveInstitutionalReadVerified: false,
+        approvedEcpEvidenceVerified: false,
+        analysisReady: false,
+        missing: [...runtime.missing, ...context.missing, ...analysisMissing],
+      }, configurationReady ? 200 : 503);
+    }
+
     if (url.pathname === "/health") {
       const runtime = runtimeReadiness(env);
       const context = contextReadiness(env);
-      const providerMissing = [!env.ANTHROPIC_API_KEY ? "ANTHROPIC_API_KEY" : "", !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "", !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : ""].filter(Boolean);
+      const providerMissing = [!env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY.startsWith("REPLACE_") ? "ANTHROPIC_API_KEY" : "", !env.ECP_ANTHROPIC_MODEL || env.ECP_ANTHROPIC_MODEL.startsWith("REPLACE_") ? "ECP_ANTHROPIC_MODEL" : "", !env.ECP_EXECUTION_STATE ? "ECP_EXECUTION_STATE" : ""].filter(Boolean);
       const ready = runtime.ready;
       return response({
         status: !runtime.ready ? "BLOCKED" : !context.ready ? "INTAKE_READY_CONTEXT_BLOCKED" : providerMissing.length ? "INTAKE_READY_ANALYSIS_BLOCKED" : "HEALTHY",
