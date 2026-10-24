@@ -1,6 +1,7 @@
 import { ConchitaAnthropicExecutionAdapter } from './conchita-anthropic-execution-adapter.js';
 import { ConchitaCloudMessageGate } from './conchita-cloud-message-gate.js';
-import { ConchitaDurableObjectExecutionResultStore, type ConchitaExecutionStateStub, ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
+import { ConchitaDurableObjectExecutionResultStore, DurableObjectProjectCheckpointStore, type ConchitaExecutionStateStub, ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
+import { ConchitaProjectCheckpointRuntime, CONCHITA_PILOT_PROJECT_ID } from './conchita-project-checkpoint-runtime.js';
 import { ConchitaKvSessionAuthenticator, ConchitaKvSessionRepository, type ConchitaKvNamespace } from './conchita-cloud-kv-session-store.js';
 import { ConchitaPersonalV0Gateway } from './conchita-personal-v0-gateway.js';
 import { createConchitaHttpEdgeHandler } from './conchita-http-edge-adapter.js';
@@ -45,9 +46,11 @@ function makePilotMessageHandler(env: Env): (request: Request) => Promise<Respon
   const platform = new AureaPlatformIntegration();
   platform.register({ manifest: { integrationId: 'conchita-cloudflare-edge', componentId: 'conchita-cloudflare-worker', version: '1', boundaries: ['OPERATIONS', 'EXECUTION', 'PERMISSION', 'WORK_CELL'], requiredCapabilities: ['conchita.chat'], requiredConfiguration: ['CONCHITA_SESSIONS', 'CONCHITA_EXECUTION_STATE', 'ANTHROPIC_API_KEY', 'CONCHITA_PILOT_USER_ID'], healthChecks: ['https', 'kv', 'durable-object', 'provider'], rollbackPlan: 'Disable the Worker deployment and preserve durable execution state.' }, inspect: () => ({ integrationId: 'conchita-cloudflare-edge', status: env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE ? 'HEALTHY' : 'BLOCKED', checkedAt: new Date().toISOString(), checks: { healthy: Boolean(env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE) }, evidence: ['CLOUDFLARE_WORKER', 'KV_SESSION_BOUNDARY', 'DURABLE_OBJECT_EXECUTION_STATE', 'SECRET_PROVIDER_BOUNDARY'], blockers: env.ANTHROPIC_API_KEY && env.CONCHITA_PILOT_USER_ID && env.CONCHITA_EXECUTION_STATE ? [] : ['CLOUD_CONFIGURATION_INCOMPLETE'] }) });
   const admission = new RuntimeAdmission(platform, new ContextRetrievalGate(contextProvider), providers, new AureaExecutionGate(sentinel));
-  const admissionFactory = { build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) { return { traceId: request.traceId, integrationId: 'conchita-cloudflare-edge', workCell: { workCellId: `CONCHITA-${request.traceId}`, projectId: 'CONCHITA-PILOT', companyId: 'AUREA', objective: request.message, owner: request.session.userId, planner: 'conchita-cloud', agents: ['conchita'], dependencies: [], restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'], state: 'READY' as const, deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const }, contextQuery: request.message, actorId: request.session.userId, actorRole: 'USER', capabilityId: 'conchita.chat', toolId: 'conchita.message', action: 'respond_to_user', effectClass: 'EXTERNAL' as const, providerCapability: 'conchita.chat', allowedProjects: ['CONCHITA-PILOT'], allowedCapabilities: ['conchita.chat'], allowedTools: ['conchita.message'] }; } };
+  const admissionFactory = { build(request: { session: ConchitaSession; message: string; mode: ConchitaMode; traceId: string }) { const projectId = request.session.projectId; if (projectId !== CONCHITA_PILOT_PROJECT_ID) throw new Error('CONCHITA_PROJECT_SCOPE_REQUIRED'); return { traceId: request.traceId, integrationId: 'conchita-cloudflare-edge', workCell: { workCellId: `CONCHITA-${request.traceId}`, projectId, companyId: 'AUREA', objective: request.message, owner: request.session.userId, planner: 'conchita-cloud', agents: ['conchita'], dependencies: [], restrictions: ['NO_BROWSER_IDENTITY', 'NO_SECRET_DISCLOSURE'], state: 'READY' as const, deliverables: [], evidence: [], qaStatus: 'PENDING' as const, auditStatus: 'PENDING' as const }, contextQuery: request.message, actorId: request.session.userId, actorRole: 'USER', capabilityId: 'conchita.chat', toolId: 'conchita.message', action: 'respond_to_user', effectClass: 'EXTERNAL' as const, providerCapability: 'conchita.chat', allowedProjects: [projectId], allowedCapabilities: ['conchita.chat'], allowedTools: ['conchita.message'] }; } };
   const bridge = new ConchitaRuntimeBridge(admission, providers, execution, admissionFactory);
-  const gateway = new ConchitaPersonalV0Gateway(bridge, sessions, undefined, undefined, conchitaExecutionTraceId);
+  const checkpointStore = new DurableObjectProjectCheckpointStore(env.CONCHITA_EXECUTION_STATE.get(executionStateId), [CONCHITA_PILOT_PROJECT_ID]);
+  const checkpointedRuntime = new ConchitaProjectCheckpointRuntime(bridge, checkpointStore);
+  const gateway = new ConchitaPersonalV0Gateway(checkpointedRuntime, sessions, undefined, undefined, conchitaExecutionTraceId);
   return createConchitaHttpEdgeHandler({ gate: new ConchitaCloudMessageGate(authenticator, gateway) }, { allowedOrigins: [env.CONCHITA_ALLOWED_ORIGIN] });
 }
 
@@ -60,7 +63,7 @@ async function handleSession(request: Request, env: Env): Promise<Response> {
   if (!env.CONCHITA_PILOT_BOOTSTRAP_TOKEN || authorization !== `Bearer ${env.CONCHITA_PILOT_BOOTSTRAP_TOKEN}`) return json({ status: 'BLOCKED', error: 'BOOTSTRAP_AUTH_REQUIRED' }, 401, headers);
   if (!env.CONCHITA_PILOT_USER_ID) return json({ status: 'BLOCKED', error: 'PILOT_USER_NOT_CONFIGURED' }, 503, headers);
   const sessions = new ConchitaKvSessionRepository(env.CONCHITA_SESSIONS);
-  const session = createConchitaSessionRecord(crypto.randomUUID(), env.CONCHITA_PILOT_USER_ID, 'PERSONAL', new Date(), new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const session = createConchitaSessionRecord(crypto.randomUUID(), env.CONCHITA_PILOT_USER_ID, 'PERSONAL', new Date(), new Date(Date.now() + 24 * 60 * 60 * 1000), CONCHITA_PILOT_PROJECT_ID);
   await sessions.save(session); return json({ status: 'COMPLETED', sessionId: session.sessionId, expiresAt: session.expiresAt }, 200, headers);
 }
 
