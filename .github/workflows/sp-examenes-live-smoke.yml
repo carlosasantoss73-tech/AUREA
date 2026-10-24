@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/sp-examenes-live-smoke.yml'
       - 'apps/sp-examenes/worker.ts'
+      - 'apps/sp-examenes/evidence-gate.ts'
       - 'apps/sp-examenes/public/index.html'
   workflow_dispatch:
 
@@ -17,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      # This smoke test intentionally runs on worker changes so latency is measured against the deployed runtime.
+      # This smoke test intentionally runs on worker/evidence-gate changes so latency and safety are measured against the deployed runtime.
       - name: Check live health endpoint
         run: |
           set -euo pipefail
@@ -44,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           # Valid 32x32 RGBA PNG checks image payload handling; OCR quality needs a separate visual fixture.
-          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAKUlEQVR4nO3OIQEAAAACIP+f1hkWWEB6FgEBAQEBAQEBAQEBAQEBgXdgl/rw4unIZ5cAAAAASUVORK5CYII=","mimeType":"image/png"}'
+          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAKUlEQVR4nO3OIQEAAAACIP+f1hkWWEB6FgEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBgXdgl/rw4unIZ5cAAAAASUVORK5CYII=","mimeType":"image/png"}'
           code="$(curl --silent --show-error --max-time 110 \
             -H 'content-type: application/json' \
             -X POST --data "$payload" -o /tmp/image-answer.json \
