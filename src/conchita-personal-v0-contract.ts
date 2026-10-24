@@ -7,6 +7,8 @@ export interface ConchitaSession {
   channel: ConchitaChannel;
   mode: ConchitaMode;
   createdAt: string;
+  /** Server-assigned project scope; clients cannot set this on message requests. */
+  projectId?: string;
 }
 
 export interface ConchitaMessageRequest {

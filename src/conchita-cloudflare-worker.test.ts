@@ -16,15 +16,18 @@ class FakeKv {
 function fakeSql() {
   const results = new Map<string, string>();
   const reservations = new Set<string>();
+  const checkpoints = new Map<string, { checkpoint_json: string; updated_at: string }>();
   return {
     exec(sql: string, ...bindings: unknown[]) {
       const traceId = String(bindings[0] ?? '');
       if (sql.startsWith('CREATE TABLE')) return { toArray: <T>() => [] as T[] };
       if (sql.includes('SELECT result_json')) return { toArray: <T>() => [...results.values()].map(result_json => ({ result_json }) as T) };
+      if (sql.includes('SELECT checkpoint_json FROM project_checkpoints')) return { toArray: <T>() => checkpoints.has(traceId) ? [checkpoints.get(traceId)! as T] : [] };
       if (sql.includes('SELECT trace_id FROM execution_results')) return { toArray: <T>() => results.has(traceId) ? [{ trace_id: traceId } as T] : [] };
       if (sql.includes('SELECT trace_id FROM execution_reservations')) return { toArray: <T>() => reservations.has(traceId) ? [{ trace_id: traceId } as T] : [] };
       if (sql.startsWith('INSERT INTO execution_reservations')) { reservations.add(traceId); return { toArray: <T>() => [] as T[] }; }
       if (sql.startsWith('INSERT OR REPLACE INTO execution_results')) { results.set(traceId, String(bindings[1])); return { toArray: <T>() => [] as T[] }; }
+      if (sql.startsWith('INSERT OR REPLACE INTO project_checkpoints')) { checkpoints.set(traceId, { checkpoint_json: String(bindings[1]), updated_at: String(bindings[2]) }); return { toArray: <T>() => [] as T[] }; }
       if (sql.startsWith('DELETE FROM execution_reservations')) { reservations.delete(traceId); return { toArray: <T>() => [] as T[] }; }
       throw new Error(`unexpected SQL: ${sql}`);
     },
