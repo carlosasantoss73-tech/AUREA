@@ -1,17 +1,6 @@
 import PAGE from "./public/index.html";
 
-export function summarizePdfRetrieval<T extends { title: string; url: string }>(
-  results: ReadonlyArray<{ doc: T; retrieved: boolean; status: string }>
-) {
-  const retrievedDocs = results.filter(result => result.retrieved).map(result => result.doc);
-  const unavailablePdfs = results
-    .filter(result => !result.retrieved)
-    .map(result => ({ title: result.doc.title, status: result.status }));
-  const pdfStatus = unavailablePdfs.length === 0
-    ? "complete"
-    : retrievedDocs.length > 0 ? "partial" : "unavailable";
-  return { retrievedDocs, unavailablePdfs, pdfStatus };
-}
+import { summarizePdfRetrieval } from "./pdf-retrieval.js";
 
 interface Env {
   GEMINI_API_KEY: string;
