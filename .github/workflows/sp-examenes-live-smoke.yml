@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      # This smoke test intentionally runs on worker changes so latency is measured against the deployed runtime.
       - name: Check live health endpoint
         run: |
           set -euo pipefail
