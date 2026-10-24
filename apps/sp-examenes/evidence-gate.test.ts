@@ -45,6 +45,19 @@ describe("enforceEvidenceGate", () => {
     expect(result).not.toContain("podría ser insubsanable");
   });
 
+  it("blocks an inferred subsanabilidad claim even when the model says NO CONCLUYENTE first", () => {
+    const answer = [
+      "Respuesta propuesta: NO CONCLUYENTE — falta verificar la disposición exacta.",
+      "Fundamento verificable: Se infiere la subsanabilidad por analogía con requisitos formales.",
+      "Fuentes oficiales: SERCOP — https://example.test",
+      "Qué no se pudo verificar: No se encontró un artículo específico que resuelva esta clasificación.",
+      "Confianza: baja"
+    ].join("\n\n");
+    const result = enforceEvidenceGate(answer);
+    expect(result).toContain("Respuesta propuesta:\nNO CONCLUYENTE");
+    expect(result).not.toContain("Se infiere la subsanabilidad por analogía");
+  });
+
   it("preserves a supported answer when no missing-rule warning exists", () => {
     const answer = "Respuesta propuesta: Subsanable.\n\nFuentes oficiales: norma aplicable.";
     expect(enforceEvidenceGate(answer)).toBe(answer);
