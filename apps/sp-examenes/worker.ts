@@ -123,22 +123,25 @@ export default {
     const pdfPartsPromise = Promise.all(selectedDocs.map(async doc => {
       try {
         const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(6000) });
-        if (!pdfResponse.ok) return null;
+        if (!pdfResponse.ok) return { doc, part: null as { inlineData: { mimeType: string; data: string } } | null, status: "http_error" as const };
         const bytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        if (!bytes.length || bytes.length > 15_000_000) return null;
-        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") return null;
+        if (!bytes.length || bytes.length > 15_000_000) return { doc, part: null, status: "invalid_size" as const };
+        if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") return { doc, part: null, status: "invalid_pdf" as const };
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000) {
           binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
         }
-        return { inlineData: { mimeType: "application/pdf", data: btoa(binary) } };
+        return { doc, part: { inlineData: { mimeType: "application/pdf", data: btoa(binary) } }, status: "retrieved" as const };
       } catch {
-        return null;
+        return { doc, part: null, status: "fetch_error" as const };
       }
     }));
-    const [official, pdfParts] = await Promise.all([officialPromise, pdfPartsPromise]);
+    const [official, pdfResults] = await Promise.all([officialPromise, pdfPartsPromise]);
+    const pdfParts = pdfResults.flatMap(result => result.part ? [result.part] : []);
+    const retrievedDocs = pdfResults.filter(result => result.part !== null).map(result => result.doc);
     const goodSources = official.results.filter(s => s.ok);
     const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
+    const pdfStatus = retrievedDocs.length === selectedDocs.length ? "complete" : retrievedDocs.length > 0 ? "partial" : "unavailable";
     const sourceContext = official.results.map(s =>
       "FUENTE: " + s.title + "\nURL: " + s.url + "\nCONSULTADA: " + s.checkedAt +
       "\nESTADO: " + (s.ok ? "consultada" : "no disponible") + "\nCONTENIDO EXTRAÍDO:\n" +
@@ -155,7 +158,11 @@ export default {
       "6. Cita título y URL oficial exactos; no fabriques enlaces. Incluye fecha/hora de consulta " + official.checkedAt + ".\n" +
       "7. Devuelve: Respuesta propuesta; Fundamento verificable; Fuentes oficiales; Qué no se pudo verificar; Confianza (alta/media/baja).\n" +
       "8. Si la imagen está borrosa o la pregunta/opciones están incompletas, pide una foto más clara o el texto.\n\n" +
-      "FUENTES OFICIALES CONSULTADAS EN VIVO:\n" + sourceContext + "\nPDF NORMATIVOS ADJUNTOS A ESTA SOLICITUD:\n" + selectedDocs.map(d => d.title + " — " + d.url).join("\n");
+      "FUENTES OFICIALES CONSULTADAS EN VIVO:\\n" + sourceContext +
+      "\\nPDF NORMATIVOS EFECTIVAMENTE ADJUNTADOS A ESTA SOLICITUD:\\n" +
+      (retrievedDocs.length ? retrievedDocs.map(d => d.title + " — " + d.url).join("\\n") : "[Ningún PDF se pudo recuperar y adjuntar.]") +
+      "\\nPDF NO RECUPERADOS (no afirmes haberlos revisado):\\n" +
+      pdfResults.filter(result => result.part === null).map(result => result.doc.title + " — estado: " + result.status).join("\\n");
 
     const userParts: Array<Record<string, unknown>> = [];
     // Use Gemini's documented generateContent Part schema (inlineData + text).
@@ -304,8 +311,11 @@ export default {
       }
       return Response.json({
         answer: answer,
-        sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt })).concat(selectedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt }))),
+        sources: goodSources.map(s => ({ title: s.title, url: s.url, checkedAt: s.checkedAt, type: "live_page" })),
         sourceStatus: sourceStatus,
+        pdfStatus: pdfStatus,
+        pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
+        unavailablePdfs: pdfResults.filter(result => result.part === null).map(result => ({ title: result.doc.title, status: result.status })),
         latencyMs: Date.now() - requestStartedAt
       }, { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
     } catch (error) {
