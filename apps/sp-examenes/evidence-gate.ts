@@ -1,6 +1,6 @@
 const SPECIFIC_RULE_MISSING = /(?:no se encontr[oó]|no pude verificar|no fue posible verificar|no se pudo verificar|no hay|no aparece|no consta).{0,140}(?:art[ií]culo|numeral|disposici[oó]n|regla|norma|criterio|clasifi|espec[ií]fic|literal)|(?:art[ií]culo|disposici[oó]n|regla|norma|criterio).{0,140}(?:no se encontr[oó]|no pude verificar|no fue posible verificar|no se pudo verificar|no consta)/is;
 
-const CLASSIFICATION_ASSERTION = /\b(?:se clasifica como|es|resulta|ser[ií]a|se considera|constituye|es un error)\b.{0,100}\b(?:subsanable|insubsanable|subsanaci[oó]n|causal de rechazo)\b/i;
+const CLASSIFICATION_ASSERTION = /\b(?:se clasifica|clasifica|es|resulta|ser[ií]a|se considera|constituye|es un error)\b.{0,120}\b(?:subsanable|insubsanable|subsanaci[oó]n|causal de rechazo)\b/i;
 
 export function enforceEvidenceGate(answer: string): string {
   const proposed = answer.split(/Fundamento verificable\s*:/i)[0] || answer;
