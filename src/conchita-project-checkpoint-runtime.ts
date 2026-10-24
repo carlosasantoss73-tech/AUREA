@@ -9,7 +9,7 @@ export interface CheckpointedConchitaRequest {
   message: string;
   mode: ConchitaMode;
   traceId: string;
-  /** Recovered server-side checkpoint; never accepted from the client. */
+  /** Recovered server-side work state; never accepted from the client. */
   checkpoint?: ProjectCheckpoint;
 }
 
@@ -17,10 +17,19 @@ export interface ConchitaCheckpointRuntimeHandler {
   handle(request: CheckpointedConchitaRequest): Promise<Pick<ConchitaMessageResponse, 'status' | 'response' | 'evidence' | 'blockers'>>;
 }
 
+// Only stable runtime identifiers are eligible for checkpoint metadata. Free-form text,
+// provider output, user input, and document excerpts are deliberately excluded.
+const SAFE_RUNTIME_REF = /^[A-Z][A-Z0-9_.:-]{0,79}$/;
+
+function safeRuntimeRefs(values: readonly string[]): string[] {
+  return [...new Set(values.filter(value => SAFE_RUNTIME_REF.test(value)))].slice(0, 10);
+}
+
 /**
  * Checkpoint lifecycle at the authenticated runtime boundary.
  * The project ID is read only from the server-loaded session record and must match
- * the single-project pilot contract. The message and provider output are never persisted.
+ * the single-project pilot contract. Only status and bounded runtime identifiers are saved;
+ * messages, provider output, and institutional source documents are never persisted.
  */
 export class ConchitaProjectCheckpointRuntime implements ConchitaCheckpointRuntimeHandler {
   constructor(
@@ -40,16 +49,28 @@ export class ConchitaProjectCheckpointRuntime implements ConchitaCheckpointRunti
       const recovered = await this.checkpoints.load(CONCHITA_PILOT_PROJECT_ID);
       const result = await this.handler.handle({ ...request, checkpoint: recovered ?? undefined });
 
-      // Persist only operational metadata, never user messages, provider outputs, or source documents.
+      // Construct state only from the runtime's typed status and allow-listed identifiers.
+      // Never copy result.response, request.message, provider outputs, or source documents.
+      const blockers = result.status === 'BLOCKED'
+        ? safeRuntimeRefs(result.blockers).slice(0, 10)
+        : [];
+      const evidenceRefs = safeRuntimeRefs(result.evidence);
+      const completed = result.status === 'COMPLETED' ? ['RUNTIME_REQUEST_COMPLETED'] : [];
+      const nextAction = result.status === 'BLOCKED'
+        ? (blockers.length ? `Resolve runtime blocker(s): ${blockers.join(', ')}` : 'Inspect runtime gate evidence before retrying.')
+        : 'Continue from the completed Conchita pilot checkpoint.';
+
       const next: ProjectCheckpoint = {
         schemaVersion: 1,
         projectId: CONCHITA_PILOT_PROJECT_ID,
         updatedAt: this.now(),
-        summary: recovered ? 'Conchita pilot runtime checkpoint refreshed.' : 'Conchita pilot runtime checkpoint initialized.',
-        completed: result.status === 'COMPLETED' ? ['AUTHENTICATED_RUNTIME_REQUEST_COMPLETED'] : [],
-        blockers: result.status === 'BLOCKED' ? result.blockers.slice(0, 10) : [],
-        nextAction: result.status === 'BLOCKED' ? 'Resolve runtime blockers before the next request.' : 'Continue the authenticated Conchita pilot.',
-        evidenceRefs: ['CONCHITA_PILOT_RUNTIME'],
+        summary: result.status === 'COMPLETED'
+          ? 'Authenticated Conchita runtime request completed.'
+          : 'Authenticated Conchita runtime request blocked.',
+        completed,
+        blockers,
+        nextAction,
+        evidenceRefs,
       };
       await this.checkpoints.save(next);
       return {
