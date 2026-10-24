@@ -46,6 +46,10 @@ jobs:
           grep -Fq 'classify_folder_acl' "$FILE"
           grep -Fq 'direct write grant' "$FILE"
           grep -Fq 'drive.metadata.readonly' "$FILE"
+          # Guard against regression to first-page-only ACL evaluation.
+          grep -Fq 'nextPageToken' "$FILE"
+          grep -Fq 'pageToken' "$FILE"
+          grep -Fq 'while True:' "$FILE"
           ! grep -Eiq 'drive\(\)\.files\(\)\.(create|update|delete)|drive\(\)\.permissions\(\)\.(create|update|delete)' "$FILE"
           grep -Fq 'SERVICE_ACCOUNT_WRITE_ROLES' "$POLICY"
-          echo "STATIC_GUARD_PASS: manual-only trigger, tested ACL classifier, least-privilege OAuth scope, and no Drive write API call patterns."
+          echo "STATIC_GUARD_PASS: manual-only trigger, tested ACL classifier, complete ACL pagination, least-privilege OAuth scope, and no Drive write API call patterns."
