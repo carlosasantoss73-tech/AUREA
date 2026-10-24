@@ -108,6 +108,7 @@ jobs:
               } for p in acl]
               print(json.dumps({"target": label, "folder_id": file_id, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
 
+              # The tested classifier's unexpected_writer decision remains fail-closed.
               decision = classify_folder_acl(acl, principal)
               print(json.dumps({
                   "target": label,
