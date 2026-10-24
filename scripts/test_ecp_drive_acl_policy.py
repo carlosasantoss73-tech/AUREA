@@ -59,6 +59,49 @@ class EcpDriveAclPolicyTests(unittest.TestCase):
         )
         self.assertFalse(result["allowed"])
 
+    def test_blocks_direct_and_inherited_third_party_writers(self):
+        for details in (None, [{"inherited": True, "role": "writer"}]):
+            with self.subTest(details=details):
+                result = classify_folder_acl(
+                    [permission(), permission(email="third-party@example.com", details=details)],
+                    PRINCIPAL,
+                )
+                self.assertFalse(result["allowed"])
+                self.assertTrue(result["direct_service_account_write_grant"])
+                self.assertIn("unexpected_write_capable_permissions", result["reasons"])
+
+    def test_blocks_direct_and_inherited_owner_permissions(self):
+        for details in (None, [{"inherited": True, "role": "owner"}]):
+            with self.subTest(details=details):
+                result = classify_folder_acl(
+                    [permission(), permission(role="owner", email="owner@example.com", details=details)],
+                    PRINCIPAL,
+                )
+                self.assertFalse(result["allowed"])
+                self.assertIn("unexpected_write_capable_permissions", result["reasons"])
+
+    def test_blocks_when_explicit_service_account_grant_is_absent(self):
+        result = classify_folder_acl(
+            [permission(email="other@example.com")], PRINCIPAL
+        )
+        self.assertFalse(result["allowed"])
+        self.assertFalse(result["direct_service_account_write_grant"])
+        self.assertIn("missing_direct_service_account_write_grant", result["reasons"])
+
+    def test_blocks_valid_grant_plus_each_additional_write_capable_permission(self):
+        additional = [
+            permission(email="other@example.com"),
+            permission(role="owner", email="owner@example.com"),
+            permission(kind="group", email=None),
+            permission(kind="domain", email=None),
+            permission(email="inherited@example.com", details=[{"inherited": True, "role": "writer"}]),
+        ]
+        for extra in additional:
+            with self.subTest(extra=extra):
+                result = classify_folder_acl([permission(), extra], PRINCIPAL)
+                self.assertFalse(result["allowed"])
+                self.assertTrue(result["direct_service_account_write_grant"])
+
     def test_ignores_read_only_permissions(self):
         result = classify_folder_acl(
             [permission(role="reader", email="auditor@example.com"), permission()],

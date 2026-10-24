@@ -42,7 +42,7 @@ jobs:
       - name: Install Google API client
         run: python -m pip install --quiet google-api-python-client google-auth
 
-      - name: Verify folder capabilities, ACL inheritance, and index protection
+      - name: Verify folder capabilities, complete ACLs, and index protection
         env:
           SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
           AGENTS_FOLDER_ID: ${{ vars.AUREA_ECP_AGENTS_FOLDER_ID }}
@@ -70,19 +70,30 @@ jobs:
               ).execute()
 
           def permissions(file_id):
-              result = drive.permissions().list(
-                  fileId=file_id,
-                  fields="permissions(id,type,emailAddress,domain,role,permissionDetails(inherited,inheritedFrom,role,permissionType))",
-                  supportsAllDrives=True,
-                  supportsTeamDrives=True,
-              ).execute()
-              return result.get("permissions", [])
+              # Read every page: a partial ACL could otherwise hide a writer and
+              # incorrectly turn a fail-closed decision into a pass.
+              collected = []
+              page_token = None
+              while True:
+                  args = {
+                      "fileId": file_id,
+                      "fields": "nextPageToken,permissions(id,type,emailAddress,domain,role,permissionDetails(inherited,inheritedFrom,role,permissionType))",
+                      "supportsAllDrives": True,
+                      "pageSize": 100,
+                  }
+                  if page_token:
+                      args["pageToken"] = page_token
+                  result = drive.permissions().list(**args).execute()
+                  collected.extend(result.get("permissions", []))
+                  page_token = result.get("nextPageToken")
+                  if not page_token:
+                      return collected
 
           target_ids = [os.environ["AGENTS_FOLDER_ID"], os.environ["ACTAS_FOLDER_ID"], os.environ["INDEX_FILE_ID"]]
           if len(set(target_ids)) != len(target_ids):
               raise SystemExit("PREFLIGHT_BLOCKED: folder and index IDs must be distinct")
 
-          principal = os.environ["SERVICE_ACCOUNT"].lower()
+          principal = os.environ["SERVICE_ACCOUNT"].strip().lower()
           folders = [
               ("03_AGENTES", os.environ["AGENTS_FOLDER_ID"]),
               ("00_CONTROL/ACTAS", os.environ["ACTAS_FOLDER_ID"]),
@@ -99,16 +110,17 @@ jobs:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: required folder capabilities absent for {label}")
 
               acl = permissions(file_id)
-              # Log ACL structure without printing permission IDs or unrelated email addresses.
+              # Keep logs policy-relevant only; never print IDs, emails, domains,
+              # or inheritedFrom locators.
               summary = [{
-                  "type": p.get("type"),
-                  "principal_matches_service_account": p.get("type") == "user" and (p.get("emailAddress") or "").lower() == principal,
-                  "role": p.get("role"),
-                  "permissionDetails": p.get("permissionDetails", []),
+                  "type": p.get("type", "unknown"),
+                  "principal_matches_service_account": p.get("type") == "user" and (p.get("emailAddress") or "").strip().lower() == principal,
+                  "role": p.get("role", "unknown"),
+                  "inherited": any(detail.get("inherited") is True for detail in (p.get("permissionDetails") or [])),
+                  "permission_types": sorted({str(detail.get("permissionType", "unknown")) for detail in (p.get("permissionDetails") or [])}),
               } for p in acl]
-              print(json.dumps({"target": label, "folder_id": file_id, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
+              print(json.dumps({"target": label, "capabilities": caps, "acl_entries_evaluated": len(acl), "acl_summary": summary}, ensure_ascii=False))
 
-              # The tested classifier's unexpected_writer decision remains fail-closed.
               decision = classify_folder_acl(acl, principal)
               print(json.dumps({
                   "target": label,
@@ -129,7 +141,6 @@ jobs:
               raise SystemExit("PREFLIGHT_BLOCKED: returned Drive ID mismatch for index")
           print(json.dumps({
               "protected_index": {
-                  "id": index.get("id"),
                   "name": index.get("name"),
                   "mimeType": index.get("mimeType"),
                   "canEdit": index.get("capabilities", {}).get("canEdit"),
