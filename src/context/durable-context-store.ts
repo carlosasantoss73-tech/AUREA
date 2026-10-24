@@ -73,7 +73,7 @@ export interface ProjectCheckpointDurableObjectStub {
 }
 
 const CHECKPOINT_PROJECT_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
-const CHECKPOINT_SECRET_PATTERN = /(?:bearer\\s+[a-z0-9._~+/-]{8,}|(?:api[_ -]?key|access[_ -]?token|password|client[_ -]?secret)\\s*[:=]\\s*\\S+|(?:sk-[a-z0-9]{12,}|gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}|AIza[a-z0-9_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----))/i;
+const CHECKPOINT_SECRET_PATTERN = /(?:bearer\s+[a-z0-9._~+/-]{8,}|(?:api[_ -]?key|access[_ -]?token|password|client[_ -]?secret)\s*[:=]\s*\S+|(?:sk-[a-z0-9]{12,}|gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}|AIza[a-z0-9_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----))/i;
 const CHECKPOINT_FIELDS = new Set(["schemaVersion", "projectId", "updatedAt", "summary", "completed", "blockers", "nextAction", "evidenceRefs"]);
 
 function checkpointText(value: unknown, field: string, maxLength: number, allowEmpty = false): string {
@@ -99,7 +99,7 @@ export function normalizeProjectCheckpoint(value: unknown, expectedProjectId?: s
   if (!CHECKPOINT_PROJECT_ID.test(projectId)) throw new Error("PROJECT_CHECKPOINT_INVALID_PROJECT_ID");
   if (expectedProjectId && projectId !== expectedProjectId) throw new Error("PROJECT_CHECKPOINT_PROJECT_MISMATCH");
   const updatedAt = checkpointText(input.updatedAt, "updatedAt", 40);
-  if (!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/.test(updatedAt) || !Number.isFinite(Date.parse(updatedAt))) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(updatedAt) || !Number.isFinite(Date.parse(updatedAt))) {
     throw new Error("PROJECT_CHECKPOINT_INVALID_TIMESTAMP");
   }
   const checkpoint: ProjectCheckpoint = {
