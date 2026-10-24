@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/ecp-institutional-drive-write-preflight.yml"
       - ".github/workflows/ecp-preflight-static-guard.yml"
+      - "scripts/ecp_drive_acl_policy.py"
+      - "scripts/test_ecp_drive_acl_policy.py"
       - "docs/audits/ECP_PILOT_BLOCKERS_2026-10-12.md"
   workflow_dispatch:
 
@@ -24,17 +26,26 @@ jobs:
           set -euo pipefail
           ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0), aliases: true); puts "YAML_PARSE_PASS"' .github/workflows/ecp-institutional-drive-write-preflight.yml
 
+      - name: Test pure Drive ACL policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest scripts.test_ecp_drive_acl_policy -v
+
       - name: Assert conservative preflight invariants
         shell: bash
         run: |
           set -euo pipefail
           FILE=.github/workflows/ecp-institutional-drive-write-preflight.yml
+          POLICY=scripts/ecp_drive_acl_policy.py
           grep -Eq '^  workflow_dispatch:$' "$FILE"
           ! grep -Eq '^  (push|schedule|pull_request|pull_request_target):' "$FILE"
           grep -Fq 'INDICE_MAESTRO_v011.json' "$FILE"
           grep -Fq 'application/json' "$FILE"
           grep -Fq 'capabilities' "$FILE"
-          grep -Fq 'unexpected_writer' "$FILE"
+          grep -Fq 'classify_folder_acl' "$FILE"
           grep -Fq 'direct write grant' "$FILE"
+          grep -Fq 'drive.metadata.readonly' "$FILE"
           ! grep -Eiq 'drive\(\)\.files\(\)\.(create|update|delete)|drive\(\)\.permissions\(\)\.(create|update|delete)' "$FILE"
-          echo "STATIC_GUARD_PASS: manual-only trigger and required fail-closed guards present; no Drive write API call patterns found."
+          grep -Fq 'SERVICE_ACCOUNT_WRITE_ROLES' "$POLICY"
+          echo "STATIC_GUARD_PASS: manual-only trigger, tested ACL classifier, least-privilege OAuth scope, and no Drive write API call patterns."
