@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
-import { DurableObjectProjectCheckpointStore } from './context/durable-context-store.js';
+import { DurableObjectProjectCheckpointStore, type ProjectCheckpoint } from './context/durable-context-store.js';
 import { ConchitaProjectCheckpointRuntime, CONCHITA_PILOT_PROJECT_ID, type ConchitaCheckpointRuntimeHandler } from './conchita-project-checkpoint-runtime.js';
 import type { ConchitaSession } from './conchita-personal-v0-contract.js';
 import { createConchitaSessionRecord } from './conchita-cloud-session-store.js';
@@ -37,36 +37,49 @@ const pilotSession: ConchitaSession = {
 };
 
 describe('Conchita authenticated project checkpoint runtime', () => {
-  it('saves runtime metadata, recreates the runtime, and recovers the server-scoped checkpoint', async () => {
+  it('delivers the full bounded work state to the resumed handler after runtime recreation', async () => {
     const sql = persistentSql();
-    const seen: Array<string | undefined> = [];
+    const receivedCheckpoints: Array<ProjectCheckpoint | undefined> = [];
     const handler: ConchitaCheckpointRuntimeHandler = {
       async handle(request) {
-        seen.push(request.checkpoint?.projectId);
-        return { status: 'COMPLETED', response: 'ok', evidence: ['runtime-test'], blockers: [] };
+        receivedCheckpoints.push(request.checkpoint);
+        return {
+          status: 'COMPLETED',
+          response: 'provider output must never be persisted',
+          evidence: ['RUNTIME_TEST_EVIDENCE'],
+          blockers: [],
+        };
       },
     };
 
     const firstRuntime = new ConchitaProjectCheckpointRuntime(handler, checkpointStore(sql), () => '2026-10-24T12:01:00.000Z');
-    const first = await firstRuntime.handle({ session: pilotSession, message: 'not persisted', mode: 'PERSONAL', traceId: 'trace-1' });
+    const first = await firstRuntime.handle({ session: pilotSession, message: 'user message must never be persisted', mode: 'PERSONAL', traceId: 'trace-1' });
     expect(first.status).toBe('COMPLETED');
     expect(first.evidence).toContain('PROJECT_CHECKPOINT_SAVED');
-    expect(seen[0]).toBeUndefined();
+    expect(receivedCheckpoints[0]).toBeUndefined();
 
-    // New runtime + Durable Object wrapper, with the same backing SQLite storage.
+    // Recreate both runtime and Durable Object wrapper while retaining the same simulated SQLite storage.
     const recreatedRuntime = new ConchitaProjectCheckpointRuntime(handler, checkpointStore(sql), () => '2026-10-24T12:02:00.000Z');
-    const second = await recreatedRuntime.handle({ session: pilotSession, message: 'also not persisted', mode: 'PERSONAL', traceId: 'trace-2' });
+    const second = await recreatedRuntime.handle({ session: pilotSession, message: 'second user message must never be persisted', mode: 'PERSONAL', traceId: 'trace-2' });
     expect(second.status).toBe('COMPLETED');
     expect(second.evidence).toContain('PROJECT_CHECKPOINT_RECOVERED');
-    expect(seen[1]).toBe(CONCHITA_PILOT_PROJECT_ID);
 
-    const recovered = await checkpointStore(sql).load(CONCHITA_PILOT_PROJECT_ID);
-    expect(recovered).toMatchObject({
+    // The handler receives the recovered work state, not merely a project ID or recovery flag.
+    expect(receivedCheckpoints[1]).toEqual({
+      schemaVersion: 1,
       projectId: CONCHITA_PILOT_PROJECT_ID,
-      summary: 'Conchita pilot runtime checkpoint refreshed.',
-      completed: ['AUTHENTICATED_RUNTIME_REQUEST_COMPLETED'],
+      updatedAt: '2026-10-24T12:01:00.000Z',
+      summary: 'Authenticated Conchita runtime request completed.',
+      completed: ['RUNTIME_REQUEST_COMPLETED'],
+      blockers: [],
+      nextAction: 'Continue from the completed Conchita pilot checkpoint.',
+      evidenceRefs: ['RUNTIME_TEST_EVIDENCE'],
     });
-    expect(JSON.stringify(recovered)).not.toContain('not persisted');
+
+    const persistedJson = JSON.stringify(await checkpointStore(sql).load(CONCHITA_PILOT_PROJECT_ID));
+    expect(persistedJson).not.toContain('user message must never be persisted');
+    expect(persistedJson).not.toContain('provider output must never be persisted');
+    expect(persistedJson).not.toContain('second user message must never be persisted');
   });
 
   it('rejects any session outside the single-project pilot scope before loading, saving, or executing', async () => {
