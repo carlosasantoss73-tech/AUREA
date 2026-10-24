@@ -1,6 +1,6 @@
 import { ConchitaAnthropicExecutionAdapter } from './conchita-anthropic-execution-adapter.js';
 import { ConchitaCloudMessageGate } from './conchita-cloud-message-gate.js';
-import { ConchitaDurableObjectExecutionResultStore, DurableObjectProjectCheckpointStore, type ConchitaExecutionStateStub, ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
+import { ConchitaDurableObjectExecutionResultStore, type ConchitaExecutionStateStub, ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
 import { ConchitaProjectCheckpointRuntime, CONCHITA_PILOT_PROJECT_ID } from './conchita-project-checkpoint-runtime.js';
 import { ConchitaKvSessionAuthenticator, ConchitaKvSessionRepository, type ConchitaKvNamespace } from './conchita-cloud-kv-session-store.js';
 import { ConchitaPersonalV0Gateway } from './conchita-personal-v0-gateway.js';
@@ -14,6 +14,7 @@ import { AureaPlatformIntegration } from './aurea-platform-integration.js';
 import { AureaSentinel } from './sentinel.js';
 import { HealthLedger } from './health-ledger.js';
 import { ContextRetrievalGate, type ContextProvider } from './context/context-retrieval-gate.js';
+import { DurableObjectProjectCheckpointStore } from './context/durable-context-store.js';
 import { createConchitaSessionRecord } from './conchita-cloud-session-store.js';
 import { conchitaExecutionTraceId } from './conchita-personal-v0-gateway.js';
 import type { ConchitaMode, ConchitaSession } from './conchita-personal-v0-contract.js';
