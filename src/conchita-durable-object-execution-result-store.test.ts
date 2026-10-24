@@ -96,6 +96,7 @@ describe('Project checkpoint persistence on existing Durable Object', () => {
   it('rejects secret-like content and oversized or unrecognized checkpoint fields', async () => {
     const store = createCheckpointStore(fakeSql());
     await expect(store.save(checkpoint('aurea', { summary: 'Bearer abcdefghijklmnop' }))).rejects.toThrow('PROJECT_CHECKPOINT_SECRET_LIKE_CONTENT_REJECTED');
+    await expect(store.save(checkpoint('aurea', { summary: 'sk-ant-api03-abcdefghijklmnop' }))).rejects.toThrow('PROJECT_CHECKPOINT_SECRET_LIKE_CONTENT_REJECTED');
     await expect(store.save(checkpoint('aurea', { extra: 'not allowed' } as unknown as Partial<ProjectCheckpoint>))).rejects.toThrow('PROJECT_CHECKPOINT_UNKNOWN_FIELD');
     await expect(store.save(checkpoint('aurea', { summary: 'x'.repeat(801) }))).rejects.toThrow('PROJECT_CHECKPOINT_INVALID_FIELD:summary');
   });
