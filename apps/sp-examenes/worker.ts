@@ -228,8 +228,8 @@ export default {
           lastStatus = response.status;
           lastDetail = String(data.error?.message || "Sin detalle devuelto por la API.").slice(0, 500);
           const transient = response.status === 408 || response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
-          // A 429 is provider-level rate limiting: skip sibling Gemini models and go to the configured cross-provider fallback.
-          if (!transient || response.status === 429 || attempt === models.length - 1) break;
+          // Provider overload/rate-limit/server errors are shared across sibling models; avoid another 12s wait and use configured cross-provider fallback.
+          if (!transient || attempt === models.length - 1 || response.status === 429 || response.status >= 500 || response.status === 408) break;
         } catch (error) {
           modelTimings.push({ model, elapsedMs: Date.now() - modelStartedAt, outcome: error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network_error" });
           lastStatus = 504;
