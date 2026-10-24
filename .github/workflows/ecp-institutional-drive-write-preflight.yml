@@ -99,16 +99,17 @@ jobs:
                   raise SystemExit(f"PREFLIGHT_BLOCKED: required folder capabilities absent for {label}")
 
               acl = permissions(file_id)
-              # Log ACL structure without printing permission IDs or unrelated email addresses.
+              # Log only policy-relevant, sanitized ACL attributes. Do not expose IDs,
+              # email addresses, domains, or inheritedFrom locators in workflow logs.
               summary = [{
-                  "type": p.get("type"),
-                  "principal_matches_service_account": p.get("type") == "user" and (p.get("emailAddress") or "").lower() == principal,
-                  "role": p.get("role"),
-                  "permissionDetails": p.get("permissionDetails", []),
+                  "type": p.get("type", "unknown"),
+                  "principal_matches_service_account": p.get("type") == "user" and (p.get("emailAddress") or "").strip().lower() == principal,
+                  "role": p.get("role", "unknown"),
+                  "inherited": any(detail.get("inherited") is True for detail in (p.get("permissionDetails") or [])),
+                  "permission_types": sorted({str(detail.get("permissionType", "unknown")) for detail in (p.get("permissionDetails") or [])}),
               } for p in acl]
-              print(json.dumps({"target": label, "folder_id": file_id, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
+              print(json.dumps({"target": label, "capabilities": caps, "acl_summary": summary}, ensure_ascii=False))
 
-              # The tested classifier's unexpected_writer decision remains fail-closed.
               decision = classify_folder_acl(acl, principal)
               print(json.dumps({
                   "target": label,
@@ -129,7 +130,6 @@ jobs:
               raise SystemExit("PREFLIGHT_BLOCKED: returned Drive ID mismatch for index")
           print(json.dumps({
               "protected_index": {
-                  "id": index.get("id"),
                   "name": index.get("name"),
                   "mimeType": index.get("mimeType"),
                   "canEdit": index.get("capabilities", {}).get("canEdit"),
