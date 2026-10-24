@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/ecp-institutional-drive-write-preflight.yml"
       - ".github/workflows/ecp-preflight-static-guard.yml"
+      - "scripts/ecp_drive_acl_policy.py"
+      - "scripts/test_ecp_drive_acl_policy.py"
       - "docs/audits/ECP_PILOT_BLOCKERS_2026-10-12.md"
   workflow_dispatch:
 
@@ -23,6 +25,12 @@ jobs:
         run: |
           set -euo pipefail
           ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0), aliases: true); puts "YAML_PARSE_PASS"' .github/workflows/ecp-institutional-drive-write-preflight.yml
+
+      - name: Test pure Drive ACL policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest scripts.test_ecp_drive_acl_policy -v
 
       - name: Assert conservative preflight invariants
         shell: bash
