@@ -37,12 +37,15 @@ jobs:
         run: |
           set -euo pipefail
           FILE=.github/workflows/ecp-institutional-drive-write-preflight.yml
+          POLICY=scripts/ecp_drive_acl_policy.py
           grep -Eq '^  workflow_dispatch:$' "$FILE"
           ! grep -Eq '^  (push|schedule|pull_request|pull_request_target):' "$FILE"
           grep -Fq 'INDICE_MAESTRO_v011.json' "$FILE"
           grep -Fq 'application/json' "$FILE"
           grep -Fq 'capabilities' "$FILE"
-          grep -Fq 'unexpected_writer' "$FILE"
+          grep -Fq 'classify_folder_acl' "$FILE"
           grep -Fq 'direct write grant' "$FILE"
+          grep -Fq 'drive.metadata.readonly' "$FILE"
           ! grep -Eiq 'drive\(\)\.files\(\)\.(create|update|delete)|drive\(\)\.permissions\(\)\.(create|update|delete)' "$FILE"
-          echo "STATIC_GUARD_PASS: manual-only trigger and required fail-closed guards present; no Drive write API call patterns found."
+          grep -Fq 'SERVICE_ACCOUNT_WRITE_ROLES' "$POLICY"
+          echo "STATIC_GUARD_PASS: manual-only trigger, tested ACL classifier, least-privilege OAuth scope, and no Drive write API call patterns."
