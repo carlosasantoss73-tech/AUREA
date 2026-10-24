@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ConchitaExecutionStateDurableObject, DurableObjectProjectCheckpointStore } from './conchita-durable-object-execution-result-store.js';
+import { ConchitaExecutionStateDurableObject } from './conchita-durable-object-execution-result-store.js';
+import { DurableObjectProjectCheckpointStore } from './context/durable-context-store.js';
 import { ConchitaProjectCheckpointRuntime, CONCHITA_PILOT_PROJECT_ID, type ConchitaCheckpointRuntimeHandler } from './conchita-project-checkpoint-runtime.js';
 import type { ConchitaSession } from './conchita-personal-v0-contract.js';
 
