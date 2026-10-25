@@ -33,6 +33,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Test Knowledge OS record precedence helper
+        run: python -m unittest scripts.test_knowledge_os_record_precedence -v
+
       - name: Preflight required GCP WIF configuration
         id: wif_gate
         env:
@@ -123,6 +126,7 @@ jobs:
           import os
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaIoBaseDownload
+          from scripts.knowledge_os_record_precedence import aggregate_records
 
           def download_text(drive, file_id):
               request = drive.files().get_media(fileId=file_id)
@@ -207,7 +211,7 @@ jobs:
           print("=== V011 VERSION-CHAIN SUMMARY ===")
           cursor_id = index_id
           seen_index_ids = set()
-          indexed_records = {}
+          chain_records = []
           chain_summary = []
           while cursor_id and cursor_id not in seen_index_ids:
               seen_index_ids.add(cursor_id)
@@ -237,31 +241,41 @@ jobs:
                       "declaredTotal": version_data.get("total_registros"),
                       "recordsInLists": local_count,
                   })
-                  for items in record_lists:
-                      for item in items:
-                          if isinstance(item, dict) and item.get("id"):
-                              indexed_records[item["id"]] = item
+                  chain_records.append({
+                      "file_id": cursor_id,
+                      "index_version": version_data.get("version_indice"),
+                      "records": [item for items in record_lists for item in items],
+                  })
                   previous = version_data.get("indice_anterior")
                   cursor_id = previous.get("fileId") if isinstance(previous, dict) else None
               else:
                   break
+          aggregation = aggregate_records(chain_records)
+          indexed_records = aggregation["records"]
           print("INDEX_CHAIN: " + json.dumps(chain_summary, ensure_ascii=False))
           print(f"INDEX_CHAIN_UNIQUE_RECORD_IDS: {len(indexed_records)}")
+          print("INDEX_CHAIN_RECORD_PRECEDENCE: NEWEST_VERSION_WINS; UNRESOLVED_DUPLICATES_FAIL_CLOSED")
+          print("INDEX_CHAIN_PRECEDENCE_CONFLICTS: " + json.dumps(aggregation["conflicts"], ensure_ascii=False))
           print("=== ECP / REUSABLE AGENT RECORD MATCHES ===")
-          matches = [
-              {k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "componente_reutilizable", "ubicacion")}
-              for item in indexed_records.values()
-              if "ECP" in str(item).upper()
-              or "CONTRATACION PUBLICA" in str(item).upper()
-              or item.get("id") in {"AKL-002", "AKL-031", "AKL-034", "AKL-035"}
-          ]
+          matches = []
+          for selected in indexed_records.values():
+              item = selected["record"]
+              if "ECP" in str(item).upper() or "CONTRATACION PUBLICA" in str(item).upper() or item.get("id") in {"AKL-002", "AKL-031", "AKL-034", "AKL-035"}:
+                  matches.append({
+                      **{k: item.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "componente_reutilizable", "ubicacion")},
+                      "probeSourceIndexFileId": selected["file_id"],
+                      "probeSourceIndexVersion": selected["index_version"],
+                  })
           print(json.dumps(matches, indent=2, ensure_ascii=False))
           print("VERSION_CHAIN_READ_ONLY: PASS")
           existing_akl_046 = indexed_records.get("AKL-046")
           print("AKL_046_INDEX_STATUS: " + ("PRESENT" if existing_akl_046 else "ABSENT_FROM_READ_INDEX_CHAIN"))
           if existing_akl_046:
+              record = existing_akl_046["record"]
               print("AKL_046_INDEX_RECORD: " + json.dumps({
-                  k: existing_akl_046.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "ubicacion")
+                  **{k: record.get(k) for k in ("id", "nombre", "proyecto", "estado", "categoria", "version", "ubicacion")},
+                  "probeSourceIndexFileId": existing_akl_046["file_id"],
+                  "probeSourceIndexVersion": existing_akl_046["index_version"],
               }, ensure_ascii=False))
 
           print("=== READ-ONLY WRITE-PERMISSION PREFLIGHT ===")

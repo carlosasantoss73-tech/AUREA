@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GoogleDriveInstitutionalReader } from "./google-drive-institutional-reader";
 
 const index = (fileId: string, previous?: string) => ({
@@ -176,4 +176,251 @@ describe("Google Drive institutional reader", () => {
       state: "VIGENTE",
     });
   });
+
+  it("reads versioned incremental record collections without hard-coding v011", async () => {
+    const current = {
+      estado_indice: "VIGENTE",
+      version_indice: "v013",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v012" },
+      registros_nuevos_v013: [{
+        id: "AKL-048", proyecto: "AUREA", nombre: "Registro incremental v013",
+        descripcion: "Prueba de lectura incremental versionada.", fuente: "KNOWLEDGE_OS",
+        estado: "VIGENTE", version: "v1",
+        ubicacion: { carpeta: "00_CONTROL", fileId: "source-v013" },
+      }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v012",
+      registros_nuevos_v012: [{
+        id: "AKL-047", proyecto: "AUREA", nombre: "Context Pack AUREA v3",
+        descripcion: "Context Pack en prueba.", fuente: "KNOWLEDGE_OS",
+        estado: "EN PRUEBA", version: "v3",
+        ubicacion: { carpeta: "00_CONTROL", fileId: "source-v012" },
+      }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current", accessToken: "test-token",
+      fetchImpl: makeFetch({ current, previous }),
+    });
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA", query: "", traceId: "trace-incremental-vnnn",
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "AKL-048", sourceId: "source-v013", state: "VIGENTE" });
+    expect(records.some((record) => record.id === "AKL-047")).toBe(false);
+  });
+
+  it("reads multiple versioned incremental collections and legacy records in one index", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      registros: [{
+        id: "legacy", proyecto: "AUREA", nombre: "Registro legado",
+        descripcion: "Registro de formato histórico.", fuente: "KNOWLEDGE_OS",
+        estado: "VIGENTE", version: "v1",
+      }],
+      registros_nuevos_v013: [{
+        id: "incremental-13", proyecto: "AUREA", nombre: "Registro incremental 13",
+        descripcion: "Registro v013.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1",
+      }],
+      registros_nuevos_v014: [{
+        id: "incremental-14", proyecto: "AUREA", nombre: "Registro incremental 14",
+        descripcion: "Registro v014.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1",
+      }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current }),
+    });
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA", query: "", traceId: "trace-incremental-multiple",
+    });
+    expect(records.map((record) => record.id).sort()).toEqual(["incremental-13", "incremental-14", "legacy"]);
+  });
+
+  it("prefers the newer index occurrence even when record states differ, without promoting its state", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v013",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v012" },
+      registros_nuevos_v013: [{ id: "AKL-TEST-STATE", proyecto: "AUREA", nombre: "Registro más nuevo",
+        descripcion: "Estado actual en prueba.", fuente: "KNOWLEDGE_OS", estado: "EN PRUEBA", version: "v2" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v012",
+      registros: [{ id: "AKL-TEST-STATE", proyecto: "AUREA", nombre: "Registro anterior",
+        descripcion: "Copia anterior vigente.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+      const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-state" });
+      expect(records.some((record) => record.id === "AKL-TEST-STATE")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      const diagnostic = String(warn.mock.calls[0][0]);
+      expect(diagnostic).toContain("BIBLIOTECARIO_RECORD_PRECEDENCE_CONFLICTS");
+      expect(diagnostic).toContain("RECORD_STATE_CONFLICT");
+      expect(diagnostic).toContain("AKL-TEST-STATE");
+      expect(diagnostic).toContain("EN PRUEBA");
+      expect(diagnostic).toContain("VIGENTE");
+    } finally { warn.mockRestore(); }
+  });
+
+  it("selects the occurrence from the highest index version for duplicate IDs", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v013" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-ORDER", proyecto: "AUREA", nombre: "Versión más reciente",
+        descripcion: "Debe prevalecer por versión del índice.", fuente: "KNOWLEDGE_OS", estado: "APROBADO", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v013",
+      registros_nuevos_v013: [{ id: "AKL-TEST-ORDER", proyecto: "AUREA", nombre: "Versión anterior",
+        descripcion: "Copia anterior.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v9" }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+    const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-order" });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "AKL-TEST-ORDER", title: "Versión más reciente", state: "APROBADO" });
+  });
+
+  it("excludes duplicate IDs and reports a conflict when index version metadata is insufficient", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-CONFLICT", proyecto: "AUREA", nombre: "Registro actual",
+        descripcion: "Versión actual.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO",
+      registros: [{ id: "AKL-TEST-CONFLICT", proyecto: "AUREA", nombre: "Registro anterior",
+        descripcion: "Versión anterior.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+      const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-no-version" });
+      expect(records.some((record) => record.id === "AKL-TEST-CONFLICT")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(String(warn.mock.calls[0][0])).toContain("BIBLIOTECARIO_RECORD_PRECEDENCE_CONFLICTS");
+      expect(String(warn.mock.calls[0][0])).toContain("INDEX_VERSION_MISSING");
+    } finally { warn.mockRestore(); }
+  });
+
+  it("excludes duplicate IDs and reports INDEX_CHAIN_ORDER_CONFLICT when v014 points to v015", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous-v015", version: "v015" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-CHAIN-ORDER", proyecto: "AUREA", nombre: "Registro v014",
+        descripcion: "No debe recuperarse desde una cadena inconsistente.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v015",
+      registros_nuevos_v015: [{ id: "AKL-TEST-CHAIN-ORDER", proyecto: "AUREA", nombre: "Registro v015",
+        descripcion: "La versión numéricamente superior no debe ganar.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v2" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, "previous-v015": previous }),
+      });
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "duplicate-chain-order-conflict",
+      });
+      expect(records.some((record) => record.id === "AKL-TEST-CHAIN-ORDER")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(String(warn.mock.calls[0][0])).toContain("INDEX_CHAIN_ORDER_CONFLICT");
+      expect(String(warn.mock.calls[0][0])).toContain("AKL-TEST-CHAIN-ORDER");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+
+  it.each([
+    ["array", ["VIGENTE"]],
+    ["object", { value: "VIGENTE" }],
+  ])("excludes a single record with malformed %s state without throwing", async (_kind, malformedState) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current",
+        accessToken: "test-token",
+        fetchImpl: makeFetch({
+          current: {
+            estado_indice: "VIGENTE",
+            version_indice: "v014",
+            registros_nuevos_v014: [{
+              id: "AKL-MALFORMED-STATE",
+              proyecto: "AUREA",
+              nombre: "Estado malformado",
+              descripcion: "No debe recuperarse.",
+              fuente: "KNOWLEDGE_OS",
+              estado: malformedState,
+              version: "v1",
+            }],
+          },
+        }),
+      });
+
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "malformed-state-single",
+      });
+      expect(records.some((record) => record.id === "AKL-MALFORMED-STATE")).toBe(false);
+      // A lone malformed record is excluded; conflict diagnostics are emitted
+      // when duplicate occurrences require precedence resolution.
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("keeps newest malformed-state occurrence for precedence and suppresses historical VIGENTE duplicate", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current",
+        accessToken: "test-token",
+        fetchImpl: makeFetch({
+          current: {
+            estado_indice: "VIGENTE",
+            version_indice: "v014",
+            indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v013" },
+            registros_nuevos_v014: [{
+              id: "AKL-MALFORMED-DUPLICATE",
+              proyecto: "AUREA",
+              nombre: "Registro más reciente",
+              descripcion: "El estado malformado debe suprimir la copia antigua.",
+              fuente: "KNOWLEDGE_OS",
+              estado: { value: "VIGENTE" },
+              version: "v2",
+            }],
+          },
+          previous: {
+            estado_indice: "REEMPLAZADO",
+            version_indice: "v013",
+            registros: [{
+              id: "AKL-MALFORMED-DUPLICATE",
+              proyecto: "AUREA",
+              nombre: "Copia histórica",
+              descripcion: "Esta copia antigua no debe reaparecer.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "VIGENTE",
+              version: "v1",
+            }],
+          },
+        }),
+      });
+
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "malformed-state-duplicate",
+      });
+      expect(records.some((record) => record.id === "AKL-MALFORMED-DUPLICATE")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      const diagnostic = String(warn.mock.calls[0][0]);
+      expect(diagnostic).toContain("RECORD_STATE_CONFLICT");
+      expect(diagnostic).toContain("MALFORMED_STATE:OBJECT");
+      expect(diagnostic).toContain("VIGENTE");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
 });
