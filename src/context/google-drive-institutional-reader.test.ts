@@ -176,4 +176,64 @@ describe("Google Drive institutional reader", () => {
       state: "VIGENTE",
     });
   });
+
+  it("reads versioned incremental record collections without hard-coding v011", async () => {
+    const current = {
+      estado_indice: "VIGENTE",
+      version_indice: "v013",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v012" },
+      registros_nuevos_v013: [{
+        id: "AKL-048", proyecto: "AUREA", nombre: "Registro incremental v013",
+        descripcion: "Prueba de lectura incremental versionada.", fuente: "KNOWLEDGE_OS",
+        estado: "VIGENTE", version: "v1",
+        ubicacion: { carpeta: "00_CONTROL", fileId: "source-v013" },
+      }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v012",
+      registros_nuevos_v012: [{
+        id: "AKL-047", proyecto: "AUREA", nombre: "Context Pack AUREA v3",
+        descripcion: "Context Pack en prueba.", fuente: "KNOWLEDGE_OS",
+        estado: "EN PRUEBA", version: "v3",
+        ubicacion: { carpeta: "00_CONTROL", fileId: "source-v012" },
+      }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current", accessToken: "test-token",
+      fetchImpl: makeFetch({ current, previous }),
+    });
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA", query: "", traceId: "trace-incremental-vnnn",
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "AKL-048", sourceId: "source-v013", state: "VIGENTE" });
+    expect(records.some((record) => record.id === "AKL-047")).toBe(false);
+  });
+
+  it("reads multiple versioned incremental collections and legacy records in one index", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      registros: [{
+        id: "legacy", proyecto: "AUREA", nombre: "Registro legado",
+        descripcion: "Registro de formato histórico.", fuente: "KNOWLEDGE_OS",
+        estado: "VIGENTE", version: "v1",
+      }],
+      registros_nuevos_v013: [{
+        id: "incremental-13", proyecto: "AUREA", nombre: "Registro incremental 13",
+        descripcion: "Registro v013.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1",
+      }],
+      registros_nuevos_v014: [{
+        id: "incremental-14", proyecto: "AUREA", nombre: "Registro incremental 14",
+        descripcion: "Registro v014.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1",
+      }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({
+      indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current }),
+    });
+    const records = await reader.readRecords("current", {
+      projectId: "AUREA", query: "", traceId: "trace-incremental-multiple",
+    });
+    expect(records.map((record) => record.id).sort()).toEqual(["incremental-13", "incremental-14", "legacy"]);
+  });
+
 });
