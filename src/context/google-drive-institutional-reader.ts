@@ -257,7 +257,7 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       const stateIsWellFormed = typeof stateValue === "string" && Boolean(stateValue.trim());
       const rawState = stateIsWellFormed
         ? stateValue
-        : `MALFORMED_STATE:${Array.isArray(stateValue) ? "ARRAY" : stateValue === null ? "NULL" : typeof stateValue === "object" ? "OBJECT" : typeof stateValue.toString === "function" ? typeof stateValue : "MISSING"}`;
+        : `MALFORMED_STATE:${stateValue === undefined ? "MISSING" : Array.isArray(stateValue) ? "ARRAY" : stateValue === null ? "NULL" : typeof stateValue === "object" ? "OBJECT" : typeof stateValue}`;
       // Keep non-retrievable states as identity candidates so a newer source
       // state (including malformed state) cannot expose an older VIGENTE copy.
       const retrievableState = stateIsWellFormed && (rawState === "VIGENTE" || rawState === "APROBADO");
