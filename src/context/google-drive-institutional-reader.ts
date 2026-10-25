@@ -82,7 +82,12 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
 
   async readRecords(indexFileId: string, input: { projectId: string; query: string; traceId: string }): Promise<InstitutionalRecord[]> {
     const candidates: Array<{ record: InstitutionalRecord; indexVersion?: number; indexFileId: string; rawState: string }> = [];
-    const conflicts: Array<{ id: string; reason: string; occurrences: Array<{ indexFileId: string; indexVersion?: number; state: string }> }> = [];
+    const conflicts: Array<{
+      id: string;
+      reason: string;
+      selectedIndexVersion?: number;
+      occurrences: Array<{ indexFileId: string; indexVersion?: number; state: string }>;
+    }> = [];
     const visited = new Set<string>();
     let cursor: string | undefined = indexFileId;
 
