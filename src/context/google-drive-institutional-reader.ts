@@ -147,6 +147,19 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
         continue;
       }
       const selected = newest[0];
+
+      // Preserve index precedence, but report differing source states for audit.
+      // This is diagnostic only: it must not promote or rewrite any state.
+      const observedStates = new Set(group.map((item) => item.rawState));
+      if (observedStates.size > 1) {
+        conflicts.push({
+          id,
+          reason: "RECORD_STATE_CONFLICT",
+          selectedIndexVersion: selected.indexVersion,
+          occurrences: group.map(({ indexFileId, indexVersion, rawState }) => ({ indexFileId, indexVersion, state: rawState })),
+        });
+      }
+
       // Resolve identity first, then apply retrieval eligibility. Never rewrite
       // the source state: a newer non-retrievable state suppresses older copies.
       if ((selected.rawState === "VIGENTE" || selected.rawState === "APROBADO") &&
