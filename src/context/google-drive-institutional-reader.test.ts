@@ -253,7 +253,13 @@ describe("Google Drive institutional reader", () => {
       const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
       const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-state" });
       expect(records.some((record) => record.id === "AKL-TEST-STATE")).toBe(false);
-      expect(warn).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledOnce();
+      const diagnostic = String(warn.mock.calls[0][0]);
+      expect(diagnostic).toContain("BIBLIOTECARIO_RECORD_PRECEDENCE_CONFLICTS");
+      expect(diagnostic).toContain("RECORD_STATE_CONFLICT");
+      expect(diagnostic).toContain("AKL-TEST-STATE");
+      expect(diagnostic).toContain("EN PRUEBA");
+      expect(diagnostic).toContain("VIGENTE");
     } finally { warn.mockRestore(); }
   });
 
