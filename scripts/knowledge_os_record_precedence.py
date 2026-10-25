@@ -73,13 +73,16 @@ def aggregate_records(chain_entries: list[dict[str, Any]]) -> dict[str, Any]:
 
         latest = max(candidates, key=lambda candidate: candidate["index_version"])
         selected[record_id] = latest
-        states = {candidate["record"].get("estado") for candidate in candidates}
+        # Source data is untrusted: state can be malformed (e.g. a list/dict).
+        # Normalize only for comparison/diagnostics so malformed metadata cannot
+        # crash the read-only probe; never alter the selected source record.
+        states = {repr(candidate["record"].get("estado")) for candidate in candidates}
         if len(states) > 1:
             conflicts.append({
                 "reason": "RECORD_STATE_CONFLICT",
                 "record_id": record_id,
                 "selected_index_version": latest["index_version"],
-                "observed_states": sorted(str(state) for state in states),
+                "observed_states": sorted(states),
             })
 
     return {"records": selected, "conflicts": conflicts}
