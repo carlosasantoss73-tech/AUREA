@@ -149,15 +149,22 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
   }
 
   private extractRecords(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }, required: boolean): InstitutionalRecord[] {
-    const rawRecords = Array.isArray(payload.registros_nuevos_v011)
-      ? payload.registros_nuevos_v011
-      : Array.isArray(payload.registros)
-        ? payload.registros
-        : undefined;
-    if (!rawRecords) {
+    // Incremental indexes may introduce any versioned collection
+    // (registros_nuevos_v001, registros_nuevos_v012, ...). Avoid hard-coding v011.
+    const incrementalKeys = Object.keys(payload)
+      .filter((key) => /^registros_nuevos_v\d{3}$/.test(key))
+      .sort();
+    const hasLegacyRecords = Array.isArray(payload.registros);
+    const hasIncrementalRecords = incrementalKeys.some((key) => Array.isArray(payload[key]));
+    if (!hasLegacyRecords && !hasIncrementalRecords) {
       if (!required) return [];
       throw new Error(`BIBLIOTECARIO_RECORDS_COLLECTION_MISSING:${indexFileId}`);
     }
+
+    const rawRecords: unknown[] = [
+      ...(hasLegacyRecords ? payload.registros as unknown[] : []),
+      ...incrementalKeys.flatMap((key) => Array.isArray(payload[key]) ? payload[key] as unknown[] : []),
+    ];
 
     return rawRecords.flatMap((raw, position) => {
       const item = asObject(raw, `records[${position}]`);
