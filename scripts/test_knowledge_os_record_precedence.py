@@ -66,6 +66,20 @@ class AggregateRecordsPrecedenceTests(unittest.TestCase):
             for conflict in result["conflicts"]
         ))
 
+    def test_malformed_unhashable_state_does_not_crash_precedence_probe(self):
+        result = aggregate_records([
+            entry("index-v11", 11, {"id": "AKL-003", "estado": {"unexpected": "object"}}),
+            entry("index-v10", 10, {"id": "AKL-003", "estado": ["VIGENTE"]}),
+        ])
+
+        self.assertEqual(result["records"]["AKL-003"]["index_version"], 11)
+        conflict = next(
+            item for item in result["conflicts"]
+            if item["reason"] == "RECORD_STATE_CONFLICT"
+        )
+        self.assertEqual(conflict["record_id"], "AKL-003")
+        self.assertEqual(len(conflict["observed_states"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
