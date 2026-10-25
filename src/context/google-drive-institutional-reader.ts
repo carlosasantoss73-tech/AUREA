@@ -250,10 +250,17 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
 
     return rawRecords.flatMap((raw, position) => {
       const item = asObject(raw, `records[${position}]`);
-      const rawState = asString(item.estado, `record[${position}].estado`);
+      // Malformed states must not abort identity/precedence resolution. Keep the
+      // occurrence if its ID/version and other required fields are readable, but
+      // make it non-retrievable and preserve a diagnostic representation.
+      const stateValue = item.estado;
+      const stateIsWellFormed = typeof stateValue === "string" && Boolean(stateValue.trim());
+      const rawState = stateIsWellFormed
+        ? stateValue
+        : `MALFORMED_STATE:${Array.isArray(stateValue) ? "ARRAY" : stateValue === null ? "NULL" : typeof stateValue === "object" ? "OBJECT" : typeof stateValue.toString === "function" ? typeof stateValue : "MISSING"}`;
       // Keep non-retrievable states as identity candidates so a newer source
-      // state (e.g. EN PRUEBA) cannot accidentally expose an older VIGENTE copy.
-      const retrievableState = rawState === "VIGENTE" || rawState === "APROBADO";
+      // state (including malformed state) cannot expose an older VIGENTE copy.
+      const retrievableState = stateIsWellFormed && (rawState === "VIGENTE" || rawState === "APROBADO");
       const state = (retrievableState ? rawState : "NO_VERIFICADO") as InstitutionalRecord["state"];
 
       const projectId = asString(item.proyecto, `record[${position}].proyecto`);
