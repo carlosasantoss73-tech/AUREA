@@ -298,4 +298,33 @@ describe("Google Drive institutional reader", () => {
     } finally { warn.mockRestore(); }
   });
 
+  it("excludes duplicate IDs and reports INDEX_CHAIN_ORDER_CONFLICT when v014 points to v015", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous-v015", version: "v015" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-CHAIN-ORDER", proyecto: "AUREA", nombre: "Registro v014",
+        descripcion: "No debe recuperarse desde una cadena inconsistente.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v015",
+      registros_nuevos_v015: [{ id: "AKL-TEST-CHAIN-ORDER", proyecto: "AUREA", nombre: "Registro v015",
+        descripcion: "La versión numéricamente superior no debe ganar.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v2" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, "previous-v015": previous }),
+      });
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "duplicate-chain-order-conflict",
+      });
+      expect(records.some((record) => record.id === "AKL-TEST-CHAIN-ORDER")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(String(warn.mock.calls[0][0])).toContain("INDEX_CHAIN_ORDER_CONFLICT");
+      expect(String(warn.mock.calls[0][0])).toContain("AKL-TEST-CHAIN-ORDER");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
 });
