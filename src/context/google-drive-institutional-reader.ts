@@ -81,7 +81,8 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
   }
 
   async readRecords(indexFileId: string, input: { projectId: string; query: string; traceId: string }): Promise<InstitutionalRecord[]> {
-    const records: InstitutionalRecord[] = [];
+    const candidates: Array<{ record: InstitutionalRecord; indexVersion?: number; indexFileId: string; rawState: string }> = [];
+    const conflicts: Array<{ id: string; reason: string; occurrences: Array<{ indexFileId: string; indexVersion?: number; state: string }> }> = [];
     const visited = new Set<string>();
     let cursor: string | undefined = indexFileId;
 
@@ -90,11 +91,57 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       if (visited.has(cursor)) throw new Error("BIBLIOTECARIO_INDEX_CHAIN_CYCLE");
       visited.add(cursor);
       const document = await this.loadIndexDocument(cursor, input.traceId);
-      records.push(...this.extractRecords(document.payload, cursor, input, depth === 0));
+      const indexVersion = this.tryIndexVersion(document.payload.version_indice);
+      candidates.push(...this.extractRecordCandidates(document.payload, cursor, input, depth === 0, indexVersion));
       cursor = this.previousIndexFileId(document.payload);
     }
 
-    return records.filter((record) => queryMatches(record, input.query));
+    const byId = new Map<string, typeof candidates>();
+    for (const candidate of candidates) {
+      const group = byId.get(candidate.record.id) ?? [];
+      group.push(candidate);
+      byId.set(candidate.record.id, group);
+    }
+
+    const resolved: InstitutionalRecord[] = [];
+    for (const [id, group] of byId) {
+      if (group.length === 1) {
+        const only = group[0];
+        if ((only.rawState === "VIGENTE" || only.rawState === "APROBADO") &&
+            (only.record.state === "VIGENTE" || only.record.state === "APROBADO")) resolved.push(only.record);
+        continue;
+      }
+
+      const versions = group.map((item) => item.indexVersion);
+      const allVersionsKnown = versions.every((version): version is number => version !== undefined);
+      const uniqueVersions = new Set(versions);
+      if (!allVersionsKnown || uniqueVersions.size !== versions.length) {
+        conflicts.push({
+          id,
+          reason: !allVersionsKnown ? "INDEX_VERSION_MISSING" : "INDEX_VERSION_TIE",
+          occurrences: group.map(({ indexFileId, indexVersion, rawState }) => ({ indexFileId, indexVersion, state: rawState })),
+        });
+        continue;
+      }
+
+      const newestVersion = Math.max(...versions);
+      const newest = group.filter((item) => item.indexVersion === newestVersion);
+      if (newest.length !== 1) {
+        conflicts.push({
+          id, reason: "INDEX_PRECEDENCE_UNRESOLVED",
+          occurrences: group.map(({ indexFileId, indexVersion, rawState }) => ({ indexFileId, indexVersion, state: rawState })),
+        });
+        continue;
+      }
+      const selected = newest[0];
+      // Resolve identity first, then apply retrieval eligibility. Never rewrite
+      // the source state: a newer non-retrievable state suppresses older copies.
+      if ((selected.rawState === "VIGENTE" || selected.rawState === "APROBADO") &&
+          (selected.record.state === "VIGENTE" || selected.record.state === "APROBADO")) resolved.push(selected.record);
+    }
+
+    if (conflicts.length) console.warn("BIBLIOTECARIO_RECORD_PRECEDENCE_CONFLICTS:" + JSON.stringify(conflicts));
+    return resolved.filter((record) => queryMatches(record, input.query));
   }
 
   private async loadIndexDocument(fileId: string, traceId: string): Promise<IndexDocument> {
@@ -148,7 +195,11 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return asOptionalString((previous as JsonObject).fileId);
   }
 
-  private extractRecords(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }, required: boolean): InstitutionalRecord[] {
+  private tryIndexVersion(value: unknown): number | undefined {
+    try { return asNumber(value, "version_indice"); } catch { return undefined; }
+  }
+
+  private extractRecordCandidates(payload: JsonObject, indexFileId: string, input: { projectId: string; query: string; traceId: string }, required: boolean, indexVersion?: number): Array<{ record: InstitutionalRecord; indexVersion?: number; indexFileId: string; rawState: string }> {
     // Incremental indexes may introduce any versioned collection
     // (registros_nuevos_v001, registros_nuevos_v012, ...). Avoid hard-coding v011.
     const incrementalKeys = Object.keys(payload)
@@ -169,11 +220,10 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
     return rawRecords.flatMap((raw, position) => {
       const item = asObject(raw, `records[${position}]`);
       const rawState = asString(item.estado, `record[${position}].estado`);
-      // The institutional source contains additional operational states (for
-      // example PROPUESTA and EN PRUEBA). They are real source values, but they
-      // are outside the retrieval contract and must never be promoted.
-      if (rawState !== "VIGENTE" && rawState !== "APROBADO") return [];
-      const state = rawState as InstitutionalRecord["state"];
+      // Keep non-retrievable states as identity candidates so a newer source
+      // state (e.g. EN PRUEBA) cannot accidentally expose an older VIGENTE copy.
+      const retrievableState = rawState === "VIGENTE" || rawState === "APROBADO";
+      const state = (retrievableState ? rawState : "NO_VERIFICADO") as InstitutionalRecord["state"];
 
       const projectId = asString(item.proyecto, `record[${position}].proyecto`);
       const title = asString(item.nombre, `record[${position}].nombre`);
@@ -185,11 +235,17 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
       const locationObject = location && typeof location === "object" && !Array.isArray(location) ? location as JsonObject : undefined;
       const sourceDocumentId = asOptionalString(locationObject?.fileId);
 
-      return {
-        id, projectId, title, text,
-        sourceId: sourceDocumentId ?? sourceId,
-        version, state, excerpt: text.slice(0, 500),
-      };
-    }).filter((record) => record.projectId === input.projectId && (record.state === "VIGENTE" || record.state === "APROBADO"));
+      if (projectId !== input.projectId) return [];
+      return [{
+        record: {
+          id, projectId, title, text,
+          sourceId: sourceDocumentId ?? sourceId,
+          version, state, excerpt: text.slice(0, 500),
+        },
+        indexVersion,
+        indexFileId,
+        rawState,
+      }];
+    });
   }
 }
