@@ -124,7 +124,20 @@ export class GoogleDriveInstitutionalReader implements InstitutionalAuthorityRea
         continue;
       }
 
-      const newestVersion = Math.max(...versions);
+      // The reader traverses the index chain from current to historical.
+      // Duplicate occurrences must therefore have strictly descending index
+      // versions in traversal order. A malformed chain must not be repaired by
+      // selecting the numeric maximum.
+      if (versions.some((version, index) => index > 0 && versions[index - 1]! <= version!)) {
+        conflicts.push({
+          id,
+          reason: "INDEX_CHAIN_ORDER_CONFLICT",
+          occurrences: group.map(({ indexFileId, indexVersion, rawState }) => ({ indexFileId, indexVersion, state: rawState })),
+        });
+        continue;
+      }
+
+      const newestVersion = versions[0]!;
       const newest = group.filter((item) => item.indexVersion === newestVersion);
       if (newest.length !== 1) {
         conflicts.push({
