@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GoogleDriveInstitutionalReader } from "./google-drive-institutional-reader";
 
 const index = (fileId: string, previous?: string) => ({
@@ -234,6 +234,68 @@ describe("Google Drive institutional reader", () => {
       projectId: "AUREA", query: "", traceId: "trace-incremental-multiple",
     });
     expect(records.map((record) => record.id).sort()).toEqual(["incremental-13", "incremental-14", "legacy"]);
+  });
+
+  it("prefers the newer index occurrence even when record states differ, without promoting its state", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v013",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v012" },
+      registros_nuevos_v013: [{ id: "AKL-TEST-STATE", proyecto: "AUREA", nombre: "Registro más nuevo",
+        descripcion: "Estado actual en prueba.", fuente: "KNOWLEDGE_OS", estado: "EN PRUEBA", version: "v2" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v012",
+      registros: [{ id: "AKL-TEST-STATE", proyecto: "AUREA", nombre: "Registro anterior",
+        descripcion: "Copia anterior vigente.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+      const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-state" });
+      expect(records.some((record) => record.id === "AKL-TEST-STATE")).toBe(false);
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+
+  it("selects the occurrence from the highest index version for duplicate IDs", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v013" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-ORDER", proyecto: "AUREA", nombre: "Versión más reciente",
+        descripcion: "Debe prevalecer por versión del índice.", fuente: "KNOWLEDGE_OS", estado: "APROBADO", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO", version_indice: "v013",
+      registros_nuevos_v013: [{ id: "AKL-TEST-ORDER", proyecto: "AUREA", nombre: "Versión anterior",
+        descripcion: "Copia anterior.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v9" }],
+    };
+    const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+    const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-order" });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ id: "AKL-TEST-ORDER", title: "Versión más reciente", state: "APROBADO" });
+  });
+
+  it("excludes duplicate IDs and reports a conflict when index version metadata is insufficient", async () => {
+    const current = {
+      estado_indice: "VIGENTE", version_indice: "v014",
+      indice_anterior: { estado: "REEMPLAZADO", fileId: "previous" },
+      registros_nuevos_v014: [{ id: "AKL-TEST-CONFLICT", proyecto: "AUREA", nombre: "Registro actual",
+        descripcion: "Versión actual.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const previous = {
+      estado_indice: "REEMPLAZADO",
+      registros: [{ id: "AKL-TEST-CONFLICT", proyecto: "AUREA", nombre: "Registro anterior",
+        descripcion: "Versión anterior.", fuente: "KNOWLEDGE_OS", estado: "VIGENTE", version: "v1" }],
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({ indexFileId: "current", accessToken: "test-token", fetchImpl: makeFetch({ current, previous }) });
+      const records = await reader.readRecords("current", { projectId: "AUREA", query: "", traceId: "duplicate-no-version" });
+      expect(records.some((record) => record.id === "AKL-TEST-CONFLICT")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(String(warn.mock.calls[0][0])).toContain("BIBLIOTECARIO_RECORD_PRECEDENCE_CONFLICTS");
+      expect(String(warn.mock.calls[0][0])).toContain("INDEX_VERSION_MISSING");
+    } finally { warn.mockRestore(); }
   });
 
 });
