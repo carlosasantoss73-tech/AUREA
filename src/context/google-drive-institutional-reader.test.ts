@@ -333,4 +333,93 @@ describe("Google Drive institutional reader", () => {
     }
   });
 
+
+  it.each([
+    ["array", ["VIGENTE"]],
+    ["object", { value: "VIGENTE" }],
+  ])("excludes a single record with malformed %s state without throwing", async (_kind, malformedState) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current",
+        accessToken: "test-token",
+        fetchImpl: makeFetch({
+          current: {
+            estado_indice: "VIGENTE",
+            version_indice: "v014",
+            registros_nuevos_v014: [{
+              id: "AKL-MALFORMED-STATE",
+              proyecto: "AUREA",
+              nombre: "Estado malformado",
+              descripcion: "No debe recuperarse.",
+              fuente: "KNOWLEDGE_OS",
+              estado: malformedState,
+              version: "v1",
+            }],
+          },
+        }),
+      });
+
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "malformed-state-single",
+      });
+      expect(records.some((record) => record.id === "AKL-MALFORMED-STATE")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(String(warn.mock.calls[0][0])).toContain("MALFORMED_STATE");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("keeps newest malformed-state occurrence for precedence and suppresses historical VIGENTE duplicate", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const reader = new GoogleDriveInstitutionalReader({
+        indexFileId: "current",
+        accessToken: "test-token",
+        fetchImpl: makeFetch({
+          current: {
+            estado_indice: "VIGENTE",
+            version_indice: "v014",
+            indice_anterior: { estado: "REEMPLAZADO", fileId: "previous", version: "v013" },
+            registros_nuevos_v014: [{
+              id: "AKL-MALFORMED-DUPLICATE",
+              proyecto: "AUREA",
+              nombre: "Registro más reciente",
+              descripcion: "El estado malformado debe suprimir la copia antigua.",
+              fuente: "KNOWLEDGE_OS",
+              estado: { value: "VIGENTE" },
+              version: "v2",
+            }],
+          },
+          previous: {
+            estado_indice: "REEMPLAZADO",
+            version_indice: "v013",
+            registros: [{
+              id: "AKL-MALFORMED-DUPLICATE",
+              proyecto: "AUREA",
+              nombre: "Copia histórica",
+              descripcion: "Esta copia antigua no debe reaparecer.",
+              fuente: "KNOWLEDGE_OS",
+              estado: "VIGENTE",
+              version: "v1",
+            }],
+          },
+        }),
+      });
+
+      const records = await reader.readRecords("current", {
+        projectId: "AUREA", query: "", traceId: "malformed-state-duplicate",
+      });
+      expect(records.some((record) => record.id === "AKL-MALFORMED-DUPLICATE")).toBe(false);
+      expect(warn).toHaveBeenCalledOnce();
+      const diagnostic = String(warn.mock.calls[0][0]);
+      expect(diagnostic).toContain("RECORD_STATE_CONFLICT");
+      expect(diagnostic).toContain("MALFORMED_STATE:OBJECT");
+      expect(diagnostic).toContain("VIGENTE");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
 });
