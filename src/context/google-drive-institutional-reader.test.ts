@@ -364,8 +364,9 @@ describe("Google Drive institutional reader", () => {
         projectId: "AUREA", query: "", traceId: "malformed-state-single",
       });
       expect(records.some((record) => record.id === "AKL-MALFORMED-STATE")).toBe(false);
-      expect(warn).toHaveBeenCalledOnce();
-      expect(String(warn.mock.calls[0][0])).toContain("MALFORMED_STATE");
+      // A lone malformed record is excluded; conflict diagnostics are emitted
+      // when duplicate occurrences require precedence resolution.
+      expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }
