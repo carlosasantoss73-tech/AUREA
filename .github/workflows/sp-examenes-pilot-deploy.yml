@@ -23,7 +23,6 @@ jobs:
       run:
         working-directory: apps/sp-examenes
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       SP_EXAMENES_OPENAI_MODEL: ${{ vars.SP_EXAMENES_OPENAI_MODEL }}
       AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
       AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
@@ -80,14 +79,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@4 secret put GEMINI_API_KEY --config wrangler.jsonc
-
-      - name: Set optional OpenAI runtime secret
-        if: ${{ env.OPENAI_API_KEY != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@4 secret put OPENAI_API_KEY --config wrangler.jsonc
 
       - name: Set optional OpenAI model
         if: ${{ env.SP_EXAMENES_OPENAI_MODEL != '' }}

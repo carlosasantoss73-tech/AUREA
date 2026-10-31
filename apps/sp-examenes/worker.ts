@@ -8,6 +8,7 @@ interface Env {
   SP_EXAMENES_MODEL?: string;
   OPENAI_API_KEY?: string;
   SP_EXAMENES_OPENAI_MODEL?: string;
+  SP_EXAMENES_ENABLE_OPENAI_FALLBACK?: string;
   AZURE_OPENAI_API_KEY?: string;
   AZURE_OPENAI_ENDPOINT?: string;
   AZURE_OPENAI_DEPLOYMENT?: string;
@@ -282,7 +283,8 @@ export default {
           image_url: { url: "data:" + mimeType + ";base64," + image, detail: "high" }
         });
         const alternateProviders: Array<{ name: string; url: string; key: string; body: Record<string, unknown>; headers?: Record<string, string> }> = [];
-        if (env.OPENAI_API_KEY) {
+        // OpenAI fallback is disabled unless explicitly enabled; stale/expired keys must not mask Gemini diagnostics.
+        if (env.OPENAI_API_KEY && env.SP_EXAMENES_ENABLE_OPENAI_FALLBACK === "true") {
           alternateProviders.push({
             name: "OpenAI",
             url: "https://api.openai.com/v1/chat/completions",
@@ -362,7 +364,17 @@ export default {
         const overload = lastStatus === 429 || lastStatus === 500 || lastStatus === 502 || lastStatus === 503 || lastStatus === 504;
         return Response.json({
           error: "Ningún proveedor de IA configurado pudo responder (" + lastStatus + "): " + lastDetail,
-          detail: lastDetail
+          detail: lastDetail,
+          provider: "Gemini",
+          modelAttempts: modelTimings.length,
+          modelTimings,
+          sourceStatus,
+          pdfStatus,
+          retrievalMs,
+          inferenceMs: Date.now() - inferenceStartedAt,
+          pdfSources: retrievedDocs.map(s => ({ title: s.title, url: s.url, checkedAt: official.checkedAt, type: "retrieved_pdf" })),
+          unavailablePdfs,
+          latencyMs: Date.now() - requestStartedAt
         }, { status: overload ? 503 : 502 });
       }
       return Response.json({
