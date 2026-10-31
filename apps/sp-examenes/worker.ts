@@ -140,7 +140,8 @@ export default {
     if (/procedimiento.*(inici|fecha)|fase preparatoria|fase precontractual|26 de junio de 2025|antes del 27 de junio de 2025|normativa anterior|r[eé]gimen anterior/i.test(qLower)) {
       selectedDocs.push({ title: "Resolución R.E-SERCOP-2025-0152 (26-jun-2025; régimen temporal para procedimientos en transición)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/06/R.E-SERCOP-2025-0152-signed-signed.pdf" });
     }
-    const pdfPartsPromise = Promise.all(selectedDocs.map(async doc => {
+    const docsToRetrieve = Array.from(new Map(selectedDocs.map(doc => [doc.url, doc])).values());
+    const pdfPartsPromise = Promise.all(docsToRetrieve.map(async doc => {
       try {
         const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(6000) });
         if (!pdfResponse.ok) return { doc, part: null as { inlineData: { mimeType: string; data: string } } | null, status: "http_error" as const };
