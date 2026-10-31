@@ -55,3 +55,15 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - Criterio de cierre: despliegue Cloudflare confirmado, comprobación `/health`, pregunta real respondida con evidencia oficial verificable, prueba de fotografía y verificación de fallo seguro cuando falte evidencia o configuración.
 - El workflow de despliegue debe validar `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` y `GEMINI_API_KEY`. No se almacena ninguna clave en el repositorio.
 - Este registro no certifica que el despliegue haya ocurrido; la evidencia debe provenir de la ejecución real del workflow y de la prueba del endpoint.
+
+
+## Registro de actualización normativa — 2026-10-30
+
+- Se sustituye el PDF del Reglamento de 2025 por el texto consolidado alojado por SERCOP en agosto de 2026. El encabezado del PDF indica estado reformado y última reforma 2026-07-30 (Decreto Ejecutivo 461).
+- Se conserva el PDF de la LOSNCP alojado por SERCOP, cuyo encabezado indica última reforma 2025-10-07.
+- Cada solicitud consulta también los índices oficiales de resoluciones externas y circulares 2026 para comprobar estados y localizar directrices.
+- La recuperación temática incorpora, cuando corresponde, las resoluciones R.E-SERCOP-2026-0006 (transición Portal/RUP), 0005 (integridad del proveedor), 0001 (potestad sancionadora), R.E-SERCOP-2025-0152 (alcance temporal específico para procedimientos en transición) y circulares 2026-0005-C, 0004-C, 0003-C, 0002-C y 0001-C.
+- El runtime no debe tratar la R.E-SERCOP-2023-0134 como vigente: el índice oficial la marca “No Vigente”. La R.E-SERCOP-2025-0154 aparece en el listado oficial de resoluciones derogadas. La R.E-SERCOP-2025-0152 aparece como vigente, pero solo debe aplicarse dentro de su supuesto temporal.
+- `sourceStatus` solo devuelve `complete` si todas las páginas oficiales seleccionadas y todos los PDF seleccionados se recuperaron correctamente; de lo contrario devuelve `partial`.
+- Esta actualización no constituye una base legal exhaustiva ni una certificación jurídica. El índice oficial es una guía de estado; para cada pregunta se debe leer la norma primaria y verificar reformas, transitorias, ámbito temporal y publicación en Registro Oficial.
+- Pendiente: CI en PR, prueba real POST contra el Worker desplegado, comparación de una pregunta con su norma exacta, prueba de fallo seguro y medición de latencia. No desplegar ni declarar el runtime actualizado antes de esas verificaciones.
