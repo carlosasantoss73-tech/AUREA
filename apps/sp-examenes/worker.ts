@@ -129,6 +129,13 @@ export default {
     if (/sanci[oó]n|potestad sancionadora|art[ií]culo 119|art[ií]culo 120|art[ií]culo 121/i.test(qLower)) {
       selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0001 (20-ene-2026; metodología sancionadora)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/1.-RESOLUCIO%CC%81N-R.E-SERCOP-2026-0001-METODOLOGI%CC%81A-CONTROL.pdf" });
     }
+    if (/f[aá]rmacos|bienes estrat[eé]gicos de salud|subasta inversa corporativa|comit[eé] interinstitucional/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0002 (20-ene-2026; comité de Subasta Inversa Corporativa de fármacos y bienes estratégicos de salud)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/2.-Resolucio%CC%81n-Nro.-R.E-SERCOP-2026-0002-Expide-Norma-Interna-de-Funcionamiento-del-Comite-Interinstitucional.pdf" });
+      selectedDocs.push({ title: "Anexo de la Resolución R.E-SERCOP-2026-0002 (norma interna del comité)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/2.1-Norma-Interna-de-Funcionamiento-de-la-Subasta-Inversa-Corporativa-de-fa%CC%81rmacos-y-biens-estregicos-en-salud-Anexo-Resolucio%CC%81n-R.E-SERCOP-2026-0002-1.pdf" });
+    }
+    if (/c[oó]digo de [eé]tica|[eé]tica institucional/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0003 (23-mar-2026; Código de Ética institucional)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/03/Resolucion-cod-etica-23-3-26-signed-signed-signed-signed-signed-signed-signed.pdf" });
+    }
     if (/planificaci[oó]n|pac|certificaci[oó]n presupuestaria|estudio de mercado|convenio de pago/i.test(qLower)) {
       selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0003-C (12-mar-2026; planificación y convenios de pago)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/03/SERCOP-SERCOP-2026-0003-C.pdf" });
     }
