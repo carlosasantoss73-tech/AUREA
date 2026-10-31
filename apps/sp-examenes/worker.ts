@@ -16,7 +16,9 @@ interface Env {
 
 const CORE_SOURCES = [
   { title: "SERCOP — LOSNCP", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/losncp" },
-  { title: "SERCOP — Reglamento", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/reglamento" }
+  { title: "SERCOP — Reglamento", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/reglamento" },
+  { title: "SERCOP — Resoluciones externas y estado de vigencia", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" },
+  { title: "SERCOP — Oficios circulares 2026 y estado de vigencia", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" }
 ] as const;
 
 // Best-effort pilot guard only: isolate memory can reset and is not a durable global quota.
@@ -103,11 +105,7 @@ export default {
 
     const requestStartedAt = Date.now();
     const liveSources: Array<{ title: string; url: string }> = [...CORE_SOURCES];
-    if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(question)) {
-      liveSources.push({ title: "SERCOP — Circulares 2026", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/OficiosCirculares2026" });
-    }
     if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28|feria inclusiva|subasta|cat[aá]logo/i.test(question)) {
-      liveSources.push({ title: "SERCOP — Resoluciones externas", url: "https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext" });
       liveSources.push({ title: "SERCOP — Decreto Ejecutivo 461 (reforma al Reglamento)", url: "https://portal.compraspublicas.gob.ec/sercop/normativa/n_r_decretos/https-portal-compraspublicas-gob-ec-sercop-wp-content-uploads-2026-07-decreto-ejecutivo-no-461-20260629212208-pdf" });
     }
     const retrievalStartedAt = Date.now();
@@ -115,16 +113,43 @@ export default {
     const qLower = question.toLowerCase();
     // Include both core legal texts for every question: many prompts require cross-checking the Law and its Regulation.
     const selectedDocs: Array<{ title: string; url: string }> = [
-      { title: "Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP; PDF oficial con reforma visible al 7-oct-2025; verificar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" },
-      { title: "Reglamento General de la LOSNCP (PDF oficial alojado por SERCOP; verificar reformas posteriores)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/Reglamento-LOSNCP-20251030.pdf" }
+      { title: "LOSNCP — texto consolidado alojado por SERCOP (última reforma indicada: 07-oct-2025)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf" },
+      { title: "Reglamento General de la LOSNCP — texto consolidado oficial SERCOP (reformado; última reforma indicada: 30-jul-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/REGLAMENTO-DE-LA-LEY-ORGANICA-SISTEMA-NACIONAL-CONTRATACION-PUBLICA.pdf" }
     ];
     if (/certificaci[oó]n|competencias|operador|perfil institucional|fases de certificaci[oó]n/i.test(qLower)) {
       selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0005-C (25-sep-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/09/SERCOP-SERCOP-2026-0005-C.pdf" });
+      selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0004-C (18-ago-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/SERCOP-SERCOP-2026-0004-C-1.pdf" });
     }
-    if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28/i.test(qLower)) {
-      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0006 (27-ago-2026)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/RESOLUCIO%CC%81N-Nro.-R.E-SERCOP-2026-0006.pdf" });
+    if (/portal|rup|registro [uú]nico de proveedores|transici[oó]n|resoluci[oó]n 0006|art[ií]culo 28|herramienta tecnol[oó]gica/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0006 (27-ago-2026; transición Portal y RUP)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/RESOLUCIO%CC%81N-Nro.-R.E-SERCOP-2026-0006.pdf" });
     }
-    const pdfPartsPromise = Promise.all(selectedDocs.map(async doc => {
+    if (/integridad|perfil de integridad|declaraci[oó]n juramentada|formulario.*proveedor/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0005 (07-ago-2026; integridad del proveedor)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/RESOLUCION-Nro.-R.E-SERCOP-2026-0005.pdf" });
+    }
+    if (/sanci[oó]n|potestad sancionadora|art[ií]culo 119|art[ií]culo 120|art[ií]culo 121/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0001 (20-ene-2026; metodología sancionadora)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/1.-RESOLUCIO%CC%81N-R.E-SERCOP-2026-0001-METODOLOGI%CC%81A-CONTROL.pdf" });
+    }
+    if (/f[aá]rmacos|bienes estrat[eé]gicos de salud|subasta inversa corporativa|comit[eé] interinstitucional/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0002 (20-ene-2026; comité de Subasta Inversa Corporativa de fármacos y bienes estratégicos de salud)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/2.-Resolucio%CC%81n-Nro.-R.E-SERCOP-2026-0002-Expide-Norma-Interna-de-Funcionamiento-del-Comite-Interinstitucional.pdf" });
+      selectedDocs.push({ title: "Anexo de la Resolución R.E-SERCOP-2026-0002 (norma interna del comité)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/01/2.1-Norma-Interna-de-Funcionamiento-de-la-Subasta-Inversa-Corporativa-de-fa%CC%81rmacos-y-biens-estregicos-en-salud-Anexo-Resolucio%CC%81n-R.E-SERCOP-2026-0002-1.pdf" });
+    }
+    if (/c[oó]digo de [eé]tica|[eé]tica institucional/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2026-0003 (23-mar-2026; Código de Ética institucional)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/03/Resolucion-cod-etica-23-3-26-signed-signed-signed-signed-signed-signed-signed.pdf" });
+    }
+    if (/planificaci[oó]n|pac|certificaci[oó]n presupuestaria|estudio de mercado|convenio de pago/i.test(qLower)) {
+      selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0003-C (12-mar-2026; planificación y convenios de pago)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/03/SERCOP-SERCOP-2026-0003-C.pdf" });
+    }
+    if (/r[eé]gimen especial|art[ií]culo 38|art\.? ?38|defensa nacional|seguridad ciudadana|fuerzas armadas|polic[ií]a nacional|rehabilitaci[oó]n social/i.test(qLower)) {
+      selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0001-C (02-mar-2026; control de régimen especial del art. 38 numeral 2 LOSNCP)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/09/3.-SERCOP-SERCOP-2026-0001-C-1.pdf" });
+    }
+    if (/cat[aá]logo electr[oó]nico|orden de compra|subasta inversa corporativa|f[aá]rmacos|bienes estrat[eé]gicos/i.test(qLower)) {
+      selectedDocs.push({ title: "Circular SERCOP-SERCOP-2026-0002-C (06-mar-2026; órdenes de compra de Catálogo Electrónico)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/03/SERCOP-SERCOP-2026-0002-C-1.pdf" });
+    }
+    if (/procedimiento.*(inici|fecha)|fase preparatoria|fase precontractual|26 de junio de 2025|antes del 27 de junio de 2025|normativa anterior|r[eé]gimen anterior/i.test(qLower)) {
+      selectedDocs.push({ title: "Resolución R.E-SERCOP-2025-0152 (26-jun-2025; régimen temporal para procedimientos en transición)", url: "https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/06/R.E-SERCOP-2025-0152-signed-signed.pdf" });
+    }
+    const docsToRetrieve = Array.from(new Map(selectedDocs.map(doc => [doc.url, doc] as const)).values());
+    const pdfPartsPromise = Promise.all(docsToRetrieve.map(async doc => {
       try {
         const pdfResponse = await fetch(doc.url, { signal: AbortSignal.timeout(6000) });
         if (!pdfResponse.ok) return { doc, part: null as { inlineData: { mimeType: string; data: string } } | null, status: "http_error" as const };
@@ -151,7 +176,7 @@ export default {
     })));
     const { retrievedDocs, unavailablePdfs, pdfStatus } = pdfSummary;
     const goodSources = official.results.filter(s => s.ok);
-    const sourceStatus = goodSources.length === official.results.length ? "complete" : "partial";
+    const sourceStatus = goodSources.length === official.results.length && pdfResults.every(result => result.part !== null) ? "complete" : "partial";
     const sourceContext = official.results.map(s =>
       "FUENTE: " + s.title + "\nURL: " + s.url + "\nCONSULTADA: " + s.checkedAt +
       "\nESTADO: " + (s.ok ? "consultada" : "no disponible") + "\nCONTENIDO EXTRAÍDO:\n" +
@@ -166,7 +191,9 @@ export default {
       "3A. BLOQUEO DE EVIDENCIA: si no encontraste en el contenido oficial una disposición que resuelva el supuesto específico, NO clasifiques el caso como subsanable/insubsanable ni des una respuesta probable. La primera línea debe ser exactamente: NO CONCLUYENTE — no pude verificar la disposición exacta en el contenido oficial consultado. Explica qué norma o dato falta y limita la conclusión a lo demostrado por las fuentes.\n" +
       "3B. No contradigas la sección Qué no se pudo verificar: si reconoces que no se encontró la regla específica, la respuesta propuesta no puede presentar una clasificación como conclusión y la confianza debe ser baja.\n" +
       "4. Nunca inventes artículos, numerales, fechas, resoluciones, reformas ni texto literal. No conviertas el título de una página en prueba del contenido de un PDF.\n" +
-      "5. Los PDF normativos adjuntos son versiones oficiales alojadas por SERCOP, pero algunos pueden estar desactualizados respecto de reformas posteriores; contrasta con las resoluciones/circulares y la fecha de la pregunta. No declares vigente una disposición solo porque aparezca en un PDF antiguo.\n" +
+      "5. El Reglamento base adjunto es el consolidado oficial alojado por SERCOP, cuyo propio encabezado indica última reforma 30-jul-2026. La LOSNCP alojada por SERCOP indica última reforma 07-oct-2025. Verifica siempre transitorias, reformas y fecha de inicio del procedimiento.\n" +
+      "5A. La página oficial del SERCOP lista la Resolución R.E-SERCOP-2023-0134 como NO VIGENTE; no la uses como normativa secundaria actual. La Resolución R.E-SERCOP-2025-0152 aparece VIGENTE y tiene un alcance temporal específico para procedimientos en transición; no la extiendas a otros casos. La Resolución R.E-SERCOP-2025-0154 aparece en el listado oficial de derogadas; no la cites como vigente.\n" +
+      "5B. Hay discrepancias entre los títulos resumidos en el índice de Oficios Circulares 2026 y el contenido de los PDFs: la Circular 0004-C (18-ago-2026) trata sobre certificación por competencias por fases, y la Circular 0001-C (02-mar-2026) trata sobre control de contrataciones de régimen especial del artículo 38 numeral 2 LOSNCP. Para determinar su alcance, prioriza el texto íntegro del PDF y no el título resumido del índice.\n" +
       "6. Cita título y URL oficial exactos; no fabriques enlaces. Incluye fecha/hora de consulta " + official.checkedAt + ".\n" +
       "7. Devuelve: Respuesta propuesta; Fundamento verificable; Fuentes oficiales; Qué no se pudo verificar; Confianza (alta/media/baja).\n" +
       "8. Si la imagen está borrosa o la pregunta/opciones están incompletas, pide una foto más clara o el texto.\n\n" +
