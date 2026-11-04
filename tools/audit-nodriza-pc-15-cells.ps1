@@ -50,7 +50,7 @@ foreach($j in $jobs){
 if(Test-Path (Join-Path $Repo ".git")){
   $branch=(& git -C $Repo branch --show-current).Trim()
   $head=(& git -C $Repo rev-parse HEAD).Trim()
-  $expected="feat/browser-use-runtime-integration-v1"
+  $expected="main"
   Cell "C04" "Repo/branch" ($(if($branch -eq $expected){"PASS"}else{"REVIEW"})) "branch=$branch; head=$head"
   Push-Location $Repo
   try {
@@ -93,10 +93,15 @@ try {
 } catch { Cell "C13" "Seguridad" "REVIEW" $_.Exception.Message }
 
 try {
-  $tests=@(Get-ChildItem (Join-Path $Repo "tests") -Recurse -File -EA SilentlyContinue|Where-Object{$_.Name -match "cell|work|recover|persist"})
+  $tests=@(Get-ChildItem $Repo -Recurse -File -EA SilentlyContinue |
+    Where-Object {
+      $_.FullName -notmatch '[\\/](node_modules|\.git|dist|build|coverage|vendor)[\\/]' -and
+      $_.Name -match '(?i)(persist|recover|checkpoint|durable|work.?cell).*(\.test\.|\.spec\.)|(^test_.*(persist|recover|checkpoint|durable|work.?cell))'
+    })
   $testCell=$results|Where-Object{$_.cell -eq "C07"}|Select-Object -First 1
   $status=$(if($testCell.status -eq "PASS" -and $tests.Count -gt 0){"PASS"}else{"REVIEW"})
-  Cell "C14" "Work Cells persistencia/recovery" $status ("Tests relacionados encontrados="+$tests.Count+"; evidencia de ejecución completa="+$testCell.status)
+  $sample=($tests | Select-Object -First 5 | ForEach-Object { $_.Name }) -join ", "
+  Cell "C14" "Work Cells persistencia/recovery" $status ("Tests relacionados encontrados="+$tests.Count+"; muestra="+$sample+"; suite completa="+$testCell.status)
 } catch { Cell "C14" "Work Cells persistencia/recovery" "REVIEW" $_.Exception.Message }
 
 $runnerDir=Test-Path "C:\actions-runner"
