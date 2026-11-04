@@ -38,14 +38,20 @@ $jobs=@(
   JobCheck "C11" "Gemini auditor" 'if(Get-Command gemini -EA SilentlyContinue){"PASS|"+((& gemini --version) -join " ")}else{"REVIEW|Gemini CLI no instalado (opcional)"}'
 )
 Wait-Job $jobs | Out-Null
+$nodeResult=$null
+$npmResult=$null
 foreach($j in $jobs){
   $line=Receive-Job $j | Select-Object -Last 1
   Remove-Job $j -Force
   $p=$line -split "\|",4
-  if($p[0] -eq "C03A"){ Cell "C03" "Node/npm" $p[2] ("Node="+$p[3]) }
-  elseif($p[0] -eq "C03B"){ Cell "C03NPM" "npm" $p[2] $p[3] }
+  if($p[0] -eq "C03A"){ $nodeResult=$p }
+  elseif($p[0] -eq "C03B"){ $npmResult=$p }
   else { Cell $p[0] $p[1] $p[2] $p[3] }
 }
+$nodeStatus=if($nodeResult){$nodeResult[2]}else{"REVIEW"}
+$npmStatus=if($npmResult){$npmResult[2]}else{"REVIEW"}
+$runtimeStatus=if($nodeStatus -eq "PASS" -and $npmStatus -eq "PASS"){"PASS"}elseif($nodeStatus -eq "BLOCKED" -or $npmStatus -eq "BLOCKED"){"BLOCKED"}else{"REVIEW"}
+Cell "C03" "Node/npm" $runtimeStatus ("Node="+$(if($nodeResult){$nodeResult[3]}else{"sin resultado"})+"; npm="+$(if($npmResult){$npmResult[3]}else{"sin resultado"}))
 
 if(Test-Path (Join-Path $Repo ".git")){
   $branch=(& git -C $Repo branch --show-current).Trim()
@@ -99,9 +105,9 @@ try {
       $_.Name -match '(?i)(persist|recover|checkpoint|durable|work.?cell).*(\.test\.|\.spec\.)|(^test_.*(persist|recover|checkpoint|durable|work.?cell))'
     })
   $testCell=$results|Where-Object{$_.cell -eq "C07"}|Select-Object -First 1
-  $status=$(if($testCell.status -eq "PASS" -and $tests.Count -gt 0){"PASS"}else{"REVIEW"})
   $sample=($tests | Select-Object -First 5 | ForEach-Object { $_.Name }) -join ", "
-  Cell "C14" "Work Cells persistencia/recovery" $status ("Tests relacionados encontrados="+$tests.Count+"; muestra="+$sample+"; suite completa="+$testCell.status)
+  # File discovery is inventory evidence only; it cannot prove persistence or restart recovery.
+  Cell "C14" "Work Cells persistencia/recovery" "REVIEW" ("Inventario solamente: pruebas relacionadas encontradas="+$tests.Count+"; muestra="+$sample+"; suite completa="+$testCell.status+"; validación real de reinicio/recuperación pendiente.")
 } catch { Cell "C14" "Work Cells persistencia/recovery" "REVIEW" $_.Exception.Message }
 
 $runnerDir=Test-Path "C:\actions-runner"
