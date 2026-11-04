@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          ref: feat/browser-use-runtime-integration-v1
+          ref: ${{ github.sha }}
 
       - name: Node baseline
         shell: pwsh
