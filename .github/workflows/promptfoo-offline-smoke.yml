@@ -1,0 +1,30 @@
+name: Promptfoo Offline Smoke Test
+
+on:
+  push:
+    branches:
+      - experiment/promptfoo-offline-eval
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promptfoo-offline-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  promptfoo-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run synthetic offline evaluation
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+        run: npx --yes promptfoo@latest eval -c .github/promptfoo/offline-smoke.yaml
