@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
   [string]$Repo = "$env:USERPROFILE\AUREA",
-  [string]$Report = ""
+  [string]$Report = "",
+  [switch]$RunExternalMcpSmoke
 )
 $ErrorActionPreference = "Continue"
 if ([string]::IsNullOrWhiteSpace($Report)) { $Report = Join-Path $Repo "migration-audit-15-cells.json" }
