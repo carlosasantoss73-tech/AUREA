@@ -1,6 +1,6 @@
 # AUREA — AUDITORÍA Y PLAN DE MIGRACIÓN NODRIZA → PC
 Fecha: 2026-09-26
-Rama: feat/browser-use-runtime-integration-v1
+Rama de ejecución prevista: main
 
 ## RESULTADO
 La migración debe hacerse como **reproducción controlada del runtime**, no como reconstrucción. La PC será inicialmente un nodo de ejecución de AUREA; el Bibliotecario/Knowledge OS seguirá siendo la autoridad institucional.
@@ -28,20 +28,29 @@ Migración en 4 fases:
 | Célula | Objetivo | PASS |
 |---|---|---|
 | C01 | Inventario PC | Hardware/SO/shell registrados |
-| C02 | Git | versión + identidad + acceso repo |
+| C02 | Git | versión + acceso remoto de solo lectura al repo |
 | C03 | Node/npm | Node >=20 y npm operativos |
 | C04 | Repo | clone/checkout reproducible |
 | C05 | Dependencias | npm install sin corrupción |
 | C06 | TypeScript | typecheck PASS |
 | C07 | Tests | suite PASS |
 | C08 | Python | Python 3.11/3.12 disponible para runtimes |
-| C09 | MCP | Playwright MCP smoke local |
+| C09 | MCP | Playwright MCP smoke externo, solo con autorización explícita |
 | C10 | Providers | credenciales separadas; nunca en repo |
 | C11 | Gemini auditor | CLI instalado opcionalmente y revisión independiente |
-| C12 | OpenAI auditor | revisión del estado local sin autoridad institucional |
+| C12 | OpenAI config | presencia de configuración; no equivale a ejecutar un auditor |
 | C13 | Seguridad | .env/.secrets excluidos y permisos revisados |
 | C14 | Persistencia | Work Cell/recovery local probado |
 | C15 | Nodo Nodriza | checklist final y decisión sobre self-hosted runner |
+
+## EJECUCIÓN SEGURA DE C09 Y ALCANCE DE C12
+
+- C09 queda en REVIEW y no ejecuta navegación por defecto.
+- Para ejecutarla se debe invocar deliberadamente el script con `-RunExternalMcpSmoke`. Esa opción descarga/ejecuta `@playwright/mcp@latest` mediante npx y navega a un sitio externo de demostración.
+- No debe activarse en una auditoría rutinaria ni en una red restringida. La versión `@latest` no está fijada; antes de usar C09 como prueba reproducible debe fijarse una versión aprobada.
+- C12 solo informa si existe una variable local `OPENAI_API_KEY`; nunca imprime su valor y no prueba conectividad ni capacidad de auditoría.
+- C02 distingue la versión de Git de la verificación de acceso remoto. Si la red no permite consultar GitHub, debe quedar REVIEW, no PASS.
+- C08 valida Python 3.11 o superior; una versión ausente o inferior queda REVIEW.
 
 ## ORDEN EFICAZ
 C01–C03 → C04–C08 → C09–C14 → C15.

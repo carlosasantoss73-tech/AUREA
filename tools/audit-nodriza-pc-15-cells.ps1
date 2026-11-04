@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
   [string]$Repo = "$env:USERPROFILE\AUREA",
-  [string]$Report = ""
+  [string]$Report = "",
+  [switch]$RunExternalMcpSmoke
 )
 $ErrorActionPreference = "Continue"
 if ([string]::IsNullOrWhiteSpace($Report)) { $Report = Join-Path $Repo "migration-audit-15-cells.json" }
@@ -31,26 +32,32 @@ try {
 
 # C02/C03/C08/C11 are independent and execute concurrently.
 $jobs=@(
-  JobCheck "C02" "Git" 'if(Get-Command git -EA SilentlyContinue){"PASS|"+((& git --version) -join " ")}else{"BLOCKED|git no encontrado"}',
+  JobCheck "C02" "Git/acceso remoto" 'if(Get-Command git -EA SilentlyContinue){$v=((& git --version) -join " ");$remote=& git ls-remote https://github.com/carlosasantoss73-tech/AUREA.git HEAD 2>$null;if($LASTEXITCODE -eq 0 -and $remote){"PASS|"+$v+"; acceso remoto de solo lectura verificado"}else{"REVIEW|"+$v+"; Git instalado, acceso remoto no verificado"}}else{"BLOCKED|git no encontrado"}',
   JobCheck "C03A" "Node" 'if(Get-Command node -EA SilentlyContinue){$s=((& node --version) -join " ");$m=[int](($s-replace "^v","").Split(".")[0]);if($m-ge 20){"PASS|"+$s}else{"BLOCKED|Node 20+ requerido: "+$s}}else{"BLOCKED|node no encontrado"}',
   JobCheck "C03B" "npm" 'if(Get-Command npm -EA SilentlyContinue){"PASS|"+((& npm --version) -join " ")}else{"BLOCKED|npm no encontrado"}',
-  JobCheck "C08" "Python" 'if(Get-Command python -EA SilentlyContinue){"PASS|"+((& python --version) -join " ")}else{"REVIEW|python no encontrado"}',
+  JobCheck "C08" "Python" 'if(Get-Command python -EA SilentlyContinue){$v=((& python --version) -join " ");$m=[regex]::Match($v,"(\d+)\.(\d+)");if($m.Success -and ([int]$m.Groups[1].Value -gt 3 -or ([int]$m.Groups[1].Value -eq 3 -and [int]$m.Groups[2].Value -ge 11))){"PASS|"+$v}else{"REVIEW|Python 3.11+ recomendado/requerido por runtimes: "+$v}}else{"REVIEW|python no encontrado"}',
   JobCheck "C11" "Gemini auditor" 'if(Get-Command gemini -EA SilentlyContinue){"PASS|"+((& gemini --version) -join " ")}else{"REVIEW|Gemini CLI no instalado (opcional)"}'
 )
 Wait-Job $jobs | Out-Null
+$nodeResult=$null
+$npmResult=$null
 foreach($j in $jobs){
   $line=Receive-Job $j | Select-Object -Last 1
   Remove-Job $j -Force
   $p=$line -split "\|",4
-  if($p[0] -eq "C03A"){ Cell "C03" "Node/npm" $p[2] ("Node="+$p[3]) }
-  elseif($p[0] -eq "C03B"){ Cell "C03NPM" "npm" $p[2] $p[3] }
+  if($p[0] -eq "C03A"){ $nodeResult=$p }
+  elseif($p[0] -eq "C03B"){ $npmResult=$p }
   else { Cell $p[0] $p[1] $p[2] $p[3] }
 }
+$nodeStatus=if($nodeResult){$nodeResult[2]}else{"REVIEW"}
+$npmStatus=if($npmResult){$npmResult[2]}else{"REVIEW"}
+$runtimeStatus=if($nodeStatus -eq "PASS" -and $npmStatus -eq "PASS"){"PASS"}elseif($nodeStatus -eq "BLOCKED" -or $npmStatus -eq "BLOCKED"){"BLOCKED"}else{"REVIEW"}
+Cell "C03" "Node/npm" $runtimeStatus ("Node="+$(if($nodeResult){$nodeResult[3]}else{"sin resultado"})+"; npm="+$(if($npmResult){$npmResult[3]}else{"sin resultado"}))
 
 if(Test-Path (Join-Path $Repo ".git")){
   $branch=(& git -C $Repo branch --show-current).Trim()
   $head=(& git -C $Repo rev-parse HEAD).Trim()
-  $expected="feat/browser-use-runtime-integration-v1"
+  $expected="main"
   Cell "C04" "Repo/branch" ($(if($branch -eq $expected){"PASS"}else{"REVIEW"})) "branch=$branch; head=$head"
   Push-Location $Repo
   try {
@@ -67,23 +74,28 @@ if(Test-Path (Join-Path $Repo ".git")){
   foreach($c in @("C04","C05","C06","C07")){Cell $c "Repositorio" "BLOCKED" "Repo no encontrado: $Repo"}
 }
 
-try {
-  $py=Get-Command python -EA SilentlyContinue
-  $script=Join-Path $Repo "apps/tool_expert_factory/functional_runtime_mcp.py"
-  if($py -and (Test-Path $script)){
-    Push-Location $Repo
-    $r=& python $script 2>&1; $code=$LASTEXITCODE
-    Pop-Location
-    Cell "C09" "MCP/browser" ($(if($code -eq 0){"PASS"}else{"REVIEW"})) (($r|Select-Object -Last 8)-join " | ")
-  } else { Cell "C09" "MCP/browser" "REVIEW" "Smoke test no ejecutable." }
-} catch { Cell "C09" "MCP/browser" "REVIEW" $_.Exception.Message }
+if($RunExternalMcpSmoke){
+  try {
+    $py=Get-Command python -EA SilentlyContinue
+    $script=Join-Path $Repo "apps/tool_expert_factory/functional_runtime_mcp.py"
+    if($py -and (Test-Path $script)){
+      Write-Host "[C09] Ejecutando smoke MCP externo solicitado explícitamente; usa npx y navegador web."
+      Push-Location $Repo
+      try { $r=& python $script 2>&1; $code=$LASTEXITCODE }
+      finally { Pop-Location }
+      Cell "C09" "MCP/browser externo" ($(if($code -eq 0){"PASS"}else{"REVIEW"})) (($r|Select-Object -Last 8)-join " | ")
+    } else { Cell "C09" "MCP/browser externo" "REVIEW" "Python o script de smoke no disponible." }
+  } catch { Cell "C09" "MCP/browser externo" "REVIEW" $_.Exception.Message }
+} else {
+  Cell "C09" "MCP/browser externo" "REVIEW" "NO EJECUTADO: requiere -RunExternalMcpSmoke explícito; descarga npx @latest y navega a un sitio externo."
+}
 
 $providerVars=@("OPENAI_API_KEY","GEMINI_API_KEY","GOOGLE_API_KEY","ANTHROPIC_API_KEY")
 $present=@($providerVars|Where-Object{-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))})
 Cell "C10" "Providers" ($(if($present.Count -gt 0){"PASS"}else{"REVIEW"})) ("Configuraciones locales presentes="+$present.Count+"; valores nunca se imprimen.")
 
 $openai=[Environment]::GetEnvironmentVariable("OPENAI_API_KEY")
-Cell "C12" "OpenAI auditor" ($(if($openai){"PASS"}else{"REVIEW"})) "La ausencia de OPENAI_API_KEY no bloquea conectores externos; no se transmite ni muestra ninguna clave."
+Cell "C12" "OpenAI config disponible" ($(if($openai){"PASS"}else{"REVIEW"})) "Solo verifica presencia de OPENAI_API_KEY; NO ejecuta ni valida un auditor OpenAI. El valor nunca se transmite ni muestra."
 
 try {
   $gitignore=Test-Path (Join-Path $Repo ".gitignore")
@@ -93,10 +105,15 @@ try {
 } catch { Cell "C13" "Seguridad" "REVIEW" $_.Exception.Message }
 
 try {
-  $tests=@(Get-ChildItem (Join-Path $Repo "tests") -Recurse -File -EA SilentlyContinue|Where-Object{$_.Name -match "cell|work|recover|persist"})
+  $tests=@(Get-ChildItem $Repo -Recurse -File -EA SilentlyContinue |
+    Where-Object {
+      $_.FullName -notmatch '[\\/](node_modules|\.git|dist|build|coverage|vendor)[\\/]' -and
+      $_.Name -match '(?i)(persist|recover|checkpoint|durable|work.?cell).*(\.test\.|\.spec\.)|(^test_.*(persist|recover|checkpoint|durable|work.?cell))'
+    })
   $testCell=$results|Where-Object{$_.cell -eq "C07"}|Select-Object -First 1
-  $status=$(if($testCell.status -eq "PASS" -and $tests.Count -gt 0){"PASS"}else{"REVIEW"})
-  Cell "C14" "Work Cells persistencia/recovery" $status ("Tests relacionados encontrados="+$tests.Count+"; evidencia de ejecución completa="+$testCell.status)
+  $sample=($tests | Select-Object -First 5 | ForEach-Object { $_.Name }) -join ", "
+  # File discovery is inventory evidence only; it cannot prove persistence or restart recovery.
+  Cell "C14" "Work Cells persistencia/recovery" "REVIEW" ("Inventario solamente: pruebas relacionadas encontradas="+$tests.Count+"; muestra="+$sample+"; suite completa="+$testCell.status+"; validación real de reinicio/recuperación pendiente.")
 } catch { Cell "C14" "Work Cells persistencia/recovery" "REVIEW" $_.Exception.Message }
 
 $runnerDir=Test-Path "C:\actions-runner"

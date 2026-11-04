@@ -9,7 +9,7 @@
 param(
   [string]$RepoUrl = "https://github.com/carlosasantoss73-tech/AUREA.git",
   [string]$Target = "$env:USERPROFILE\AUREA",
-  [string]$Branch = "feat/browser-use-runtime-integration-v1"
+  [string]$Branch = "main"
 )
 
 $ErrorActionPreference = "Stop"
