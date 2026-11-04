@@ -35,3 +35,24 @@ C1-C7 are not declared complete by this document. The repository currently prove
 
 ## Reusable learning
 The fastest safe path is to prepare every non-dependent prerequisite before requesting external credentials or deployment access. A blocked infrastructure cell must not block local tests, contracts, documentation, or independent QA preparation.
+
+
+## Compact project checkpoint — 2026-10-24
+
+### Reused destination (configuration evidence only)
+
+The existing `CONCHITA_EXECUTION_STATE` binding in `wrangler.jsonc` targets the existing `ConchitaExecutionStateDurableObject`, whose SQLite storage already persists execution results and reservations. The checkpoint adapter reuses that same binding and class; it creates no database, public endpoint, or second Knowledge Store.
+
+### Checkpoint contract
+
+- One compact allow-listed checkpoint per `projectId`, maximum 8 KiB.
+- Fields: schema version, project ID, timestamp, short summary, completed items, blockers, next action, and evidence references.
+- Caller must pass an explicit project allow-list; a project-key mismatch, unknown field, oversized payload, secret-like content, or unavailable Durable Object fails closed.
+- No source documents or institutional knowledge are copied. Knowledge OS remains authoritative.
+- Checkpoint operations are internal Durable Object binding operations; this change adds no public HTTP route and does not alter Worker secrets or permissions.
+
+### Evidence boundary
+
+- Focused tests simulate saving, recreating the Durable Object instance while retaining the same persistent-storage object, then recovering the identical checkpoint; they also cover project isolation and failure-safe behavior.
+- This is a local/CI persistence simulation, **not** proof of a live Cloudflare restart/recovery.
+- Live validation remains pending until an authorized operator verifies the existing Worker deployment and runs a controlled save → Worker/object restart or recreation → load check using a non-sensitive test checkpoint. Do not deploy or change Cloudflare configuration merely to mark this gate green.

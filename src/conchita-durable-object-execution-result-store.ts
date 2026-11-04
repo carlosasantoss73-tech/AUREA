@@ -1,3 +1,4 @@
+import { normalizeProjectCheckpoint, type ProjectCheckpoint } from './context/durable-context-store.js';
 import type { ExecutionResultStore, ExecutionResultStoreState, ExecutionReservationStatus } from './execution-result-store.js';
 import type { ExecutionRuntimeResult } from './execution-runtime.js';
 
@@ -51,6 +52,7 @@ export class ConchitaExecutionStateDurableObject {
   constructor(private readonly state: ConchitaExecutionDurableObjectState) {
     this.state.storage.sql.exec('CREATE TABLE IF NOT EXISTS execution_results (trace_id TEXT PRIMARY KEY, result_json TEXT NOT NULL)');
     this.state.storage.sql.exec('CREATE TABLE IF NOT EXISTS execution_reservations (trace_id TEXT PRIMARY KEY)');
+    this.state.storage.sql.exec('CREATE TABLE IF NOT EXISTS project_checkpoints (project_id TEXT PRIMARY KEY, checkpoint_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
   }
 
   private snapshot(): ExecutionResultStoreState {
@@ -62,9 +64,24 @@ export class ConchitaExecutionStateDurableObject {
   async fetch(request: Request): Promise<Response> {
     if (request.method !== 'POST') return response({ status: 'BLOCKED', error: 'METHOD_NOT_ALLOWED' }, 405);
     try {
-      const body = await request.json() as { operation?: string; traceId?: string; result?: ExecutionRuntimeResult };
+      const body = await request.json() as { operation?: string; traceId?: string; result?: ExecutionRuntimeResult; projectId?: string; checkpoint?: ProjectCheckpoint };
       const sql = this.state.storage.sql;
       switch (body.operation) {
+        case 'loadCheckpoint': {
+          if (!body.projectId || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(body.projectId)) return response({ status: 'BLOCKED', error: 'PROJECT_CHECKPOINT_PROJECT_ID_REQUIRED' }, 400);
+          const rows = sql.exec('SELECT checkpoint_json FROM project_checkpoints WHERE project_id = ?', body.projectId).toArray<{ checkpoint_json: string }>();
+          if (!rows.length) return response({ status: 'OK', checkpoint: null });
+          const checkpoint = normalizeProjectCheckpoint(JSON.parse(rows[0].checkpoint_json), body.projectId);
+          return response({ status: 'OK', checkpoint });
+        }
+        case 'saveCheckpoint': {
+          if (!body.projectId || !body.checkpoint) return response({ status: 'BLOCKED', error: 'PROJECT_CHECKPOINT_REQUIRED' }, 400);
+          let checkpoint: ProjectCheckpoint;
+          try { checkpoint = normalizeProjectCheckpoint(body.checkpoint, body.projectId); }
+          catch (error) { return response({ status: 'BLOCKED', error: error instanceof Error ? error.message : 'PROJECT_CHECKPOINT_INVALID' }, 400); }
+          sql.exec('INSERT OR REPLACE INTO project_checkpoints (project_id, checkpoint_json, updated_at) VALUES (?, ?, ?)', checkpoint.projectId, JSON.stringify(checkpoint), checkpoint.updatedAt);
+          return response({ status: 'OK' });
+        }
         case 'loadState': return response({ status: 'OK', state: this.snapshot() });
         case 'reserve': {
           if (!body.traceId) return response({ status: 'BLOCKED', error: 'TRACE_ID_REQUIRED' }, 400);
