@@ -14,14 +14,14 @@ env:
 jobs:
   gcp-access-gate:
     runs-on: ubuntu-latest
+    env:
+      WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER || secrets.AUREA_GCP_WIF_PROVIDER }}
+      SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT || secrets.AUREA_GCP_SERVICE_ACCOUNT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Report configured GCP federation inputs
-        env:
-          WIF_PROVIDER: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
-          SERVICE_ACCOUNT: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
           echo "=== AUREA GCP ACCESS GATE ==="
@@ -32,7 +32,7 @@ jobs:
           if [ -n "$SERVICE_ACCOUNT" ]; then echo "Service account variable: PRESENT"; else echo "Service account variable: MISSING"; fi
 
       - name: Fail closed when WIF federation is not configured
-        if: ${{ vars.AUREA_GCP_WIF_PROVIDER == '' }}
+        if: ${{ env.WIF_PROVIDER == '' }}
         run: |
           set -euo pipefail
           echo "GCP_CONTROL_PLANE_NOT_CONFIGURED"
@@ -42,7 +42,7 @@ jobs:
           exit 1
 
       - name: Fail closed on incomplete federation configuration
-        if: ${{ vars.AUREA_GCP_WIF_PROVIDER != '' && vars.AUREA_GCP_SERVICE_ACCOUNT == '' }}
+        if: ${{ env.WIF_PROVIDER != '' && env.SERVICE_ACCOUNT == '' }}
         run: |
           set -euo pipefail
           echo "GCP_WIF_CONFIGURATION_INCOMPLETE"
@@ -54,8 +54,8 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.AUREA_GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.AUREA_GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
           create_credentials_file: true
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/drive.readonly
