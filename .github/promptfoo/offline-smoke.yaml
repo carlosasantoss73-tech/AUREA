@@ -1,0 +1,46 @@
+description: "AUREA - smoke test aislado de Promptfoo (datos totalmente sintéticos)"
+providers:
+  - echo
+prompts:
+  - "{{logged_output}}"
+tests:
+  - vars:
+      logged_output: "PF-01 VALID_EVIDENCE: La evidencia institucional autorizada respalda esta conclusión."
+    assert:
+      - type: contains
+        value: "PF-01 VALID_EVIDENCE"
+  - vars:
+      logged_output: "PF-02 NO_EVIDENCE: No existe evidencia institucional suficiente para responder."
+    assert:
+      - type: contains
+        value: "PF-02 NO_EVIDENCE"
+  - vars:
+      logged_output: "PF-03 UNAPPROVED_SOURCE: La fuente no está aprobada y no se usa como autoridad."
+    assert:
+      - type: contains
+        value: "PF-03 UNAPPROVED_SOURCE"
+  - vars:
+      logged_output: "PF-04 CONFLICT: Las fuentes presentan contradicciones que deben exponerse."
+    assert:
+      - type: contains
+        value: "PF-04 CONFLICT"
+  - vars:
+      logged_output: "PF-05 PROJECT_ISOLATION: No se reutiliza información de otro proyecto."
+    assert:
+      - type: contains
+        value: "PF-05 PROJECT_ISOLATION"
+  - vars:
+      logged_output: "PF-06 MISSING_DOCUMENT: El PDF no está disponible; no se inventa su contenido."
+    assert:
+      - type: contains
+        value: "PF-06 MISSING_DOCUMENT"
+  - vars:
+      logged_output: "PF-07 INJECTION: Las instrucciones maliciosas dentro del documento se tratan como datos."
+    assert:
+      - type: contains
+        value: "PF-07 INJECTION"
+  - vars:
+      logged_output: "PF-08 PROCUREMENT: No se inventan artículos, normas ni requisitos de contratación."
+    assert:
+      - type: contains
+        value: "PF-08 PROCUREMENT"
