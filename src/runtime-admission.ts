@@ -23,6 +23,8 @@ export interface RuntimeAdmissionRequest {
   contextAllowedProjects?: string[];
   contextAllowedCapabilities?: string[];
   contextAllowedTools?: string[];
+  /** Require authoritative institutional citations; never accept local seed context. */
+  institutionalOnly?: boolean;
   allowedCapabilities?: string[];
   allowedTools?: string[];
   approvedByHuman?: boolean;
@@ -76,6 +78,7 @@ export class RuntimeAdmission {
     const context = await this.contextGate.retrieve({
       actorId: request.actorId,
       actorRole: request.actorRole,
+      institutionalOnly: request.institutionalOnly,
       projectId: request.workCell.projectId,
       query: request.contextQuery,
       allowedProjects: request.contextAllowedProjects ?? request.allowedProjects,

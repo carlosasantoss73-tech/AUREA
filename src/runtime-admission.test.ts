@@ -73,6 +73,20 @@ describe("RuntimeAdmission", () => {
     expect(result.evidence).toContain("EXECUTION_STATE_COMMITTED");
   });
 
+  it("propagates institutionalOnly and blocks unproven context before provider selection", async () => {
+    const result = await admission().admit({
+      traceId: "TRACE-RUNTIME-INSTITUTIONAL-001", integrationId: "INT-RUNTIME", workCell: cell,
+      contextQuery: "continúa con el trabajo anterior", actorId: "AGT-001", actorRole: "ROLE-001",
+      capabilityId: "CAP-001", toolId: "TOOL-001", action: "execute", effectClass: "READ",
+      providerCapability: "text", institutionalOnly: true,
+      allowedProjects: ["PRJ-001"], allowedCapabilities: ["CAP-001"], allowedTools: ["TOOL-001"],
+    });
+    expect(result.status).toBe("BLOCKED");
+    expect(result.contextStatus).toBe("BLOCKED");
+    expect(result.blockers).toContain("CONTEXT_BLOCKED:INSTITUTIONAL_CONTEXT_REQUIRED_NO_LOCAL_FALLBACK");
+    expect(result.evidence).toContain("CONTEXT:BLOCKED");
+  });
+
   it("fails closed when no executable provider exists", async () => {
     const platform = new AureaPlatformIntegration();
     platform.register(platformAdapter);
