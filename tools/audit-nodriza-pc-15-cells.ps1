@@ -35,7 +35,7 @@ $jobs=@(
   JobCheck "C02" "Git/acceso remoto" 'if(Get-Command git -EA SilentlyContinue){$v=((& git --version) -join " ");$remote=& git ls-remote https://github.com/carlosasantoss73-tech/AUREA.git HEAD 2>$null;if($LASTEXITCODE -eq 0 -and $remote){"PASS|"+$v+"; acceso remoto de solo lectura verificado"}else{"REVIEW|"+$v+"; Git instalado, acceso remoto no verificado"}}else{"BLOCKED|git no encontrado"}',
   JobCheck "C03A" "Node" 'if(Get-Command node -EA SilentlyContinue){$s=((& node --version) -join " ");$m=[int](($s-replace "^v","").Split(".")[0]);if($m-ge 20){"PASS|"+$s}else{"BLOCKED|Node 20+ requerido: "+$s}}else{"BLOCKED|node no encontrado"}',
   JobCheck "C03B" "npm" 'if(Get-Command npm -EA SilentlyContinue){"PASS|"+((& npm --version) -join " ")}else{"BLOCKED|npm no encontrado"}',
-  JobCheck "C08" "Python" 'if(Get-Command python -EA SilentlyContinue){$v=((& python --version) -join " ");$m=[regex]::Match($v,"(\\d+)\\.(\\d+)");if($m.Success -and ([int]$m.Groups[1].Value -gt 3 -or ([int]$m.Groups[1].Value -eq 3 -and [int]$m.Groups[2].Value -ge 11))){"PASS|"+$v}else{"REVIEW|Python 3.11+ recomendado/requerido por runtimes: "+$v}}else{"REVIEW|python no encontrado"}',
+  JobCheck "C08" "Python" 'if(Get-Command python -EA SilentlyContinue){$v=((& python --version) -join " ");$m=[regex]::Match($v,"(\d+)\.(\d+)");if($m.Success -and ([int]$m.Groups[1].Value -gt 3 -or ([int]$m.Groups[1].Value -eq 3 -and [int]$m.Groups[2].Value -ge 11))){"PASS|"+$v}else{"REVIEW|Python 3.11+ recomendado/requerido por runtimes: "+$v}}else{"REVIEW|python no encontrado"}',
   JobCheck "C11" "Gemini auditor" 'if(Get-Command gemini -EA SilentlyContinue){"PASS|"+((& gemini --version) -join " ")}else{"REVIEW|Gemini CLI no instalado (opcional)"}'
 )
 Wait-Job $jobs | Out-Null
