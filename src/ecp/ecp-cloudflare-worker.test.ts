@@ -2,6 +2,91 @@ import { describe, expect, it } from "vitest";
 import worker from "./ecp-cloudflare-worker.js";
 
 describe("ECP Cloudflare Worker readiness", () => {
+  it("returns 503 from /ready when intake is available but institutional context is blocked", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "REPLACE_WITH_VERIFIED_CURRENT_INDEX_ID",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "",
+      ANTHROPIC_API_KEY: "configured-key-placeholder",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: "NOT_READY",
+      runtimeReady: true,
+      institutionalContextConfigured: false,
+      analysisReady: false,
+    });
+  });
+
+  it("returns 503 from /ready when the Drive token is still a placeholder", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_EXECUTION_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "verified-index-id",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "REPLACE_WITH_DRIVE_TOKEN",
+      ANTHROPIC_API_KEY: "configured-key-placeholder",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: "NOT_READY",
+      institutionalContextConfigured: false,
+      analysisReady: false,
+      missing: ["ECP_GOOGLE_DRIVE_ACCESS_TOKEN"],
+    });
+  });
+
+  it("returns 503 from /ready when the Anthropic API key is still a placeholder", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_EXECUTION_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "verified-index-id",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "configured-drive-token",
+      ANTHROPIC_API_KEY: "REPLACE_WITH_ANTHROPIC_API_KEY",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      status: "NOT_READY",
+      analysisReady: false,
+      missing: ["ANTHROPIC_API_KEY"],
+    });
+  });
+
+  it("returns 200 from /ready only when runtime, context and provider configuration are present", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/ready"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_EXECUTION_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "verified-index-id",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "configured-token-placeholder",
+      ANTHROPIC_API_KEY: "test-api-key",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+    } as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: "CONFIGURED_UNVERIFIED",
+      runtimeReady: true,
+      institutionalContextConfigured: true,
+      configurationReady: true,
+      liveInstitutionalReadVerified: false,
+      approvedEcpEvidenceVerified: false,
+      analysisReady: false,
+    });
+  });
+
   it("fails closed and does not serve the pilot UI without a valid Access assertion", async () => {
     const response = await worker.fetch(new Request("https://ecp.example.test/"), {
       ECP_EXPEDIENT_STATE: {} as never,
@@ -49,6 +134,25 @@ describe("ECP Cloudflare Worker readiness", () => {
     expect(body.missing).toContain("ECP_INSTITUTIONAL_INDEX_FILE_ID");
     expect(body.missing).toContain("ECP_GOOGLE_DRIVE_ACCESS_TOKEN");
   });
+  it("does not report HEALTHY when the Anthropic API key is a placeholder", async () => {
+    const response = await worker.fetch(new Request("https://ecp.example.test/health"), {
+      ECP_EXPEDIENT_STATE: {} as never,
+      ECP_ACCESS_TEAM_DOMAIN: "pilot-team",
+      ECP_ACCESS_AUD: "pilot-audience",
+      ECP_ACCESS_ACTOR_ROLE: "ANALYST",
+      ECP_INSTITUTIONAL_INDEX_FILE_ID: "verified-index-id",
+      ECP_GOOGLE_DRIVE_ACCESS_TOKEN: "configured-drive-token",
+      ANTHROPIC_API_KEY: "REPLACE_WITH_ANTHROPIC_API_KEY",
+      ECP_ANTHROPIC_MODEL: "configured-model",
+      ECP_EXECUTION_STATE: {} as never,
+    } as never);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { status: string; analysisReady: boolean; analysisMissing: string[] };
+    expect(body.status).toBe("INTAKE_READY_ANALYSIS_BLOCKED");
+    expect(body.analysisReady).toBe(false);
+    expect(body.analysisMissing).toContain("ANTHROPIC_API_KEY");
+  });
+
   it("does not report HEALTHY when institutional context exists but analysis provider configuration is missing", async () => {
     const response = await worker.fetch(new Request("https://ecp.example.test/health"), {
       ECP_EXPEDIENT_STATE: {} as never,

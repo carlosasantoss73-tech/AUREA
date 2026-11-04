@@ -19,6 +19,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/ecp-worker-build.yml"
+      - ".github/workflows/ecp-worker-safe-dry-run.yml"
   workflow_dispatch:
 
 permissions:
