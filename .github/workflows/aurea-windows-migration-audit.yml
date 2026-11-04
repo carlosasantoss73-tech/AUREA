@@ -2,6 +2,17 @@ name: AUREA Windows Migration Audit
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "package.json"
+      - "tsconfig.json"
+      - "src/**"
+      - "apps/tool_expert_factory/**"
+      - "tools/bootstrap-aurea-windows.ps1"
+      - "docs/AUDITORIA_MIGRACION_NODRIZA_PC_2026-09-26.md"
+      - "tools/audit-nodriza-pc-15-cells.ps1"
+      - ".gitignore"
+      - ".github/workflows/aurea-windows-migration-audit.yml"
   push:
     paths:
       - "package.json"
