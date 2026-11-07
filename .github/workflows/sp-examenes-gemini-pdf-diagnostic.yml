@@ -1,0 +1,85 @@
+name: SP Examenes Gemini PDF Diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostics/sp-examenes-gemini-pdf
+    paths:
+      - .github/workflows/sp-examenes-gemini-pdf-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  compare-gemini-payloads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate diagnostic secret without revealing it
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GEMINI_API_KEY:-}" ]; then
+            echo "DIAGNOSTIC_BLOCKED: GitHub Actions secret GEMINI_API_KEY is unavailable."
+            exit 1
+          fi
+          echo "GEMINI_API_KEY is configured (value intentionally not displayed)."
+
+      - name: Download official legal PDFs
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 45 \
+            'https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2025/12/LOSNCP.pdf' \
+            -o /tmp/losncp.pdf
+          curl --fail --silent --show-error --location --max-time 45 \
+            'https://portal.compraspublicas.gob.ec/sercop/wp-content/uploads/2026/08/REGLAMENTO-DE-LA-LEY-ORGANICA-SISTEMA-NACIONAL-CONTRATACION-PUBLICA.pdf' \
+            -o /tmp/reglamento.pdf
+          file /tmp/losncp.pdf /tmp/reglamento.pdf
+          wc -c /tmp/losncp.pdf /tmp/reglamento.pdf
+
+      - name: Compare minimal text request against request with both official PDFs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          MODEL='gemini-3.8-flash'
+          URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
+
+          python3 - <<'PY'
+          import base64, json
+          question = "Responde únicamente: DIAGNOSTICO_OK. Esta es una prueba técnica, no una consulta jurídica."
+          with open("/tmp/text-only.json", "w") as f:
+              json.dump({"contents":[{"role":"user","parts":[{"text":question}]}],
+                         "generationConfig":{"maxOutputTokens":32}}, f)
+          parts = [
+              {"inlineData":{"mimeType":"application/pdf","data":base64.b64encode(open("/tmp/losncp.pdf","rb").read()).decode()}},
+              {"inlineData":{"mimeType":"application/pdf","data":base64.b64encode(open("/tmp/reglamento.pdf","rb").read()).decode()}},
+              {"text":question}
+          ]
+          with open("/tmp/with-pdfs.json", "w") as f:
+              json.dump({"contents":[{"role":"user","parts":parts}],
+                         "generationConfig":{"maxOutputTokens":32}}, f)
+          for path in ("/tmp/text-only.json", "/tmp/with-pdfs.json"):
+              print(path, "request_bytes=", __import__("os").path.getsize(path))
+          PY
+
+          run_case() {
+            label="$1"
+            body="$2"
+            response="/tmp/${label}-response.json"
+            start="$(date +%s)"
+            code="$(curl --silent --show-error --location --max-time 110 \
+              -H 'content-type: application/json' \
+              -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+              -X POST --data-binary "@${body}" \
+              -o "${response}" -w '%{http_code}' "${URL}")" || code="CURL_FAILED"
+            elapsed="$(( $(date +%s) - start ))"
+            echo "CASE=${label} HTTP=${code} ELAPSED_SECONDS=${elapsed}"
+            if [ -f "${response}" ]; then
+              jq -c '{error:(.error.message // null), answer:([.candidates[]?.content?.parts[]?.text // empty] | join("\n") | .[0:300]), promptTokenCount:(.usageMetadata.promptTokenCount // null), candidatesTokenCount:(.usageMetadata.candidatesTokenCount // null)}' "${response}" || true
+            fi
+          }
+
+          run_case text_only /tmp/text-only.json
+          run_case both_pdfs /tmp/with-pdfs.json
