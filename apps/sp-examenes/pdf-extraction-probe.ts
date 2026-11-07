@@ -20,7 +20,7 @@ export async function extractPdfPages(data: Uint8Array): Promise<ExtractedPdfPag
         .filter((item): item is typeof item & { str: string } => "str" in item)
         .map(item => item.str)
         .join(" ")
-        .replace(/\\s+/g, " ")
+        .replace(/\s+/g, " ")
         .trim()
     });
   }
