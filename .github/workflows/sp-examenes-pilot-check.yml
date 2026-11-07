@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps/sp-examenes/**'
+      - 'package.json'
       - '.github/workflows/sp-examenes-pilot-check.yml'
       - '.github/workflows/sp-examenes-pilot-deploy.yml'
 
@@ -13,16 +14,24 @@ permissions:
 jobs:
   worker-dry-run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install repository dependencies
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Run repository tests
+        run: npm test
       - name: Validate required pilot files
         run: |
           test -s apps/sp-examenes/worker.ts
           test -s apps/sp-examenes/public/index.html
           test -s apps/sp-examenes/wrangler.jsonc
-      - name: Bundle Worker without deployment
+          test -s apps/sp-examenes/pdf-extraction-probe.worker.ts
+          test -s apps/sp-examenes/wrangler.pdf-probe.jsonc
+      - name: Bundle production Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
+      - name: Bundle isolated PDF extraction Worker without deployment
+        run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.pdf-probe.jsonc
