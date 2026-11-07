@@ -1,6 +1,9 @@
 name: SP Examenes PDF.js Worker Compatibility Probe
 
 on:
+  push:
+    branches:
+      - 'diagnostics/sp-examenes-pdfjs-worker'
   pull_request:
     paths:
       - 'apps/sp-examenes/pdfjs-probe/**'
