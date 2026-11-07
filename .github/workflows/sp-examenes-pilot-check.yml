@@ -3,33 +3,37 @@ name: SP Examenes Pilot Check
 on:
   push:
     branches:
-      - 'diagnostics/sp-examenes-pdfjs-worker'
+      - diagnostics/sp-examenes-pdfjs-worker
   pull_request:
     paths:
-      - 'apps/sp-examenes/**'
-      - '.github/workflows/sp-examenes-pilot-check.yml'
-      - '.github/workflows/sp-examenes-pilot-deploy.yml'
+      - "apps/sp-examenes/**"
+      - ".github/workflows/sp-examenes-pilot-check.yml"
+      - ".github/workflows/sp-examenes-pilot-deploy.yml"
 
 permissions:
   contents: read
 
 jobs:
   worker-dry-run:
+    name: Validate SP Examenes and isolated PDF.js probe
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Validate required pilot files
         run: |
           test -s apps/sp-examenes/worker.ts
           test -s apps/sp-examenes/public/index.html
           test -s apps/sp-examenes/wrangler.jsonc
-      - name: Bundle Worker without deployment
+          test -s apps/sp-examenes/pdfjs-probe/worker.ts
+          test -s apps/sp-examenes/pdfjs-probe/wrangler.jsonc
+      - name: Bundle production Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
-
       - name: Install PDF.js probe dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Verify pinned PDF.js version
@@ -46,10 +50,10 @@ jobs:
           exit 1
       - name: Extract known text inside Workers runtime
         run: |
-          response=$(curl --fail --silent --show-error -X POST http://127.0.0.1:8787/probe -H 'content-type: application/json' -d '{}')
+          response=$(curl --fail --silent --show-error -X POST http://127.0.0.1:8787/probe -H "content-type: application/json" -d "{}")
           echo "$response"
           echo "$response" | grep -q '"status":"pass"'
-          echo "$response" | grep -q 'SP EXAMENES PDFJS WORKER PROBE'
+          echo "$response" | grep -q "SP EXAMENES PDFJS WORKER PROBE"
       - name: Stop isolated PDF.js runtime
         if: always()
         run: |
