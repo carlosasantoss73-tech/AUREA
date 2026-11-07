@@ -6,7 +6,7 @@ function makeOnePagePdf(): Uint8Array {
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-    "<< /Length 62 >>\nstream\nBT /F1 12 Tf 20 50 Td (SP EXAMENES PDF TEST) Tj ET\nendstream",
+    "<< /Length 51 >>\nstream\nBT /F1 12 Tf 20 50 Td (SP EXAMENES PDF TEST) Tj ET\nendstream",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
   ];
   let pdf = "%PDF-1.4\n";
