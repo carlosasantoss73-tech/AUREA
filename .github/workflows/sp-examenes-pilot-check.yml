@@ -1,6 +1,9 @@
 name: SP Examenes Pilot Check
 
 on:
+  push:
+    branches:
+      - 'diagnostics/sp-examenes-pdfjs-worker'
   pull_request:
     paths:
       - 'apps/sp-examenes/**'
