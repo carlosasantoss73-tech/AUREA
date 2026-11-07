@@ -26,3 +26,28 @@ jobs:
           test -s apps/sp-examenes/wrangler.jsonc
       - name: Bundle Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
+
+      - name: Install PDF.js probe dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Verify pinned PDF.js version
+        run: node --input-type=module -e "import { version } from 'pdfjs-dist/legacy/build/pdf.mjs'; if (version !== '5.4.394') throw new Error('Unexpected PDF.js version: ' + version); console.log('PDF.js', version)"
+      - name: Start isolated PDF.js Worker runtime
+        run: |
+          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 --config apps/sp-examenes/pdfjs-probe/wrangler.jsonc > /tmp/pdfjs-probe.log 2>&1 &
+          echo $! > /tmp/pdfjs-probe.pid
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:8787/health; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/pdfjs-probe.log
+          exit 1
+      - name: Extract known text inside Workers runtime
+        run: |
+          response=$(curl --fail --silent --show-error -X POST http://127.0.0.1:8787/probe -H 'content-type: application/json' -d '{}')
+          echo "$response"
+          echo "$response" | grep -q '"status":"pass"'
+          echo "$response" | grep -q 'SP EXAMENES PDFJS WORKER PROBE'
+      - name: Stop isolated PDF.js runtime
+        if: always()
+        run: |
+          if [ -f /tmp/pdfjs-probe.pid ]; then kill "$(cat /tmp/pdfjs-probe.pid)" 2>/dev/null || true; fi
