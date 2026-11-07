@@ -1,4 +1,5 @@
-// Isolated diagnostic fixture (PR validation trigger): validates PDF.js text extraction in workerd, never production.\nimport { getDocument, version as pdfjsVersion } from "pdfjs-dist/legacy/build/pdf.mjs";
+// Isolated diagnostic fixture (PR validation trigger): validates PDF.js text extraction in workerd, never production.
+import { getDocument, version as pdfjsVersion } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 function makeProbePdf(): Uint8Array {
   const stream = "BT /F1 12 Tf 72 720 Td (SP EXAMENES PDFJS WORKER PROBE) Tj ET";
