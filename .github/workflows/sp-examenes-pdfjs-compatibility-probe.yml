@@ -1,0 +1,47 @@
+name: SP Examenes PDF.js Worker Compatibility Probe
+
+on:
+  pull_request:
+    paths:
+      - 'apps/sp-examenes/pdfjs-probe/**'
+      - '.github/workflows/sp-examenes-pdfjs-compatibility-probe.yml'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  local-worker-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Verify installed PDF.js version
+        run: node --input-type=module -e "import { version } from 'pdfjs-dist/legacy/build/pdf.mjs'; if (version !== '5.4.394') throw new Error('Unexpected PDF.js version: ' + version); console.log('PDF.js', version)"
+      - name: Start isolated Cloudflare Workers runtime
+        run: |
+          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 --config apps/sp-examenes/pdfjs-probe/wrangler.jsonc > /tmp/pdfjs-probe.log 2>&1 &
+          echo $! > /tmp/pdfjs-probe.pid
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:8787/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/pdfjs-probe.log
+          exit 1
+      - name: Extract text from generated PDF inside Workers runtime
+        run: |
+          response=$(curl --fail --silent --show-error -X POST http://127.0.0.1:8787/probe -H 'content-type: application/json' -d '{}')
+          echo "$response"
+          echo "$response" | grep -q '"status":"pass"'
+          echo "$response" | grep -q 'SP EXAMENES PDFJS WORKER PROBE'
+      - name: Stop isolated runtime
+        if: always()
+        run: |
+          if [ -f /tmp/pdfjs-probe.pid ]; then kill "$(cat /tmp/pdfjs-probe.pid)" 2>/dev/null || true; fi
