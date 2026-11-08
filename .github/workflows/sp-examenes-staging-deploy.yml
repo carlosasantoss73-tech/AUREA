@@ -2,6 +2,15 @@ name: SP Examenes Staging Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Selecciona yes SOLO cuando quieras desplegar realmente en Cloudflare"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
 
 permissions:
   contents: read
@@ -31,7 +40,10 @@ jobs:
           test -s wrangler.staging.jsonc
           grep -q '"name": "sp-examenes-staging"' wrangler.staging.jsonc
           grep -q 'v1-sp-examenes-staging-licenses' wrangler.staging.jsonc
+      - name: Compile staging bundle without deployment
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.staging.jsonc
       - name: Verify dedicated staging secrets
+        if: ${{ inputs.confirm_deploy == 'yes' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
@@ -43,6 +55,7 @@ jobs:
             exit 1
           fi
       - name: Verify Cloudflare staging account scope
+        if: ${{ inputs.confirm_deploy == 'yes' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
@@ -60,17 +73,20 @@ jobs:
           fi
           echo "Cuenta Cloudflare de staging validada."
       - name: Deploy isolated staging Worker
+        if: ${{ inputs.confirm_deploy == 'yes' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
         run: npx --yes wrangler@4 deploy --config wrangler.staging.jsonc
       - name: Set staging admin runtime secret
+        if: ${{ inputs.confirm_deploy == 'yes' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
           SP_EXAMENES_ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
         run: printf '%s' "$SP_EXAMENES_ADMIN_TOKEN" | npx --yes wrangler@4 secret put SP_EXAMENES_ADMIN_TOKEN --config wrangler.staging.jsonc
       - name: Set staging Gemini runtime secret
+        if: ${{ inputs.confirm_deploy == 'yes' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
