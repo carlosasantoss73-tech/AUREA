@@ -7,7 +7,10 @@ export interface SpExamSqlStorage {
 }
 
 export interface SpExamLicenseDurableObjectState {
-  storage: { sql: SpExamSqlStorage };
+  storage: {
+    sql: SpExamSqlStorage;
+    transactionSync<T>(closure: () => T): T;
+  };
 }
 
 type LicenseStatus = "PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED";
