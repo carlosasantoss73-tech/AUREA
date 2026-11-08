@@ -68,3 +68,36 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - `sourceStatus` solo devuelve `complete` si todas las páginas oficiales seleccionadas y todos los PDF seleccionados se recuperaron correctamente; de lo contrario devuelve `partial`.
 - Esta actualización no constituye una base legal exhaustiva ni una certificación jurídica. El índice oficial es una guía de estado; para cada pregunta se debe leer la norma primaria y verificar reformas, transitorias, ámbito temporal y publicación en Registro Oficial.
 - Pendiente: CI en PR, prueba real POST contra el Worker desplegado, comparación de una pregunta con su norma exacta, prueba de fallo seguro y medición de latencia. No desplegar ni declarar el runtime actualizado antes de esas verificaciones.
+
+
+## Acceso individual por licencia — implementación en PR #241
+
+- Cada licencia se crea manualmente después de confirmar el pago; no existe pasarela de pagos integrada.
+- El endpoint administrativo `POST /api/admin/licenses` genera un código aleatorio y devuelve el código una sola vez. La base almacena únicamente su hash.
+- El comprador activa el código en la interfaz; los 30 días empiezan en esa primera activación.
+- La sesión se entrega mediante cookie `HttpOnly; Secure; SameSite=Lax` y se valida antes de cada `POST /api/answer`.
+- El administrador puede consultar el estado mediante `POST /api/admin/licenses/status` y revocar mediante `POST /api/admin/licenses/revoke`.
+- Los endpoints administrativos requieren el secreto `SP_EXAMENES_ADMIN_TOKEN`. Debe guardarse como GitHub Actions secret y como secreto runtime de Cloudflare; nunca incluirlo en HTML, JavaScript del navegador, logs ni conversaciones.
+- El control de acceso utiliza un Durable Object SQLite exclusivo de SP EXÁMENES. No comparte el namespace de Conchita ni ECP.
+- Los estados consultables son `PENDING`, `ACTIVE`, `EXPIRED` y `REVOKED`. El vencimiento se calcula a los 30 días exactos desde la activación.
+- No se ha integrado cobro automático ni una cuota diaria individual de preguntas; el limitador temporal actual por IP sigue siendo una protección best-effort del piloto.
+- La configuración de Durable Objects requiere migración al desplegar. No ejecutar despliegues ni configurar secretos de producción como parte de la revisión de este PR.
+
+Ejemplo administrativo (sustituir el dominio y aportar el token de forma segura desde el entorno administrador):
+
+```bash
+curl -X POST "https://TU-DOMINIO/api/admin/licenses" \
+  -H "Authorization: Bearer $SP_EXAMENES_ADMIN_TOKEN"
+
+curl -X POST "https://TU-DOMINIO/api/admin/licenses/status" \
+  -H "Authorization: Bearer $SP_EXAMENES_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"SPEX-CODIGO_DEVUELTO_AL_CREAR"}'
+
+curl -X POST "https://TU-DOMINIO/api/admin/licenses/revoke" \
+  -H "Authorization: Bearer $SP_EXAMENES_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"SPEX-CODIGO_A_REVOCAR"}'
+```
+
+Esta documentación describe el comportamiento propuesto en la rama del PR. No acredita que el sistema esté desplegado ni habilitado en producción.
