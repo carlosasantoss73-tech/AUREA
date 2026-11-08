@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           admin_token="ci-only-admin-token-not-for-production"
-          printf 'SP_EXAMENES_ADMIN_TOKEN=%s\\n' "$admin_token" > apps/sp-examenes/.dev.vars
+          printf 'SP_EXAMENES_ADMIN_TOKEN=%s\n' "$admin_token" > apps/sp-examenes/.dev.vars
           npx --yes wrangler@4 dev --config apps/sp-examenes/wrangler.jsonc --local --ip 127.0.0.1 --port 8787 > /tmp/sp-examenes-wrangler.log 2>&1 &
           server_pid=$!
           cleanup() {
@@ -68,7 +68,7 @@ jobs:
           [[ "$code" =~ ^SPEX-[A-F0-9]{48}$ ]]
           activate_code="$(curl -sS -D /tmp/sp-exam-activate.headers -o /tmp/sp-exam-activate.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/activate -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')")"
           test "$activate_code" = "200"
-          cookie="$(awk 'tolower($1) == "set-cookie:" { sub(/\\r$/, "", $2); split($2, parts, ";"); print parts[1] }' /tmp/sp-exam-activate.headers | tail -n 1)"
+          cookie="$(awk 'tolower($1) == "set-cookie:" { sub(/\r$/, "", $2); split($2, parts, ";"); print parts[1] }' /tmp/sp-exam-activate.headers | tail -n 1)"
           test -n "$cookie"
           curl -fsS http://127.0.0.1:8787/api/session/status -H "Cookie: $cookie" | jq -e '.active == true' >/dev/null
           curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses/status -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')" | jq -e '.status == "ACTIVE"' >/dev/null
