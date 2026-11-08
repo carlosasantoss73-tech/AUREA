@@ -4,8 +4,17 @@ import { summarizePdfRetrieval } from "./pdf-retrieval.js";
 import { enforceEvidenceGate } from "./evidence-gate.js";
 export { SpExamenesLicenseDurableObject } from "./licensing.js";
 
+interface SpExamenesLicenseNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  };
+}
+
 interface Env {
   GEMINI_API_KEY: string;
+  SP_EXAMENES_LICENSES?: SpExamenesLicenseNamespace;
+  SP_EXAMENES_ADMIN_TOKEN?: string;
   SP_EXAMENES_MODEL?: string;
   OPENAI_API_KEY?: string;
   SP_EXAMENES_OPENAI_MODEL?: string;
@@ -35,7 +44,12 @@ function randomToken(bytes = 32): string {
 function readSessionCookie(request: Request): string {
   const cookie = request.headers.get("cookie") || "";
   const entry = cookie.split(";").map(part => part.trim()).find(part => part.startsWith("sp_exam_session="));
-  return entry ? decodeURIComponent(entry.slice("sp_exam_session=".length)) : "";
+  if (!entry) return "";
+  try {
+    return decodeURIComponent(entry.slice("sp_exam_session=".length));
+  } catch {
+    return "";
+  }
 }
 
 const CORE_SOURCES = [
