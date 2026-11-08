@@ -32,6 +32,10 @@ function createHarness() {
         sessions.set(sessionHash, { session_hash: sessionHash, code_hash: codeHash, expires_at: expiresAt, revoked_at: null });
         return { toArray: <T>() => [] as T[] };
       }
+      if (statement.startsWith("SELECT status, created_at, activated_at, expires_at FROM sp_exam_licenses")) {
+        const row = licenses.get(String(values[0]));
+        return { toArray: <T>() => (row ? [{ status: row.status, created_at: row.created_at, activated_at: row.activated_at, expires_at: row.expires_at }] : []) as T[] };
+      }
       if (statement.startsWith("SELECT l.status AS license_status")) {
         const session = sessions.get(String(values[0]));
         const license = session ? licenses.get(session.code_hash) : undefined;
@@ -142,6 +146,23 @@ describe("SP EXÁMENES isolated license Durable Object", () => {
     expect(initialized).toBe(2);
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({ status: "BLOCKED" });
+  });
+
+  it("lets an administrator inspect pending, active, expired and revoked states", async () => {
+    const { call } = createHarness();
+    const now = 1_800_000_000_000;
+    const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+    await call({ operation: "create", codeHash: "hash-code", now });
+    const pending = await call({ operation: "status", codeHash: "hash-code", now });
+    expect(await pending.json()).toMatchObject({ status: "PENDING", activatedAt: null, expiresAt: null });
+    await call({ operation: "activate", codeHash: "hash-code", sessionHash: "hash-session", now });
+    const active = await call({ operation: "status", codeHash: "hash-code", now: expiresAt - 1 });
+    expect(await active.json()).toMatchObject({ status: "ACTIVE", expiresAt });
+    const expired = await call({ operation: "status", codeHash: "hash-code", now: expiresAt });
+    expect(await expired.json()).toMatchObject({ status: "EXPIRED", expiresAt });
+    await call({ operation: "revoke", codeHash: "hash-code", now: expiresAt + 1 });
+    const revoked = await call({ operation: "status", codeHash: "hash-code", now: expiresAt + 2 });
+    expect(await revoked.json()).toMatchObject({ status: "REVOKED" });
   });
 
   it("allows exactly one winner when the same license is activated concurrently", async () => {
