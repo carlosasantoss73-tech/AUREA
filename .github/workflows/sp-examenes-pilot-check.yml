@@ -36,5 +36,47 @@ jobs:
           apps/sp-examenes/pdf-retrieval.ts
           apps/sp-examenes/evidence-gate.ts
           apps/sp-examenes/worker.ts
+      - name: Local licensing end-to-end smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          admin_token="ci-only-admin-token-not-for-production"
+          printf 'SP_EXAMENES_ADMIN_TOKEN=%s\\n' "$admin_token" > apps/sp-examenes/.dev.vars
+          npx --yes wrangler@4 dev --config apps/sp-examenes/wrangler.jsonc --local --ip 127.0.0.1 --port 8787 > /tmp/sp-examenes-wrangler.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            rm -f apps/sp-examenes/.dev.vars
+          }
+          trap cleanup EXIT
+          ready=false
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/sp-examenes-wrangler.log
+            echo "::error::Local SP EXAMENES Worker did not become ready."
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8787/health | jq -e '.status == "ok"' >/dev/null
+          unauth_code="$(curl -sS -o /tmp/sp-exam-noauth.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/answer -H 'Content-Type: application/json' -d '{"question":"smoke test"}')"
+          test "$unauth_code" = "401"
+          created="$(curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses -H "Authorization: Bearer $admin_token")"
+          code="$(printf '%s' "$created" | jq -er '.code')"
+          [[ "$code" =~ ^SPEX-[A-F0-9]{48}$ ]]
+          activate_code="$(curl -sS -D /tmp/sp-exam-activate.headers -o /tmp/sp-exam-activate.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/activate -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')")"
+          test "$activate_code" = "200"
+          cookie="$(awk 'tolower($1) == "set-cookie:" { sub(/\\r$/, "", $2); split($2, parts, ";"); print parts[1] }' /tmp/sp-exam-activate.headers | tail -n 1)"
+          test -n "$cookie"
+          curl -fsS http://127.0.0.1:8787/api/session/status -H "Cookie: $cookie" | jq -e '.active == true' >/dev/null
+          curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses/status -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')" | jq -e '.status == "ACTIVE"' >/dev/null
+          valid_answer_code="$(curl -sS -o /tmp/sp-exam-valid-answer.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/answer -H "Cookie: $cookie" -H 'Content-Type: application/json' -d '{"question":"smoke test"}')"
+          test "$valid_answer_code" = "503"
+          curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses/revoke -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')" | jq -e '.status == "REVOKED"' >/dev/null
+          revoked_answer_code="$(curl -sS -o /tmp/sp-exam-revoked-answer.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/answer -H "Cookie: $cookie" -H 'Content-Type: application/json' -d '{"question":"smoke test"}')"
+          test "$revoked_answer_code" = "403"
+          echo "Local licensing end-to-end smoke test passed."
       - name: Bundle Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
