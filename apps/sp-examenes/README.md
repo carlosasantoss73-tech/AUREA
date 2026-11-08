@@ -80,7 +80,7 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - Los endpoints administrativos requieren el secreto `SP_EXAMENES_ADMIN_TOKEN`. Debe guardarse como GitHub Actions secret y como secreto runtime de Cloudflare; nunca incluirlo en HTML, JavaScript del navegador, logs ni conversaciones. Para generarlo localmente puede usarse `openssl rand -hex 32`; no pegar su valor en el repositorio ni en el chat.
 - El control de acceso utiliza un Durable Object SQLite exclusivo de SP EXÁMENES. No comparte el namespace de Conchita ni ECP.
 - Los estados consultables son `PENDING`, `ACTIVE`, `EXPIRED` y `REVOKED`. El vencimiento se calcula a los 30 días exactos desde la activación.
-- No se ha integrado cobro automático ni una cuota diaria individual de preguntas; el limitador temporal actual por IP sigue siendo una protección best-effort del piloto.
+- No se ha integrado cobro automático ni una cuota diaria individual de preguntas; el limitador temporal actual por IP sigue siendo una protección best-effort del piloto. El código es una credencial portadora: quien lo recibe primero puede activarlo; no se verifica correo, identidad civil ni segundo factor. La activación crea una sola sesión de navegador y no existe recuperación automática si se pierde la cookie; cualquier reemisión requiere soporte administrativo y una decisión manual sobre los días restantes.
 - La configuración de Durable Objects requiere migración al desplegar. No ejecutar despliegues ni configurar secretos de producción como parte de la revisión de este PR.
 
 Ejemplo administrativo (sustituir el dominio y aportar el token de forma segura desde el entorno administrador):
