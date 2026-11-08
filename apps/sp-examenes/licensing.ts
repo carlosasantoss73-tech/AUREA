@@ -94,15 +94,16 @@ export class SpExamenesLicenseDurableObject {
           return json({ status: "ACTIVATED", expiresAt: activation });
         }
         case "validate": {
-          if (!body.sessionHash || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
+          if (!body.sessionHash || typeof body.now !== "number" || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
+          const now = body.now;
           const rows = sql.exec(
             "SELECT l.status AS license_status, l.expires_at, s.expires_at AS session_expires_at, s.revoked_at FROM sp_exam_sessions s JOIN sp_exam_licenses l ON l.code_hash = s.code_hash WHERE s.session_hash = ?",
             body.sessionHash
           ).toArray<{ license_status: LicenseStatus; expires_at: number | null; session_expires_at: number; revoked_at: number | null }>();
           const session = rows[0];
           if (!session || session.revoked_at !== null || session.license_status !== "ACTIVE" ||
-              session.expires_at === null || body.now >= session.expires_at ||
-              body.now >= session.session_expires_at) {
+              session.expires_at === null || now >= session.expires_at ||
+              now >= session.session_expires_at) {
             return json({ status: "BLOCKED", reason: "ACCESS_DENIED" }, 403);
           }
           return json({ status: "AUTHORIZED", expiresAt: session.expires_at });
