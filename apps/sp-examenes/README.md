@@ -77,7 +77,7 @@ Estas páginas son un punto de entrada, no sustituyen revisar el texto de la nor
 - El comprador activa el código en la interfaz; los 30 días empiezan en esa primera activación.
 - La sesión se entrega mediante cookie `HttpOnly; Secure; SameSite=Lax` y se valida antes de cada `POST /api/answer`.
 - El administrador puede consultar el estado mediante `POST /api/admin/licenses/status` y revocar mediante `POST /api/admin/licenses/revoke`.
-- Los endpoints administrativos requieren el secreto `SP_EXAMENES_ADMIN_TOKEN`. Debe guardarse como GitHub Actions secret y como secreto runtime de Cloudflare; nunca incluirlo en HTML, JavaScript del navegador, logs ni conversaciones.
+- Los endpoints administrativos requieren el secreto `SP_EXAMENES_ADMIN_TOKEN`. Debe guardarse como GitHub Actions secret y como secreto runtime de Cloudflare; nunca incluirlo en HTML, JavaScript del navegador, logs ni conversaciones. Para generarlo localmente puede usarse `openssl rand -hex 32`; no pegar su valor en el repositorio ni en el chat.
 - El control de acceso utiliza un Durable Object SQLite exclusivo de SP EXÁMENES. No comparte el namespace de Conchita ni ECP.
 - Los estados consultables son `PENDING`, `ACTIVE`, `EXPIRED` y `REVOKED`. El vencimiento se calcula a los 30 días exactos desde la activación.
 - No se ha integrado cobro automático ni una cuota diaria individual de preguntas; el limitador temporal actual por IP sigue siendo una protección best-effort del piloto.
