@@ -13,14 +13,14 @@ label{display:block;font-weight:650;margin-bottom:8px}textarea{width:100%;min-he
 </style></head>
 <body><header><div class="wrap"><h1>SP EXÁMENES</h1><p>Práctica guiada · Contratación pública del Ecuador</p></div></header>
 <main>
-<section class="panel"><label for="question">Escribe la pregunta del examen</label><textarea id="question" maxlength="6000" placeholder="Pega aquí la pregunta y sus opciones. También puedes adjuntar una fotografía."></textarea>
+<section class="panel"><label for="phase">Módulo de práctica</label><select id="phase" required style="width:100%;border:1px solid #b8c3d2;border-radius:10px;padding:12px;font:inherit;margin-bottom:14px"><option value="" selected disabled>Selecciona una fase</option><option value="preparatoria">Fase preparatoria</option><option value="precontractual">Fase precontractual</option></select><label for="question">Escribe la pregunta del examen</label><textarea id="question" maxlength="6000" placeholder="Pega aquí la pregunta y sus opciones. También puedes adjuntar una fotografía."></textarea>
 <div class="actions"><label class="filebutton" for="photo">Adjuntar foto</label><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" hidden><button id="send">Analizar pregunta</button></div>
 <img id="preview" class="preview" alt="Vista previa de la pregunta adjunta"><div class="small">Imagen JPG, PNG o WebP; máximo 4 MB. No adjuntes cédulas ni datos personales.</div><div id="status" class="status" role="status"></div></section>
 <section class="panel" id="result-panel" hidden><h2>Respuesta</h2><div id="answer"></div><div class="sources" id="sources"></div></section>
 <section class="panel"><h3>Cómo responde</h3><p class="notice">Consulta fuentes oficiales disponibles en ese momento. Si no puede verificar el fundamento, debe indicarlo y no inventar artículos. Esta herramienta es para práctica y estudio; no sustituye la revisión de la norma ni está diseñada para responder por ti una evaluación oficial activa.</p><p class="notice">Piloto de prueba. La consulta de páginas oficiales no garantiza que todos los PDF o reformas hayan podido leerse en cada pregunta.</p></section>
 </main>
 <script>
-const question=document.querySelector('#question'),photo=document.querySelector('#photo'),preview=document.querySelector('#preview'),send=document.querySelector('#send'),status=document.querySelector('#status'),panel=document.querySelector('#result-panel'),answer=document.querySelector('#answer'),sources=document.querySelector('#sources');
+const phase=document.querySelector('#phase'),question=document.querySelector('#question'),photo=document.querySelector('#photo'),preview=document.querySelector('#preview'),send=document.querySelector('#send'),status=document.querySelector('#status'),panel=document.querySelector('#result-panel'),answer=document.querySelector('#answer'),sources=document.querySelector('#sources');
 const uploadArea=document.querySelector('main .panel');
 let imageData=null,imageMime=null,processingImage=false;
 function appendInline(parent,text){
@@ -66,14 +66,14 @@ question.addEventListener('paste',e=>{const items=Array.from(e.clipboardData?.it
 uploadArea.addEventListener('dragover',e=>{if(Array.from(e.dataTransfer?.items||[]).some(x=>x.type.startsWith('image/'))){e.preventDefault();status.textContent='Suelta la imagen para adjuntarla.';}});
 uploadArea.addEventListener('drop',e=>{const file=Array.from(e.dataTransfer?.files||[]).find(x=>x.type.startsWith('image/'));if(file){e.preventDefault();loadImage(file);}});
 send.addEventListener('click',async()=>{
-  const q=question.value.trim();if(processingImage){status.textContent='Espera a que termine de prepararse la imagen.';return;}
+  const q=question.value.trim();if(!phase.value){status.textContent='Selecciona si practicarás fase preparatoria o precontractual.';return;}if(processingImage){status.textContent='Espera a que termine de prepararse la imagen.';return;}
   if(!q&&!imageData){status.textContent='Escribe una pregunta, adjunta una fotografía o pega una captura con Ctrl+V.';return;}
   send.disabled=true;status.textContent='Consultando fuentes oficiales y analizando la pregunta…';panel.hidden=true;
   const started=Date.now();
   try{
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),95000);
     let res,data;
-    try{res=await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q,image:imageData,mimeType:imageMime}),signal:controller.signal});data=await res.json();}
+    try{res=await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phase:phase.value,question:q,image:imageData,mimeType:imageMime}),signal:controller.signal});data=await res.json();}
     finally{clearTimeout(timeout);}
     if(!res.ok)throw new Error(data.error||'El servidor respondió HTTP '+res.status+'.');
     renderAnswer(data.answer||'No se recibió una respuesta verificable.');sources.replaceChildren();
