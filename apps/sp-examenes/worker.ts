@@ -2,8 +2,6 @@ import PAGE from "./public/index.html";
 
 import { summarizePdfRetrieval } from "./pdf-retrieval.js";
 import { enforceEvidenceGate } from "./evidence-gate.js";
-import { SpExamenesLicenseDurableObject } from "./licensing.js";
-
 export { SpExamenesLicenseDurableObject } from "./licensing.js";
 
 interface Env {
