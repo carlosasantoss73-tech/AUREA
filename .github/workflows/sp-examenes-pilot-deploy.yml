@@ -43,8 +43,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SP_EXAMENES_ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_ADMIN_TOKEN }}
         run: |
-          SP_EXAMENES_ADMIN_TOKEN="${{ secrets.SP_EXAMENES_ADMIN_TOKEN }}"
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$GEMINI_API_KEY" ] || [ -z "$SP_EXAMENES_ADMIN_TOKEN" ]; then
             echo "::error::Missing one of CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, GEMINI_API_KEY or SP_EXAMENES_ADMIN_TOKEN in GitHub Actions secrets."
             exit 1
