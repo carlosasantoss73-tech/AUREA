@@ -6,6 +6,7 @@ on:
       - 'apps/sp-examenes/**'
       - '.github/workflows/sp-examenes-pilot-check.yml'
       - '.github/workflows/sp-examenes-pilot-deploy.yml'
+      - '.github/workflows/sp-examenes-staging-deploy.yml'
 
 permissions:
   contents: read
@@ -80,3 +81,6 @@ jobs:
           echo "Local licensing end-to-end smoke test passed."
       - name: Bundle Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
+
+      - name: Bundle isolated staging Worker without deployment
+        run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.staging.jsonc
