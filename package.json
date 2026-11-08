@@ -14,7 +14,8 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "pdfjs-dist": "5.4.394",
-    "@ayocore/exceljs": "5.0.2"
+    "@ayocore/exceljs": "5.0.2",
+    "pdfjs-serverless": "1.3.1",
+    "pdfjs-dist": "5.4.394"
   }
 }
