@@ -31,11 +31,5 @@
         "SpExamenesLicenseDurableObject"
       ]
     }
-  ],
-  "exports": {
-    "SpExamenesLicenseDurableObject": {
-      "type": "durable-object",
-      "storage": "sqlite"
-    }
-  }
+  ]
 }
