@@ -24,6 +24,8 @@ jobs:
         run: npm install --no-package-lock --ignore-scripts
       - name: Run repository tests
         run: npm test
+      - name: Verify extraction against official SERCOP PDFs
+        run: npx vitest run apps/sp-examenes/pdf-extraction-probe.integration.test.ts
       - name: Validate required pilot files
         run: |
           test -s apps/sp-examenes/worker.ts
