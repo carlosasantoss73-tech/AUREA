@@ -100,6 +100,23 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    if (request.method === "GET" && url.pathname === "/api/session/status") {
+      const session = readSessionCookie(request);
+      if (!session) return Response.json({ active: false }, { status: 401, headers: { "cache-control": "no-store" } });
+      try {
+        const sessionHash = await sha256Hex(session);
+        const response = await getLicenseStub(env).fetch("https://license.internal/", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ operation: "validate", sessionHash, now: Date.now() })
+        });
+        if (!response.ok) return Response.json({ active: false }, { status: 401, headers: { "cache-control": "no-store" } });
+        const data = await response.json() as { expiresAt?: number };
+        return Response.json({ active: true, expiresAt: data.expiresAt }, { headers: { "cache-control": "no-store" } });
+      } catch {
+        return Response.json({ active: false, error: "LICENSE_SERVICE_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+      }
+    }
+
     if (request.method === "POST" && url.pathname === "/api/admin/licenses") {
       if (!env.SP_EXAMENES_ADMIN_TOKEN) return Response.json({ error: "Administración no configurada." }, { status: 503 });
       if (request.headers.get("authorization") !== "Bearer " + env.SP_EXAMENES_ADMIN_TOKEN) {
