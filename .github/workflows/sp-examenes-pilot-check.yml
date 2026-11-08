@@ -24,5 +24,7 @@ jobs:
           test -s apps/sp-examenes/worker.ts
           test -s apps/sp-examenes/public/index.html
           test -s apps/sp-examenes/wrangler.jsonc
+      - name: Run SP EXAMENES licensing tests
+        run: npx --yes vitest@2.1.0 run apps/sp-examenes/licensing.test.ts
       - name: Bundle Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config apps/sp-examenes/wrangler.jsonc
