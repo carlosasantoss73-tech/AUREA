@@ -175,6 +175,30 @@ export default {
       }
     }
 
+    if (request.method === "POST" && url.pathname === "/api/admin/licenses/status") {
+      if (!env.SP_EXAMENES_ADMIN_TOKEN) return Response.json({ error: "Administración no configurada." }, { status: 503 });
+      if (request.headers.get("authorization") !== "Bearer " + env.SP_EXAMENES_ADMIN_TOKEN) {
+        return Response.json({ error: "No autorizado." }, { status: 401 });
+      }
+      let payload: { code?: unknown };
+      try { payload = await request.json() as typeof payload; }
+      catch { return Response.json({ error: "Solicitud inválida." }, { status: 400 }); }
+      const code = typeof payload.code === "string" ? payload.code.trim().toUpperCase() : "";
+      if (!/^SPEX-[A-F0-9]{48}$/.test(code)) return Response.json({ error: "Código inválido." }, { status: 400 });
+      try {
+        const codeHash = await sha256Hex(code);
+        const response = await getLicenseStub(env).fetch("https://license.internal/", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ operation: "status", codeHash, now: Date.now() })
+        });
+        const data = await response.json() as Record<string, unknown>;
+        if (!response.ok) return Response.json({ error: "Licencia no encontrada." }, { status: 404, headers: { "cache-control": "no-store" } });
+        return Response.json(data, { headers: { "cache-control": "no-store" } });
+      } catch {
+        return Response.json({ error: "Servicio de licencias no disponible." }, { status: 503 });
+      }
+    }
+
     if (request.method === "POST" && url.pathname === "/api/admin/licenses/revoke") {
       if (!env.SP_EXAMENES_ADMIN_TOKEN) return Response.json({ error: "Administración no configurada." }, { status: 503 });
       if (request.headers.get("authorization") !== "Bearer " + env.SP_EXAMENES_ADMIN_TOKEN) {
