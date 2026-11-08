@@ -93,6 +93,24 @@ export class SpExamenesLicenseDurableObject {
           if (activation === null) return json({ status: "BLOCKED", reason: "INVALID_LICENSE" }, 409);
           return json({ status: "ACTIVATED", expiresAt: activation });
         }
+        case "status": {
+          if (!body.codeHash || typeof body.now !== "number" || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
+          const rows = sql.exec(
+            "SELECT status, created_at, activated_at, expires_at FROM sp_exam_licenses WHERE code_hash = ?",
+            body.codeHash
+          ).toArray<{ status: LicenseStatus; created_at: number; activated_at: number | null; expires_at: number | null }>();
+          const license = rows[0];
+          if (!license) return json({ status: "NOT_FOUND" }, 404);
+          const status: LicenseStatus = license.status === "ACTIVE" && license.expires_at !== null && body.now >= license.expires_at
+            ? "EXPIRED"
+            : license.status;
+          return json({
+            status,
+            createdAt: license.created_at,
+            activatedAt: license.activated_at,
+            expiresAt: license.expires_at
+          });
+        }
         case "validate": {
           if (!body.sessionHash || typeof body.now !== "number" || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
           const now = body.now;
