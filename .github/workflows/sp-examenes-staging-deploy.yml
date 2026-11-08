@@ -1,0 +1,78 @@
+name: SP Examenes Staging Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sp-examenes-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/sp-examenes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/sp-examenes-staging-isolation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate staging files
+        run: |
+          test -s worker.ts
+          test -s public/index.html
+          test -s wrangler.staging.jsonc
+          grep -q '"name": "sp-examenes-staging"' wrangler.staging.jsonc
+          grep -q 'v1-sp-examenes-staging-licenses' wrangler.staging.jsonc
+      - name: Verify dedicated staging secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_STAGING_API_KEY }}
+          SP_EXAMENES_ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$GEMINI_API_KEY" ] || [ -z "$SP_EXAMENES_ADMIN_TOKEN" ]; then
+            echo "::error::Faltan secretos dedicados de staging en GitHub Actions."
+            exit 1
+          fi
+      - name: Verify Cloudflare staging account scope
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+        run: |
+          response="$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts)"
+          success="$(printf '%s' "$response" | jq -r '.success // false')"
+          if [ "$success" != "true" ]; then
+            echo "::error::El token de staging no pudo consultar las cuentas Cloudflare autorizadas."
+            exit 1
+          fi
+          match_count="$(printf '%s' "$response" | jq --arg id "$CLOUDFLARE_ACCOUNT_ID" '[.result[]? | select(.id == $id)] | length')"
+          if [ "$match_count" != "1" ]; then
+            echo "::error::El ID de cuenta configurado no coincide con una cuenta accesible por el token de staging."
+            exit 1
+          fi
+          echo "Cuenta Cloudflare de staging validada."
+      - name: Deploy isolated staging Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --config wrangler.staging.jsonc
+      - name: Set staging admin runtime secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+          SP_EXAMENES_ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
+        run: printf '%s' "$SP_EXAMENES_ADMIN_TOKEN" | npx --yes wrangler@4 secret put SP_EXAMENES_ADMIN_TOKEN --config wrangler.staging.jsonc
+      - name: Set staging Gemini runtime secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STAGING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_STAGING_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_STAGING_API_KEY }}
+        run: printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@4 secret put GEMINI_API_KEY --config wrangler.staging.jsonc
