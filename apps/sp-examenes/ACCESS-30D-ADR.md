@@ -88,3 +88,22 @@ Estas decisiones no se deben inventar ni resolver usando secretos, cuentas o rec
 ## 8. Criterio de aceptación
 
 El Hito 4 solo podrá marcarse terminado cuando el flujo esté implementado en una rama revisable, CI pase, pruebas de seguridad y expiración pasen, y una prueba end-to-end en entorno de prueba demuestre acceso válido y bloqueo tras vencimiento/revocación. Un documento ADR o CI aislado no basta.
+
+## 9. Evidencia adicional del repositorio (revisión 2026-11-07)
+
+La revisión de `main` encontró que AUREA ya contiene un patrón Durable Object con SQLite:
+- `src/conchita-durable-object-execution-result-store.ts`: adaptador y clase Durable Object con almacenamiento SQLite; las mutaciones se serializan por instancia.
+- `src/conchita-durable-object-execution-result-store.test.ts`: prueba de reserva concurrente (16 solicitudes; una sola reserva exitosa).
+- `wrangler.jsonc`: declara `CONCHITA_EXECUTION_STATE`, exporta la clase Durable Object y configura almacenamiento SQLite.
+- `wrangler.ecp.jsonc`: declara Durable Objects para ECP y migración SQLite.
+
+Esto cambia la recomendación: **Durable Objects es el patrón ya utilizado en AUREA y debe evaluarse primero para el control atómico de activación**, antes de introducir D1 o basar la activación únicamente en KV.
+
+Límites de esta evidencia:
+- Los bindings encontrados pertenecen a Conchita/ECP, no a SP EXÁMENES.
+- No demuestra que el namespace esté habilitado o migrado en la cuenta/entorno de SP EXÁMENES.
+- No autoriza compartir el namespace de Conchita con SP EXÁMENES.
+- El código de Durable Object encontrado gestiona reservas de ejecución, no licencias; se requiere un contrato aislado para licencias, hash de códigos, sesiones y revocación.
+- El test usa un adaptador SQL simulado; no demuestra persistencia real desplegada.
+
+Siguiente paso de implementación: definir una clase Durable Object propia de SP EXÁMENES, con aislamiento de namespace y esquema SQLite para licencias/sesiones, y probar operaciones concurrentes con un test realista del runtime Cloudflare antes de enlazarla al Worker.
