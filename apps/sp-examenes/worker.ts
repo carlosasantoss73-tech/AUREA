@@ -2,6 +2,9 @@ import PAGE from "./public/index.html";
 
 import { summarizePdfRetrieval } from "./pdf-retrieval.js";
 import { enforceEvidenceGate } from "./evidence-gate.js";
+import { SpExamenesLicenseDurableObject } from "./licensing.js";
+
+export { SpExamenesLicenseDurableObject } from "./licensing.js";
 
 interface Env {
   GEMINI_API_KEY: string;
@@ -13,6 +16,28 @@ interface Env {
   AZURE_OPENAI_ENDPOINT?: string;
   AZURE_OPENAI_DEPLOYMENT?: string;
   AZURE_OPENAI_API_VERSION?: string;
+}
+
+function getLicenseStub(env: Env) {
+  if (!env.SP_EXAMENES_LICENSES) throw new Error("LICENSE_NAMESPACE_NOT_CONFIGURED");
+  const id = env.SP_EXAMENES_LICENSES.idFromName("sp-examenes-license-authority-v1");
+  return env.SP_EXAMENES_LICENSES.get(id);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function randomToken(bytes = 32): string {
+  const value = crypto.getRandomValues(new Uint8Array(bytes));
+  return Array.from(value, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function readSessionCookie(request: Request): string {
+  const cookie = request.headers.get("cookie") || "";
+  const entry = cookie.split(";").map(part => part.trim()).find(part => part.startsWith("sp_exam_session="));
+  return entry ? decodeURIComponent(entry.slice("sp_exam_session=".length)) : "";
 }
 
 const CORE_SOURCES = [
@@ -74,6 +99,76 @@ async function readOfficialSources(sources: ReadonlyArray<{ title: string; url: 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === "POST" && url.pathname === "/api/admin/licenses") {
+      if (!env.SP_EXAMENES_ADMIN_TOKEN) return Response.json({ error: "Administración no configurada." }, { status: 503 });
+      if (request.headers.get("authorization") !== "Bearer " + env.SP_EXAMENES_ADMIN_TOKEN) {
+        return Response.json({ error: "No autorizado." }, { status: 401 });
+      }
+      try {
+        const code = "SPEX-" + randomToken(24).toUpperCase();
+        const codeHash = await sha256Hex(code);
+        const response = await getLicenseStub(env).fetch("https://license.internal/", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ operation: "create", codeHash, now: Date.now() })
+        });
+        if (!response.ok) return Response.json({ error: "No se pudo crear la licencia." }, { status: 503 });
+        return Response.json({ code, status: "PENDING", delivery: "show_once" }, { status: 201, headers: { "cache-control": "no-store" } });
+      } catch {
+        return Response.json({ error: "Servicio de licencias no disponible." }, { status: 503 });
+      }
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/activate") {
+      let payload: { code?: unknown };
+      try { payload = await request.json() as typeof payload; }
+      catch { return Response.json({ error: "Solicitud inválida." }, { status: 400 }); }
+      const code = typeof payload.code === "string" ? payload.code.trim().toUpperCase() : "";
+      if (!/^SPEX-[A-F0-9]{48}$/.test(code)) return Response.json({ error: "Código inválido." }, { status: 400 });
+      try {
+        const session = randomToken(32);
+        const [codeHash, sessionHash] = await Promise.all([sha256Hex(code), sha256Hex(session)]);
+        const response = await getLicenseStub(env).fetch("https://license.internal/", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ operation: "activate", codeHash, sessionHash, now: Date.now() })
+        });
+        const result = await response.json() as { status?: string; expiresAt?: number };
+        if (!response.ok || result.status !== "ACTIVATED") return Response.json({ error: "Código inválido, ya utilizado o no disponible." }, { status: 409 });
+        const maxAge = Math.max(0, Math.floor(((result.expiresAt || Date.now()) - Date.now()) / 1000));
+        return Response.json({ status: "ACTIVATED", expiresAt: result.expiresAt }, {
+          headers: {
+            "cache-control": "no-store",
+            "set-cookie": "sp_exam_session=" + encodeURIComponent(session) + "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=" + maxAge
+          }
+        });
+      } catch {
+        return Response.json({ error: "Servicio de licencias no disponible." }, { status: 503 });
+      }
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/admin/licenses/revoke") {
+      if (!env.SP_EXAMENES_ADMIN_TOKEN) return Response.json({ error: "Administración no configurada." }, { status: 503 });
+      if (request.headers.get("authorization") !== "Bearer " + env.SP_EXAMENES_ADMIN_TOKEN) {
+        return Response.json({ error: "No autorizado." }, { status: 401 });
+      }
+      let payload: { code?: unknown };
+      try { payload = await request.json() as typeof payload; }
+      catch { return Response.json({ error: "Solicitud inválida." }, { status: 400 }); }
+      const code = typeof payload.code === "string" ? payload.code.trim().toUpperCase() : "";
+      if (!/^SPEX-[A-F0-9]{48}$/.test(code)) return Response.json({ error: "Código inválido." }, { status: 400 });
+      try {
+        const codeHash = await sha256Hex(code);
+        const response = await getLicenseStub(env).fetch("https://license.internal/", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ operation: "revoke", codeHash, now: Date.now() })
+        });
+        if (!response.ok) return Response.json({ error: "No se pudo revocar la licencia." }, { status: 503 });
+        return Response.json({ status: "REVOKED" }, { headers: { "cache-control": "no-store" } });
+      } catch {
+        return Response.json({ error: "Servicio de licencias no disponible." }, { status: 503 });
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({ status: "ok", app: "SP-EXAMENES", version: "0.1-pilot" });
     }
@@ -83,6 +178,24 @@ export default {
     if (request.method !== "POST" || url.pathname !== "/api/answer") {
       return new Response("Not found", { status: 404 });
     }
+    // Every answer request requires a valid, unexpired, non-revoked individual license.
+    // If the DO binding/storage is missing or fails, block before any provider call.
+    const session = readSessionCookie(request);
+    if (!session) return Response.json({ error: "Activa tu licencia para continuar." }, { status: 401 });
+    if (request.headers.get("origin") && request.headers.get("origin") !== url.origin) {
+      return Response.json({ error: "Origen no permitido." }, { status: 403 });
+    }
+    try {
+      const sessionHash = await sha256Hex(session);
+      const licenseResponse = await getLicenseStub(env).fetch("https://license.internal/", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operation: "validate", sessionHash, now: Date.now() })
+      });
+      if (!licenseResponse.ok) return Response.json({ error: "Licencia no válida o vencida." }, { status: 403 });
+    } catch {
+      return Response.json({ error: "No se pudo validar la licencia. Inténtalo más tarde." }, { status: 503 });
+    }
+
     const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
     if (!allowPilotRequest(clientIp)) return Response.json({ error: "Límite temporal del piloto alcanzado. Espera unos minutos antes de intentar de nuevo." }, { status: 429 });
     if (!(request.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
