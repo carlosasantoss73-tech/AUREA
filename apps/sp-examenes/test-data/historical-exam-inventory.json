@@ -1,0 +1,281 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "sp-examenes-precontractual-2026-11-07-historical-partial",
+  "purpose": "Inventario histórico provisional para preparar validación; no constituye banco de preguntas validado.",
+  "exam": {
+    "phase": "precontractual",
+    "date": "2026-11-07",
+    "reported_score": "10/10",
+    "reported_question_count": 25,
+    "certificate_reported": true
+  },
+  "provenance": {
+    "source_type": "resumen recuperado de conversación anterior",
+    "original_exam_file_available": false,
+    "original_question_text_available": false,
+    "original_options_available": false,
+    "legal_answers_independently_verified": false,
+    "warning": "Las letras y fundamentos son registros históricos resumidos, no respuestas certificadas ni cotejadas contra el examen original."
+  },
+  "records": [
+    {
+      "id": "P01",
+      "historical_answer": "C",
+      "topic": "APU",
+      "legal_reference_summary": "art. 264 del Reglamento",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P02",
+      "historical_answer": "A",
+      "topic": "Inalterabilidad",
+      "legal_reference_summary": "art. 46",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P03",
+      "historical_answer": "A",
+      "topic": "Origen local y productor nacional",
+      "legal_reference_summary": "art. 51 LOSNCP",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P04",
+      "historical_answer": "B",
+      "topic": "Mayor beneficio económico",
+      "legal_reference_summary": "art. 248.12",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P05",
+      "historical_answer": null,
+      "historical_candidates": [
+        "A",
+        "C"
+      ],
+      "topic": "No precisado en el resumen",
+      "legal_reference_summary": "art. 103",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "ambiguous_historical_summary",
+      "note": "El resumen previo recomendó A, pero registró ambigüedad entre A y C."
+    },
+    {
+      "id": "P06",
+      "historical_answer": "B",
+      "topic": "Empresa Eléctrica Quito",
+      "legal_reference_summary": "art. 330.1",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P07",
+      "historical_answer": "D",
+      "topic": "Título extranjero",
+      "legal_reference_summary": "art. 40 LOSNCP y art. 162 del Reglamento",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P08",
+      "historical_answer": "D",
+      "topic": "Licitación",
+      "legal_reference_summary": "art. 242",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P09",
+      "historical_answer": "D",
+      "topic": "Tercer nivel",
+      "legal_reference_summary": "art. 40",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P10",
+      "historical_answer": "C",
+      "topic": "Licitación",
+      "legal_reference_summary": "art. 326",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P11",
+      "historical_answer": "C",
+      "topic": "Agrupación de ítems no relacionados",
+      "legal_reference_summary": "art. 258.2",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P12",
+      "historical_answer": "D",
+      "topic": "Indicios fundados",
+      "legal_reference_summary": "art. 431",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P13",
+      "historical_answer": "B",
+      "topic": "Pliego",
+      "legal_reference_summary": "arts. 83–84",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P14",
+      "historical_answer": "B",
+      "topic": "Adjudicatario fallido",
+      "legal_reference_summary": "art. 346",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P15",
+      "historical_answer": "A",
+      "topic": "Inicio de ejecución desde suscripción",
+      "legal_reference_summary": "art. 306",
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "unverified_summary"
+    },
+    {
+      "id": "P16",
+      "historical_answer": "B",
+      "topic": "Concurso",
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "incomplete_low_confidence",
+      "note": "El registro histórico está truncado; no se conserva el detalle del fundamento."
+    },
+    {
+      "id": "P17",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P18",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P19",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P20",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P21",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P22",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P23",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P24",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    },
+    {
+      "id": "P25",
+      "historical_answer": null,
+      "topic": null,
+      "legal_reference_summary": null,
+      "question_text_available": false,
+      "options_available": false,
+      "verification_status": "missing_record"
+    }
+  ],
+  "duplicate_relationships": [
+    {
+      "record": "P16",
+      "relationship": "repeated_question",
+      "related_record": "",
+      "note": "El resumen histórico indica repetición, pero no conserva identificador del original."
+    },
+    {
+      "record": "P19",
+      "relationship": "equivalent_to",
+      "related_record": "P07",
+      "note": "Equivalencia reportada en el resumen; texto original no disponible."
+    },
+    {
+      "record": "P22",
+      "relationship": "repeated_question",
+      "related_record": "P09",
+      "note": "Repetición reportada en el resumen."
+    }
+  ],
+  "validation_rules": [
+    "No generar enunciados ni opciones a partir de resúmenes.",
+    "No tratar historical_answer como respuesta correcta verificada.",
+    "P05 debe permanecer ambiguo hasta cotejo con el original.",
+    "P16 debe permanecer incompleto y de baja confianza.",
+    "P17–P25 deben permanecer marcadas como faltantes.",
+    "Las preguntas sintéticas, si se agregan, deben identificarse explícitamente como synthetic y nunca mezclarse con preguntas reales."
+  ]
+}
