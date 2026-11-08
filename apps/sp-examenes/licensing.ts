@@ -70,7 +70,8 @@ export class SpExamenesLicenseDurableObject {
           return json({ status: "CREATED" }, 201);
         }
         case "activate": {
-          if (!body.codeHash || !body.sessionHash || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
+          if (!body.codeHash || !body.sessionHash || typeof body.now !== "number" || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
+          const now = body.now;
           const activation = this.state.storage.transactionSync(() => {
             const rows = sql.exec(
               "SELECT code_hash, status, expires_at FROM sp_exam_licenses WHERE code_hash = ?",
@@ -78,10 +79,10 @@ export class SpExamenesLicenseDurableObject {
             ).toArray<{ code_hash: string; status: LicenseStatus; expires_at: number | null }>();
             const license = rows[0];
             if (!license || license.status !== "PENDING") return null;
-            const expiresAt = body.now! + 30 * 24 * 60 * 60 * 1000;
+            const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
             sql.exec(
               "UPDATE sp_exam_licenses SET status = 'ACTIVE', activated_at = ?, expires_at = ? WHERE code_hash = ? AND status = 'PENDING'",
-              body.now, expiresAt, body.codeHash
+              now, expiresAt, body.codeHash
             );
             sql.exec(
               "INSERT INTO sp_exam_sessions (session_hash, code_hash, expires_at, revoked_at) VALUES (?, ?, ?, NULL)",
