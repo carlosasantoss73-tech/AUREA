@@ -105,13 +105,36 @@ describe("SP EXÁMENES isolated license Durable Object", () => {
     expect(result.status).toBe(403);
   });
 
-  it("fails closed when storage throws", async () => {
-    const object = new SpExamenesLicenseDurableObject({ storage: { sql: { exec() { throw new Error("disk unavailable"); } } } });
+  it("fails closed when storage throws during validation", async () => {
+    let initialized = 0;
+    const sql = {
+      exec(statement: string) {
+        if (statement.startsWith("CREATE TABLE")) {
+          initialized++;
+          return { toArray: <T>() => [] as T[] };
+        }
+        throw new Error("disk unavailable");
+      }
+    };
+    const object = new SpExamenesLicenseDurableObject({ storage: { sql } });
     const response = await object.fetch(new Request("https://license.internal/", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ operation: "validate", sessionHash: "session", now: 1_800_000_000_000 })
     }));
+    expect(initialized).toBe(2);
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({ status: "BLOCKED" });
+  });
+
+  it("allows exactly one winner when the same license is activated concurrently", async () => {
+    const { call } = createHarness();
+    const now = 1_800_000_000_000;
+    await call({ operation: "create", codeHash: "hash-code", now });
+    const attempts = await Promise.all([
+      call({ operation: "activate", codeHash: "hash-code", sessionHash: "session-one", now }),
+      call({ operation: "activate", codeHash: "hash-code", sessionHash: "session-two", now })
+    ]);
+    expect(attempts.filter(response => response.status === 200)).toHaveLength(1);
+    expect(attempts.filter(response => response.status === 409)).toHaveLength(1);
   });
 });
