@@ -113,3 +113,12 @@ Esta documentación describe el comportamiento propuesto en la rama del PR. No a
 - La URL de staging y los endpoints reales solo se pueden confirmar después de un despliegue exitoso.
 - Antes de habilitar usuarios: probar `/health`, creación de licencia con token administrativo, activación de un solo uso, cookie/sesión, pregunta real con Gemini, citas/fallo seguro, revocación y bloqueo posterior. No considerar probado el vencimiento de 30 días sin una prueba controlada verificable.
 - Este entorno es de prueba; no se debe fusionar ni redirigir a producción como parte de esta preparación.
+
+
+### Preparación previa de Cloudflare (mínimo privilegio)
+
+Antes del primer despliegue, crea manualmente desde el panel de Cloudflare un Worker vacío llamado exactamente `sp-examenes-staging` en la cuenta de staging. No reutilices el Worker `sp-examenes-pilot` ni otro Worker de AUREA.
+
+Después crea un API Token de cuenta limitado al recurso individual `sp-examenes-staging` con rol **Workers Editor**. No concedas Admin global si el Worker ya existe: Cloudflare documenta que desplegar un Worker existente y administrar sus secretos requiere Editor; crear un Worker nuevo requiere Admin a nivel de producto. El Durable Object hereda los permisos del Worker. Guarda el token como `CLOUDFLARE_STAGING_API_TOKEN` y el ID de la cuenta como `CLOUDFLARE_STAGING_ACCOUNT_ID` en GitHub Actions Secrets. Así el workflow no necesita permiso adicional para listar todas las cuentas de Cloudflare.
+
+Completa también `GEMINI_STAGING_API_KEY` y `SP_EXAMENES_STAGING_ADMIN_TOKEN`. Genera este último como secreto aleatorio de al menos 32 bytes en un gestor seguro; no lo pegues en el chat ni en el repositorio. La ejecución predeterminada del workflow solo hace dry-run. El despliegue real exige seleccionar explícitamente `yes`.
