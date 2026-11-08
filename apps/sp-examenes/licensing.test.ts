@@ -56,7 +56,23 @@ function createHarness() {
       throw new Error("UNEXPECTED_SQL: " + statement);
     }
   };
-  const object = new SpExamenesLicenseDurableObject({ storage: { sql } });
+  const storage = {
+    sql,
+    transactionSync<T>(closure: () => T): T {
+      const licenseSnapshot = new Map([...licenses].map(([key, value]) => [key, { ...value }]));
+      const sessionSnapshot = new Map([...sessions].map(([key, value]) => [key, { ...value }]));
+      try {
+        return closure();
+      } catch (error) {
+        licenses.clear();
+        for (const [key, value] of licenseSnapshot) licenses.set(key, value);
+        sessions.clear();
+        for (const [key, value] of sessionSnapshot) sessions.set(key, value);
+        throw error;
+      }
+    }
+  };
+  const object = new SpExamenesLicenseDurableObject({ storage });
   const call = async (body: unknown) => object.fetch(new Request("https://license.internal/", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
   }));
@@ -116,7 +132,9 @@ describe("SP EXÁMENES isolated license Durable Object", () => {
         throw new Error("disk unavailable");
       }
     };
-    const object = new SpExamenesLicenseDurableObject({ storage: { sql } });
+    const object = new SpExamenesLicenseDurableObject({
+      storage: { sql, transactionSync: <T>(closure: () => T): T => closure() }
+    });
     const response = await object.fetch(new Request("https://license.internal/", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ operation: "validate", sessionHash: "session", now: 1_800_000_000_000 })
