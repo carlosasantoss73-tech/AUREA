@@ -47,9 +47,13 @@ function createHarness() {
         }] : [];
         return { toArray: <T>() => row as T[] };
       }
+      if (statement.startsWith("SELECT status FROM sp_exam_licenses")) {
+        const row = licenses.get(String(values[0]));
+        return { toArray: <T>() => (row ? [{ status: row.status }] : []) as T[] };
+      }
       if (statement.startsWith("UPDATE sp_exam_licenses SET status = 'REVOKED'")) {
         const row = licenses.get(String(values[0]));
-        if (row && ["PENDING", "ACTIVE"].includes(row.status)) row.status = "REVOKED";
+        if (row && ["PENDING", "ACTIVE", "EXPIRED"].includes(row.status)) row.status = "REVOKED";
         return { toArray: <T>() => [] as T[] };
       }
       if (statement.startsWith("UPDATE sp_exam_sessions SET revoked_at")) {
@@ -120,9 +124,29 @@ describe("SP EXÁMENES isolated license Durable Object", () => {
     const now = 1_800_000_000_000;
     await call({ operation: "create", codeHash: "hash-code", now });
     await call({ operation: "activate", codeHash: "hash-code", sessionHash: "hash-session", now });
-    await call({ operation: "revoke", codeHash: "hash-code", now: now + 1 });
+    const revoked = await call({ operation: "revoke", codeHash: "hash-code", now: now + 1 });
+    expect(revoked.status).toBe(200);
+    await expect(revoked.json()).resolves.toMatchObject({ status: "REVOKED" });
     const result = await call({ operation: "validate", sessionHash: "hash-session", now: now + 2 });
     expect(result.status).toBe(403);
+  });
+
+  it("returns 404 instead of claiming success when the license does not exist", async () => {
+    const { call } = createHarness();
+    const response = await call({ operation: "revoke", codeHash: "missing-license", now: 1_800_000_000_000 });
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ status: "NOT_FOUND" });
+  });
+
+  it("keeps revocation idempotent for an already revoked license", async () => {
+    const { call } = createHarness();
+    const now = 1_800_000_000_000;
+    await call({ operation: "create", codeHash: "hash-code", now });
+    const first = await call({ operation: "revoke", codeHash: "hash-code", now: now + 1 });
+    const second = await call({ operation: "revoke", codeHash: "hash-code", now: now + 2 });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({ status: "REVOKED" });
   });
 
   it("fails closed when storage throws during validation", async () => {
