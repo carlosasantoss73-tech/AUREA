@@ -99,9 +99,9 @@ jobs:
             -o /tmp/staging-answer.json -w '%{http_code}' \
             -X POST "$STAGING_URL/api/answer" \
             -H 'Content-Type: application/json' \
-            --data '{"question":"Prueba controlada de staging: ¿qué debe hacer el sistema si no puede verificar en una fuente oficial la disposición exacta aplicable? Responde brevemente."}')"
+            --data '{"question":"Prueba controlada de seguridad jurídica: ¿la omisión de incluir o referenciar un manual de fábrica en una oferta para adquirir equipos de sonido es subsanable o insubsanable? Clasifica solo si encuentras una disposición oficial específica que resuelva exactamente este supuesto; si no la encuentras, abstente de clasificar."}')"
           test "$answer_status" = "200"
-          jq -e '(.answer | type == "string") and (.answer | length > 0) and (.answer | contains("NO CONCLUYENTE")) and (.answer | contains("Confianza: baja")) and (.answer | contains("Fuentes oficiales:"))' /tmp/staging-answer.json >/dev/null
+          jq -e '(.answer | type == "string") and (.answer | startswith("Respuesta propuesta:\nNO CONCLUYENTE — no pude verificar la disposición exacta en el contenido oficial consultado.")) and (.answer | contains("Confianza: baja")) and (.answer | contains("Fuentes oficiales:"))' /tmp/staging-answer.json >/dev/null
 
           curl --fail --silent --show-error --max-time 15 \
             -X POST "$STAGING_URL/api/admin/licenses/revoke" \
