@@ -6,6 +6,8 @@ on:
       - 'apps/sp-examenes/**'
       - '.github/workflows/sp-examenes-pilot-check.yml'
       - '.github/workflows/sp-examenes-pilot-deploy.yml'
+      - '.github/workflows/sp-examenes-live-smoke.yml'
+      - '.github/workflows/sp-examenes-staging-live-smoke.yml'
 
 permissions:
   contents: read
