@@ -128,14 +128,22 @@ export class SpExamenesLicenseDurableObject {
         }
         case "revoke": {
           if (!body.codeHash || !Number.isSafeInteger(body.now)) return json({ status: "BLOCKED", reason: "INVALID_REQUEST" }, 400);
-          const result = sql.exec(
-            "UPDATE sp_exam_licenses SET status = 'REVOKED' WHERE code_hash = ? AND status IN ('PENDING','ACTIVE')",
+          const rows = sql.exec(
+            "SELECT status FROM sp_exam_licenses WHERE code_hash = ?",
             body.codeHash
-          );
-          sql.exec(
-            "UPDATE sp_exam_sessions SET revoked_at = ? WHERE code_hash = ? AND revoked_at IS NULL",
-            body.now, body.codeHash
-          );
+          ).toArray<{ status: LicenseStatus }>();
+          const license = rows[0];
+          if (!license) return json({ status: "NOT_FOUND" }, 404);
+          if (license.status !== "REVOKED") {
+            sql.exec(
+              "UPDATE sp_exam_licenses SET status = 'REVOKED' WHERE code_hash = ? AND status IN ('PENDING','ACTIVE','EXPIRED')",
+              body.codeHash
+            );
+            sql.exec(
+              "UPDATE sp_exam_sessions SET revoked_at = ? WHERE code_hash = ? AND revoked_at IS NULL",
+              body.now, body.codeHash
+            );
+          }
           return json({ status: "REVOKED" });
         }
         default:
