@@ -1,0 +1,122 @@
+name: SP Examenes Staging Licensed Live Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: "URL HTTPS exacta del Worker staging desplegado (sin barra final)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sp-examenes-staging-live-smoke
+  cancel-in-progress: false
+
+jobs:
+  licensed-live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate staging URL and admin secret
+        env:
+          STAGING_URL: ${{ inputs.staging_url }}
+          ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$STAGING_URL" =~ ^https://[a-z0-9-]+\.workers\.dev$ ]]; then
+            echo "::error::La URL debe ser el hostname HTTPS del Worker staging en workers.dev, sin ruta ni barra final."
+            exit 1
+          fi
+          if [ -z "$ADMIN_TOKEN" ]; then
+            echo "::error::Falta el secreto SP_EXAMENES_STAGING_ADMIN_TOKEN."
+            exit 1
+          fi
+
+      - name: Verify health, activation, answer authorization and revocation
+        env:
+          STAGING_URL: ${{ inputs.staging_url }}
+          ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=""
+          cookie_jar="$(mktemp)"
+          cleanup() {
+            if [ -n "$code" ]; then
+              curl --silent --show-error --max-time 15 \
+                -X POST "$STAGING_URL/api/admin/licenses/revoke" \
+                -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H 'Content-Type: application/json' \
+                --data "$(jq -nc --arg code "$code" '{code:$code}')" >/dev/null || true
+            fi
+            rm -f "$cookie_jar"
+          }
+          trap cleanup EXIT
+
+          curl --fail --silent --show-error --max-time 15 "$STAGING_URL/health" \
+            | jq -e '.status == "ok" and .app == "SP-EXAMENES"' >/dev/null
+
+          unauth_status="$(curl --silent --show-error --max-time 15 \
+            -o /tmp/no-session.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/answer" \
+            -H 'Content-Type: application/json' \
+            --data '{"question":"Prueba de acceso sin licencia."}')"
+          test "$unauth_status" = "401"
+
+          create_status="$(curl --silent --show-error --max-time 15 \
+            -o /tmp/license-created.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/admin/licenses" \
+            -H "Authorization: Bearer $ADMIN_TOKEN")"
+          test "$create_status" = "201"
+          code="$(jq -er '.code' /tmp/license-created.json)"
+          [[ "$code" =~ ^SPEX-[A-F0-9]{48}$ ]]
+
+          activate_status="$(curl --silent --show-error --max-time 15 \
+            -c "$cookie_jar" -b "$cookie_jar" \
+            -o /tmp/license-activated.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/activate" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg code "$code" '{code:$code}')")"
+          test "$activate_status" = "200"
+          jq -e '.status == "ACTIVATED" and (.expiresAt | type == "number")' /tmp/license-activated.json >/dev/null
+
+          curl --fail --silent --show-error --max-time 15 \
+            -b "$cookie_jar" "$STAGING_URL/api/session/status" \
+            | jq -e '.active == true' >/dev/null
+
+          curl --fail --silent --show-error --max-time 15 \
+            -X POST "$STAGING_URL/api/admin/licenses/status" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg code "$code" '{code:$code}')" \
+            | jq -e '.status == "ACTIVE"' >/dev/null
+
+          answer_status="$(curl --silent --show-error --max-time 115 \
+            -b "$cookie_jar" \
+            -o /tmp/staging-answer.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/answer" \
+            -H 'Content-Type: application/json' \
+            --data '{"question":"Prueba controlada de staging: ¿qué debe hacer el sistema si no puede verificar en una fuente oficial la disposición exacta aplicable? Responde brevemente."}')"
+          test "$answer_status" = "200"
+          jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/staging-answer.json >/dev/null
+
+          curl --fail --silent --show-error --max-time 15 \
+            -X POST "$STAGING_URL/api/admin/licenses/revoke" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg code "$code" '{code:$code}')" \
+            | jq -e '.status == "REVOKED"' >/dev/null
+          code=""
+
+          revoked_status="$(curl --silent --show-error --max-time 15 \
+            -b "$cookie_jar" \
+            -o /tmp/revoked-answer.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/answer" \
+            -H 'Content-Type: application/json' \
+            --data '{"question":"Esta solicitud debe ser bloqueada tras la revocación."}')"
+          test "$revoked_status" = "403"
+
+          echo "STAGING LIVE SMOKE PASSED: health, no-session 401, one-time activation, active session, real answer, revocation and post-revocation 403."
