@@ -7,11 +7,29 @@
   "rules": [
     {
       "type": "Text",
-      "globs": ["**/*.html"],
+      "globs": [
+        "**/*.html"
+      ],
       "fallthrough": false
     }
   ],
   "vars": {
     "SP_EXAMENES_MODEL": "gemini-3.8-flash"
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SP_EXAMENES_LICENSES",
+        "class_name": "SpExamenesLicenseDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-sp-examenes-licenses",
+      "new_sqlite_classes": [
+        "SpExamenesLicenseDurableObject"
+      ]
+    }
+  ]
 }
