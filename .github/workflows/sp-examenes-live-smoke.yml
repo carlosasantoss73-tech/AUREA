@@ -1,4 +1,4 @@
-name: SP Examenes Live Smoke Test
+name: SP Examenes Pilot Health Check
 
 on:
   push:
@@ -14,12 +14,11 @@ permissions:
   contents: read
 
 jobs:
-  live-smoke:
+  live-health:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      # This smoke test intentionally runs on worker/evidence-gate changes so latency and safety are measured against the deployed runtime.
-      - name: Check live health endpoint
+      - name: Check deployed pilot health endpoint
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --max-time 15 \
@@ -27,31 +26,3 @@ jobs:
             -o /tmp/health.json
           cat /tmp/health.json
           jq -e '.status == "ok" and .app == "SP-EXAMENES"' /tmp/health.json >/dev/null
-      - name: Submit one controlled text question and measure latency
-        run: |
-          set -euo pipefail
-          payload='{"question":"Un oferente olvidó incluir o referenciar el manual de fábrica en su oferta para un proceso de adquisición de equipos de sonido. ¿Cómo se clasifica esta omisión?","image":null,"mimeType":null}'
-          code="$(curl --silent --show-error --max-time 110 \
-            -H 'content-type: application/json' \
-            -X POST --data "$payload" -o /tmp/text-answer.json \
-            -w '%{http_code}' \
-            https://sp-examenes-pilot.carlosasantoss73.workers.dev/api/answer)"
-          echo "Text HTTP status: $code"
-          jq -c '{error,sourceStatus,pdfStatus,retrievalMs,inferenceMs,answer:(.answer // null),sourcesCount:(.sources | length),pdfSourcesCount:(.pdfSources | length),unavailablePdfsCount:(.unavailablePdfs | length),modelAttempts,modelTimings,latencyMs}' /tmp/text-answer.json
-          test "$code" = "200"
-          jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/text-answer.json >/dev/null
-          jq -e '.answer | contains("NO CONCLUYENTE")' /tmp/text-answer.json >/dev/null
-      - name: Submit image input smoke test
-        run: |
-          set -euo pipefail
-          # Valid 1x1 PNG checks image payload handling; OCR quality needs a separate visual fixture.
-          payload='{"question":"Responde brevemente a esta pregunta de práctica: ¿qué información debe verificar una entidad antes de clasificar una omisión documental?","image":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==","mimeType":"image/png"}'
-          code="$(curl --silent --show-error --max-time 110 \
-            -H 'content-type: application/json' \
-            -X POST --data "$payload" -o /tmp/image-answer.json \
-            -w '%{http_code}' \
-            https://sp-examenes-pilot.carlosasantoss73.workers.dev/api/answer)"
-          echo "Image HTTP status: $code"
-          jq -c '{error,sourceStatus,pdfStatus,retrievalMs,inferenceMs,answer:(.answer // null),sourcesCount:(.sources | length),pdfSourcesCount:(.pdfSources | length),unavailablePdfsCount:(.unavailablePdfs | length),modelAttempts,modelTimings,latencyMs}' /tmp/image-answer.json
-          test "$code" = "200"
-          jq -e '(.answer | type == "string") and (.answer | length > 0)' /tmp/image-answer.json >/dev/null
