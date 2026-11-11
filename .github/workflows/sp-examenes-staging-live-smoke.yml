@@ -26,7 +26,7 @@ jobs:
           ADMIN_TOKEN: ${{ secrets.SP_EXAMENES_STAGING_ADMIN_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ ! "$STAGING_URL" =~ ^https://[a-z0-9-]+\.workers\.dev$ ]]; then
+          if [[ ! "$STAGING_URL" =~ ^https://([a-z0-9-]+\.)+workers\.dev$ ]]; then
             echo "::error::La URL debe ser el hostname HTTPS del Worker staging en workers.dev, sin ruta ni barra final."
             exit 1
           fi
