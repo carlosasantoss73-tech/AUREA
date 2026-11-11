@@ -191,8 +191,19 @@ export default {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ operation: "status", codeHash, now: Date.now() })
         });
+        if (response.status === 404) {
+          return Response.json({ error: "Licencia no encontrada.", status: "NOT_FOUND" }, {
+            status: 404,
+            headers: { "cache-control": "no-store" }
+          });
+        }
+        if (!response.ok) {
+          return Response.json({ error: "No se pudo consultar el estado de la licencia." }, {
+            status: 503,
+            headers: { "cache-control": "no-store" }
+          });
+        }
         const data = await response.json() as Record<string, unknown>;
-        if (!response.ok) return Response.json({ error: "Licencia no encontrada." }, { status: 404, headers: { "cache-control": "no-store" } });
         return Response.json(data, { headers: { "cache-control": "no-store" } });
       } catch {
         return Response.json({ error: "Servicio de licencias no disponible." }, { status: 503 });
