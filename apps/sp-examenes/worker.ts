@@ -215,6 +215,12 @@ export default {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ operation: "revoke", codeHash, now: Date.now() })
         });
+        if (response.status === 404) {
+          return Response.json({ error: "Licencia no encontrada.", status: "NOT_FOUND" }, {
+            status: 404,
+            headers: { "cache-control": "no-store" }
+          });
+        }
         if (!response.ok) return Response.json({ error: "No se pudo revocar la licencia." }, { status: 503 });
         return Response.json({ status: "REVOKED" }, { headers: { "cache-control": "no-store" } });
       } catch {
