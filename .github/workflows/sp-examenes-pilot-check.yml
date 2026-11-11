@@ -73,6 +73,13 @@ jobs:
           test -n "$cookie"
           curl -fsS http://127.0.0.1:8787/api/session/status -H "Cookie: $cookie" | jq -e '.active == true' >/dev/null
           curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses/status -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')" | jq -e '.status == "ACTIVE"' >/dev/null
+          missing_code="SPEX-000000000000000000000000000000000000000000000000"
+          missing_status_code="$(curl -sS -o /tmp/sp-exam-missing-status.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/admin/licenses/status -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$missing_code" '{code:$code}')")"
+          test "$missing_status_code" = "404"
+          jq -e '.status == "NOT_FOUND"' /tmp/sp-exam-missing-status.json >/dev/null
+          missing_revoke_code="$(curl -sS -o /tmp/sp-exam-missing-revoke.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/admin/licenses/revoke -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$missing_code" '{code:$code}')")"
+          test "$missing_revoke_code" = "404"
+          jq -e '.status == "NOT_FOUND"' /tmp/sp-exam-missing-revoke.json >/dev/null
           valid_answer_code="$(curl -sS -o /tmp/sp-exam-valid-answer.json -w '%{http_code}' -X POST http://127.0.0.1:8787/api/answer -H "Cookie: $cookie" -H 'Content-Type: application/json' -d '{"question":"smoke test"}')"
           test "$valid_answer_code" = "503"
           curl -fsS -X POST http://127.0.0.1:8787/api/admin/licenses/revoke -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' -d "$(jq -nc --arg code "$code" '{code:$code}')" | jq -e '.status == "REVOKED"' >/dev/null
