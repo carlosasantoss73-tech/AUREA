@@ -13,14 +13,46 @@ label{display:block;font-weight:650;margin-bottom:8px}textarea{width:100%;min-he
 </style></head>
 <body><header><div class="wrap"><h1>SP EXÁMENES</h1><p>Práctica guiada · Contratación pública del Ecuador</p></div></header>
 <main>
-<section class="panel"><label for="question">Escribe la pregunta del examen</label><textarea id="question" maxlength="6000" placeholder="Pega aquí la pregunta y sus opciones. También puedes adjuntar una fotografía."></textarea>
+<section class="panel" id="activation-panel">
+<h2>Activar acceso</h2>
+<p class="notice">Ingresa el código individual que recibiste después de confirmar tu compra. La vigencia de 30 días comienza al activarlo.</p>
+<label for="license-code">Código de acceso</label>
+<input id="license-code" type="text" autocomplete="one-time-code" maxlength="53" placeholder="SPEX-…"
+style="width:100%;border:1px solid #b8c3d2;border-radius:10px;padding:12px;font:inherit;text-transform:uppercase">
+<div class="actions"><button id="activate">Activar acceso</button></div>
+<div id="activation-status" class="status" role="status"></div>
+</section>
+<section class="panel" id="exam-panel" hidden><label for="question">Escribe la pregunta del examen</label><textarea id="question" maxlength="6000" placeholder="Pega aquí la pregunta y sus opciones. También puedes adjuntar una fotografía."></textarea>
 <div class="actions"><label class="filebutton" for="photo">Adjuntar foto</label><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" hidden><button id="send">Analizar pregunta</button></div>
 <img id="preview" class="preview" alt="Vista previa de la pregunta adjunta"><div class="small">Imagen JPG, PNG o WebP; máximo 4 MB. No adjuntes cédulas ni datos personales.</div><div id="status" class="status" role="status"></div></section>
 <section class="panel" id="result-panel" hidden><h2>Respuesta</h2><div id="answer"></div><div class="sources" id="sources"></div></section>
 <section class="panel"><h3>Cómo responde</h3><p class="notice">Consulta fuentes oficiales disponibles en ese momento. Si no puede verificar el fundamento, debe indicarlo y no inventar artículos. Esta herramienta es para práctica y estudio; no sustituye la revisión de la norma ni está diseñada para responder por ti una evaluación oficial activa.</p><p class="notice">Piloto de prueba. La consulta de páginas oficiales no garantiza que todos los PDF o reformas hayan podido leerse en cada pregunta.</p></section>
 </main>
 <script>
+const activationPanel=document.querySelector('#activation-panel'),examPanel=document.querySelector('#exam-panel'),licenseCode=document.querySelector('#license-code'),activate=document.querySelector('#activate'),activationStatus=document.querySelector('#activation-status');
 const question=document.querySelector('#question'),photo=document.querySelector('#photo'),preview=document.querySelector('#preview'),send=document.querySelector('#send'),status=document.querySelector('#status'),panel=document.querySelector('#result-panel'),answer=document.querySelector('#answer'),sources=document.querySelector('#sources');
+function setAccess(active,expiresAt){
+  activationPanel.hidden=active;examPanel.hidden=!active;
+  if(active&&expiresAt){status.textContent='Acceso activo hasta '+new Date(expiresAt).toLocaleString('es-EC')+'.';}
+}
+async function checkAccess(){
+  try{const res=await fetch('/api/session/status',{cache:'no-store'});const data=await res.json();setAccess(res.ok&&data.active,data.expiresAt);}
+  catch{activationStatus.textContent='No se pudo comprobar el acceso. Verifica tu conexión e inténtalo de nuevo.';}
+}
+activate.addEventListener('click',async()=>{
+  const code=licenseCode.value.trim().toUpperCase();
+  if(!code){activationStatus.textContent='Ingresa tu código de acceso.';return;}
+  activate.disabled=true;activationStatus.textContent='Validando y activando tu licencia…';
+  try{
+    const res=await fetch('/api/activate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'No se pudo activar el código.');
+    licenseCode.value='';setAccess(true,data.expiresAt);
+    activationStatus.textContent='Acceso activado correctamente.';
+  }catch(e){activationStatus.textContent=e instanceof Error?e.message:'No se pudo activar el acceso.';}
+  finally{activate.disabled=false;}
+});
+checkAccess();
 const uploadArea=document.querySelector('main .panel');
 let imageData=null,imageMime=null,processingImage=false;
 function appendInline(parent,text){
