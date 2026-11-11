@@ -107,7 +107,7 @@ Esta documentación describe el comportamiento propuesto en la rama del PR. No a
 
 - La configuración `wrangler.staging.jsonc` declara un Worker independiente llamado `sp-examenes-staging`.
 - Su Durable Object SQLite se crea bajo el script de staging con una etiqueta de migración propia: `v1-sp-examenes-staging-licenses`. No reutiliza el nombre del Worker ni la etiqueta de migración del piloto.
-- El workflow `.github/workflows/sp-examenes-staging-deploy.yml` solo admite ejecución manual (`workflow_dispatch`) y fija la rama `feat/sp-examenes-staging-isolation`; no se ejecuta por push a `main`.
+- El workflow `.github/workflows/sp-examenes-staging-deploy.yml` solo admite ejecución manual (`workflow_dispatch`) y fija la rama `integration/sp-examenes-licenses-main-2026-11-11`; no se ejecuta por push a `main`.
 - Requiere secretos GitHub Actions dedicados: `CLOUDFLARE_STAGING_API_TOKEN`, `CLOUDFLARE_STAGING_ACCOUNT_ID`, `GEMINI_STAGING_API_KEY` y `SP_EXAMENES_STAGING_ADMIN_TOKEN`. No reutilizar secretos de producción/pilot ni pegarlos en el chat.
 - El token Cloudflare debe limitarse a la cuenta y permisos mínimos para desplegar Workers y gestionar sus secretos/recursos Durable Objects.
 - La URL de staging y los endpoints reales solo se pueden confirmar después de un despliegue exitoso.
